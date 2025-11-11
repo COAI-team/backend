@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="kr.or.kosa.backend.freeboard.mapper.FreeboardMapper">
+
+    <!-- 전체 목록 -->
+    <select id="selectAll" resultType="kr.or.kosa.backend.freeboard.dto.Freeboard">
+        SELECT * FROM FREEBOARD
+        WHERE FREEBOARD_DELETED_YN = 'N'
+        ORDER BY FREEBOARD_ID DESC
+    </select>
+
+    <!-- 게시글 단건 조회 -->
+    <select id="selectById" parameterType="long" resultType="kr.or.kosa.backend.freeboard.dto.Freeboard">
+        SELECT * FROM FREEBOARD WHERE FREEBOARD_ID = #{id}
+    </select>
+
+    <!-- 새 글 등록 -->
+    <insert id="insert" parameterType="kr.or.kosa.backend.freeboard.dto.Freeboard" useGeneratedKeys="true" keyProperty="freeboardId">
+        INSERT INTO FREEBOARD (
+        USER_ID, FREEBOARD_TITLE, FREEBOARD_CONTENT, FREEBOARD_CLICK,
+        FREEBOARD_IMAGE, FREEBOARD_REPRESENT_IMAGE, FREEBOARD_CREATED_AT, FREEBOARD_DELETED_YN
+        ) VALUES (
+        #{userId}, #{freeboardTitle}, #{freeboardContent}, 0,
+        #{freeboardImage}, #{freeboardRepresentImage}, NOW(), 'N'
+        )
+    </insert>
+
+    <!-- 수정 -->
+    <update id="update" parameterType="kr.or.kosa.backend.freeboard.dto.Freeboard">
+        UPDATE FREEBOARD
+        SET
+        FREEBOARD_TITLE = #{freeboardTitle},
+        FREEBOARD_CONTENT = #{freeboardContent},
+        FREEBOARD_IMAGE = #{freeboardImage},
+        FREEBOARD_REPRESENT_IMAGE = #{freeboardRepresentImage}
+        WHERE FREEBOARD_ID = #{freeboardId}
+    </update>
+
+    <!-- 삭제 (soft delete) -->
+    <update id="delete" parameterType="long">
+        UPDATE FREEBOARD
+        SET FREEBOARD_DELETED_YN = 'Y'
+        WHERE FREEBOARD_ID = #{id}
+    </update>
+
+</mapper>

@@ -25,13 +25,23 @@ repositories {
 }
 
 dependencies {
+    // --- Spring Boot 기본 웹 ---
     implementation 'org.springframework.boot:spring-boot-starter-web'
-    compileOnly 'org.projectlombok:lombok'
-    developmentOnly 'org.springframework.boot:spring-boot-devtools'
+
+    // --- MyBatis ---
+    implementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter:3.0.3'
+
+    // --- Database (MySQL) ---
     runtimeOnly 'com.mysql:mysql-connector-j'
-    runtimeOnly 'org.mariadb.jdbc:mariadb-java-client'
-    runtimeOnly 'org.postgresql:postgresql'
+
+    // --- Lombok ---
+    compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
+
+    // --- 개발 편의 ---
+    developmentOnly 'org.springframework.boot:spring-boot-devtools'
+
+    // --- 테스트 ---
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
