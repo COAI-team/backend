@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="kr.or.kosa.backend.freeboard.mapper.FreeboardMapper">
+
+    <!-- 게시글 목록 (페이징) -->
+    <select id="selectPage" resultType="kr.or.kosa.backend.freeboard.domain.Freeboard">
+        SELECT
+        freeboard_id,
+        user_id,
+        freeboard_title,
+        freeboard_content,
+        freeboard_click,
+        freeboard_image,
+        freeboard_represent_image,
+        freeboard_created_at,
+        freeboard_deleted_yn
+        FROM freeboard
+        WHERE freeboard_deleted_yn = 'N'
+        ORDER BY freeboard_id DESC
+        LIMIT #{size} OFFSET #{offset}
+    </select>
+
+    <!-- 상세 조회 -->
+    <select id="selectById" parameterType="long" resultType="kr.or.kosa.backend.freeboard.domain.Freeboard">
+        SELECT
+        freeboard_id,
+        user_id,
+        freeboard_title,
+        freeboard_content,
+        freeboard_click,
+        freeboard_image,
+        freeboard_represent_image,
+        freeboard_created_at,
+        freeboard_deleted_yn
+        FROM freeboard
+        WHERE freeboard_id = #{id}
+        AND freeboard_deleted_yn = 'N'
+    </select>
+
+    <!-- 등록 -->
+    <insert id="insert" parameterType="kr.or.kosa.backend.freeboard.domain.Freeboard"
+            useGeneratedKeys="true" keyProperty="freeboardId">
+        INSERT INTO freeboard (
+        user_id,
+        freeboard_title,
+        freeboard_content,
+        freeboard_click,
+        freeboard_image,
+        freeboard_represent_image,
+        freeboard_created_at,
+        freeboard_deleted_yn
+        ) VALUES (
+        #{userId},
+        #{freeboardTitle},
+        #{freeboardContent},
+        0,
+        #{freeboardImage},
+        #{freeboardRepresentImage},
+        NOW(),
+        'N'
+        )
+    </insert>
+
+    <!-- 수정 -->
+    <update id="update" parameterType="kr.or.kosa.backend.freeboard.domain.Freeboard">
+        UPDATE freeboard
+        SET
+        freeboard_title = #{freeboardTitle},
+        freeboard_content = #{freeboardContent},
+        freeboard_image = #{freeboardImage},
+        freeboard_represent_image = #{freeboardRepresentImage}
+        WHERE freeboard_id = #{freeboardId}
+        AND freeboard_deleted_yn = 'N'
+    </update>
+
+    <!-- 삭제 -->
+    <update id="delete" parameterType="long">
+        UPDATE freeboard
+        SET freeboard_deleted_yn = 'Y'
+        WHERE freeboard_id = #{id}
+    </update>
+
+    <!-- 조회수 증가 -->
+    <update id="increaseClick" parameterType="long">
+        UPDATE freeboard
+        SET freeboard_click = freeboard_click + 1
+        WHERE freeboard_id = #{id}
+    </update>
+
+    <!-- 전체 게시글 수 -->
+    <select id="countAll" resultType="int">
+        SELECT COUNT(*)
+        FROM freeboard
+        WHERE freeboard_deleted_yn = 'N'
+    </select>
+
+</mapper>

@@ -1,51 +1,50 @@
 package kr.or.kosa.backend.freeboard.controller;
 
-import kr.or.kosa.backend.freeboard.dto.Freeboard;
-import kr.or.kosa.backend.freeboard.service.FreeboardService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
-
 import java.util.List;
+import java.util.Map;
+
+import kr.or.kosa.backend.freeboard.domain.Freeboard;
+import kr.or.kosa.backend.freeboard.service.FreeboardService;
 
 @RestController
-@RequestMapping("/api/freeboard")
 @RequiredArgsConstructor
+@RequestMapping("/api/freeboard")
 public class FreeboardController {
 
     private final FreeboardService service;
 
-    // 전체 조회
-    @GetMapping
-    public List<Freeboard> list() {
-        return service.getAll();
+    // 페이징 게시글 목록
+    @GetMapping("/list")
+    public Map<String, Object> list(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size
+    ) {
+        return service.listPage(page, size);
     }
 
-    // 단건 조회
+    // 게시글 상세 보기
     @GetMapping("/{id}")
     public Freeboard detail(@PathVariable Long id) {
-        return service.getById(id);
+        return service.detail(id);
     }
 
-    // 등록
+    // 게시글 작성
     @PostMapping
-    public String create(@RequestBody Freeboard board) {
-        service.create(board);
-        return "등록 성공";
+    public void write(@RequestBody Freeboard board) {
+        service.write(board);
     }
 
-    // 수정
-    @PutMapping("/{id}")
-    public String update(@PathVariable Long id, @RequestBody Freeboard board) {
-        board.setFreeboardId(id);
-        service.update(board);
-        return "수정 성공";
+    // 게시글 수정
+    @PutMapping
+    public void edit(@RequestBody Freeboard board) {
+        service.edit(board);
     }
 
-    // 삭제 (soft delete)
+    // 게시글 삭제
     @DeleteMapping("/{id}")
-    public String delete(@PathVariable Long id) {
+    public void delete(@PathVariable Long id) {
         service.delete(id);
-        return "삭제 성공";
     }
 }
-

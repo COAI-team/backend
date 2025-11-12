@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="kr.or.kosa.backend.freeComment.mapper.FreeCommentMapper">
+
+    <!-- 특정 게시글의 댓글 목록 -->
+    <select id="findByBoardId" resultType="kr.or.kosa.backend.freeComment.domain.FreeComment">
+        SELECT
+        free_comment_id,
+        freeboard_id,
+        free_comment_parent_id,
+        user_id,
+        free_comment_content,
+        free_comment_created_at,
+        free_comment_deleted_yn
+        FROM free_comment
+        WHERE freeboard_id = #{freeboardId}
+        ORDER BY
+        CASE
+        WHEN free_comment_parent_id IS NULL THEN free_comment_id
+        ELSE free_comment_parent_id
+        END ASC,
+        free_comment_created_at ASC
+    </select>
+
+    <!-- 댓글 등록 -->
+    <insert id="insertComment" parameterType="kr.or.kosa.backend.freeComment.domain.FreeComment"
+            useGeneratedKeys="true" keyProperty="freeCommentId">
+        INSERT INTO free_comment (
+        freeboard_id,
+        free_comment_parent_id,
+        user_id,
+        free_comment_content,
+        free_comment_created_at,
+        free_comment_deleted_yn
+        ) VALUES (
+        #{freeboardId},
+        #{freeCommentParentId},
+        #{userId},
+        #{freeCommentContent},
+        NOW(),
+        'N'
+        )
+    </insert>
+
+    <!-- 댓글 수정 -->
+    <update id="updateComment" parameterType="kr.or.kosa.backend.freeComment.domain.FreeComment">
+        UPDATE free_comment
+        SET free_comment_content = #{freeCommentContent}
+        WHERE free_comment_id = #{freeCommentId}
+        AND free_comment_deleted_yn = 'N'
+    </update>
+
+    <!-- 댓글 삭제 (소프트 삭제) -->
+    <update id="deleteComment" parameterType="long">
+        UPDATE free_comment
+        SET free_comment_deleted_yn = 'Y'
+        WHERE free_comment_id = #{freeCommentId}
+    </update>
+
+</mapper>

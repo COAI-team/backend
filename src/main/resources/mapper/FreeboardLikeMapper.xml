@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="kr.or.kosa.backend.freeboardLike.mapper.FreeboardLikeMapper">
+
+    <!-- 좋아요 수 -->
+    <select id="countByBoardId" resultType="int">
+        SELECT COUNT(*)
+        FROM freeboard_like
+        WHERE freeboard_id = #{freeboardId}
+    </select>
+
+    <!-- 좋아요 여부 확인 -->
+    <select id="exists" resultType="int">
+        SELECT 1
+        FROM freeboard_like
+        WHERE freeboard_id = #{freeboardId}
+          AND user_id = #{userId}
+        LIMIT 1
+    </select>
+
+    <!-- 좋아요 추가 -->
+    <insert id="insertLike">
+        INSERT INTO freeboard_like (freeboard_id, user_id)
+        VALUES (#{freeboardId}, #{userId})
+    </insert>
+
+    <!-- 좋아요 취소 -->
+    <delete id="deleteLike">
+        DELETE FROM freeboard_like
+        WHERE freeboard_id = #{freeboardId}
+          AND user_id = #{userId}
+    </delete>
+
+</mapper>

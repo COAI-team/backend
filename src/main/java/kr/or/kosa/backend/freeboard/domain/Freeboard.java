@@ -1,4 +1,4 @@
-package kr.or.kosa.backend.freeboard.dto;
+package kr.or.kosa.backend.freeboard.domain;
 
 import lombok.Data;
 import java.time.LocalDateTime;
