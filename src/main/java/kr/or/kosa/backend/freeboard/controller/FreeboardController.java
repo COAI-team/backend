@@ -2,7 +2,6 @@ package kr.or.kosa.backend.freeboard.controller;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
-import java.util.List;
 import java.util.Map;
 
 import kr.or.kosa.backend.freeboard.domain.Freeboard;

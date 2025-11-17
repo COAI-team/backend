@@ -41,6 +41,9 @@ dependencies {
     // --- 개발 편의 ---
     developmentOnly 'org.springframework.boot:spring-boot-devtools'
 
+    // --- 이미지 저장소 ---
+    implementation 'com.cloudinary:cloudinary-http44:1.34.0'
+
     // --- 테스트 ---
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
