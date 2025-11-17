@@ -32,7 +32,7 @@ public class SecurityConfig {
                 )
 
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/users/register", "/users/login").permitAll()  // 회원가입/로그인 허용
+                        .requestMatchers("/users/register", "/users/login", "/email/**").permitAll()  // 회원가입/로그인 허용
                         .anyRequest().authenticated()  // 나머지는 인증 필요
                 );
 

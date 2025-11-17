@@ -8,6 +8,9 @@ public enum ErrorCode {
     EMAIL_DUPLICATE(400, "이미 사용 중인 이메일입니다."),
     NICKNAME_DUPLICATE(400, "이미 사용 중인 닉네임입니다."),
 
+    EMAIL_NOT_VERIFIED(400, "이메일 인증이 완료되지 않았습니다."),
+    INVALID_VERIFICATION_CODE(400, "인증 코드가 일치하지 않습니다."),
+
     INVALID_IMAGE_SIZE(400, "이미지 크기는 5MB 이하만 업로드할 수 있습니다."),
     INVALID_IMAGE_EXTENSION(400, "이미지 파일은 JPEG 또는 PNG 형식만 허용됩니다."),
     INVALID_IMAGE_FILE(400, "손상되었거나 올바르지 않은 이미지 파일입니다."),

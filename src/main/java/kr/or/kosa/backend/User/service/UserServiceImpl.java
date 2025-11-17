@@ -28,7 +28,7 @@ public class UserServiceImpl implements UserService {
 
     private final UserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
-//    private final EmailVerificationService emailVerificationService;
+    private final EmailVerificationService emailVerificationService;
 
     @Value("${file.upload-dir}")
     private String uploadDir;
@@ -41,9 +41,9 @@ public class UserServiceImpl implements UserService {
         }
 
         // 🔥 1) 이메일 인증 여부 확인 (여기가 핵심)
-//        if (!emailVerificationService.isVerified(dto.getEmail())) {
-//            throw new CustomException(ErrorCode.EMAIL_NOT_VERIFIED);
-//        }
+        if (!emailVerificationService.isVerified(dto.getEmail())) {
+            throw new CustomException(ErrorCode.EMAIL_NOT_VERIFIED);
+        }
 
         // 🔥 2) 이메일 중복 체크
         if (userMapper.findByEmail(dto.getEmail()) != null) {
@@ -62,7 +62,7 @@ public class UserServiceImpl implements UserService {
         user.setName(dto.getName());
         user.setNickname(dto.getNickname());
         user.setImage(null);
-        user.setEnabled(true);  // ⭐ 회원가입 중 인증 완료이므로 true
+        user.setEnabled(true);
 
         userMapper.insertUser(user);
         int userId = user.getId();

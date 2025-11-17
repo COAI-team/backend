@@ -27,6 +27,7 @@ repositories {
 dependencies {
     // --- Spring Boot 기본 웹 ---
     implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-mail'
 
     // --- Spring Security 추가 ---
     implementation 'org.springframework.boot:spring-boot-starter-security'
