@@ -1,9 +1,6 @@
 package kr.or.kosa.backend.user.service;
 
-import kr.or.kosa.backend.user.dto.UserLoginResponseDto;
-import kr.or.kosa.backend.user.dto.UserRegisterRequestDto;
-import kr.or.kosa.backend.user.dto.UserLoginRequestDto;
-import kr.or.kosa.backend.user.dto.UserResponseDto;
+import kr.or.kosa.backend.user.dto.*;
 import org.springframework.web.multipart.MultipartFile;
 
 public interface UserService {
@@ -12,9 +9,14 @@ public interface UserService {
 
     UserLoginResponseDto login(UserLoginRequestDto dto);
 
-    String refresh(String bearerToken);
+    String refresh(String token);
 
-    void logout(String bearerToken);
+    void logout(String token);
 
     UserResponseDto getById(Integer id);
+
+    void sendPasswordResetLink(String email);
+
+    void resetPassword(PasswordResetConfirmDto dto);
 }
+

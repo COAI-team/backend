@@ -18,56 +18,62 @@ import java.util.Map;
 public class UserController {
 
     private final UserService userService;
+    
+    private static final String KEY_SUCCESS = "success";
+    private static final String KEY_MESSAGE = "message";
 
-    // ============================
-    // 회원가입
-    // ============================
     @PostMapping(value = "/register", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<?> register(
+    public ResponseEntity<Map<String, Object>> register(
             @Valid @ModelAttribute UserRegisterRequestDto dto,
             @RequestPart(value = "image", required = false) MultipartFile image
     ) {
         int userId = userService.register(dto, image);
 
         return ResponseEntity.ok(Map.of(
-                "success", true,
-                "message", "회원가입이 완료되었습니다.",
+                KEY_SUCCESS, true,
+                KEY_MESSAGE, "회원가입이 완료되었습니다.",
                 "userId", userId
         ));
     }
 
-    // ============================
-    // 로그인 (JWT 발급)
-    // ============================
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody UserLoginRequestDto dto) {
+    public ResponseEntity<UserLoginResponseDto> login(@RequestBody UserLoginRequestDto dto) {
         UserLoginResponseDto response = userService.login(dto);
         return ResponseEntity.ok(response);
     }
 
-    // ============================
-    // 액세스 토큰 재발급
-    // ============================
     @PostMapping("/refresh")
-    public ResponseEntity<?> refresh(@RequestHeader("Authorization") String token) {
+    public ResponseEntity<Map<String, String>> refresh(@RequestHeader("Authorization") String token) {
         String newAccessToken = userService.refresh(token);
         return ResponseEntity.ok(Map.of("accessToken", newAccessToken));
     }
 
-    // ============================
-    // 로그아웃 (Refresh Token 제거)
-    // ============================
     @PostMapping("/logout")
-    public ResponseEntity<?> logout(@RequestHeader("Authorization") String token) {
+    public ResponseEntity<Map<String, Object>> logout(@RequestHeader("Authorization") String token) {
         userService.logout(token);
-        return ResponseEntity.ok(Map.of("success", true, "message", "로그아웃 완료"));
+        return ResponseEntity.ok(Map.of(
+                KEY_SUCCESS, true,
+                KEY_MESSAGE, "로그아웃 완료"
+        ));
     }
 
-    // ============================
-    // 사용자 조회
-    // ============================
     @GetMapping("/{id}")
-    public ResponseEntity<?> getUser(@PathVariable Integer id) {
+    public ResponseEntity<UserResponseDto> getUser(@PathVariable Integer id) {
         return ResponseEntity.ok(userService.getById(id));
+    }
+
+    @PostMapping("/password/reset/request")
+    public ResponseEntity<Map<String, Boolean>> requestPasswordReset(@RequestBody Map<String, String> body) {
+        userService.sendPasswordResetLink(body.get("email"));
+        return ResponseEntity.ok(Map.of(KEY_SUCCESS, true));
+    }
+
+    @PostMapping("/password/reset/confirm")
+    public ResponseEntity<Map<String, Object>> confirmPasswordReset(@RequestBody PasswordResetConfirmDto dto) {
+        userService.resetPassword(dto);
+        return ResponseEntity.ok(Map.of(
+                KEY_SUCCESS, true,
+                KEY_MESSAGE, "비밀번호가 변경되었습니다."
+        ));
     }
 }

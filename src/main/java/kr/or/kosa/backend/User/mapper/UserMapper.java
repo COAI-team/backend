@@ -28,4 +28,9 @@ public interface UserMapper {
             @Param("id") int id,
             @Param("token") String token
     );
+
+    void updatePassword(
+            @Param("id") int id,
+            @Param("password") String password
+    );
 }

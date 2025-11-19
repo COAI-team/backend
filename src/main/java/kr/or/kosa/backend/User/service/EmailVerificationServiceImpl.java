@@ -46,17 +46,15 @@ public class EmailVerificationServiceImpl implements EmailVerificationService {
         String key = "email:verify:" + email;
         String savedCode = redisTemplate.opsForValue().get(key);
 
-        // 존재하지 않음(없거나 TTL 만료)
         if (savedCode == null) {
             return false;
         }
 
-        // 코드 일치 여부 확인
         if (!savedCode.equals(requestCode)) {
             return false;
         }
 
-        // 인증 완료 → Redis에서 제거
+        // 인증 성공 → Redis에서 제거
         redisTemplate.delete(key);
 
         return true;
@@ -64,8 +62,12 @@ public class EmailVerificationServiceImpl implements EmailVerificationService {
 
     @Override
     public boolean isVerified(String email) {
-        // 인증 여부가 필요하다면 별도 저장 가능
-        // 현재는 verifyCode() 자체가 인증 여부 판단
+        // 현재 구조에서는 verifyCode() 자체가 인증 여부 판단
         return false;
+    }
+
+    @Override
+    public void send(String to, String subject, String text) {
+        emailSender.sendEmail(to, subject, text);
     }
 }

@@ -25,6 +25,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
     private final JwtProvider jwtProvider;
+
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
@@ -44,10 +45,14 @@ public class SecurityConfig {
                                 "/users/login",
                                 "/users/register",
                                 "/users/refresh",
+                                "/users/password/reset/request",
+                                "/users/password/reset/confirm",
                                 "/email/**"
                         ).permitAll()
+
                         .anyRequest().authenticated()
                 )
+
                 .addFilterBefore(
                         new JwtAuthenticationFilter(jwtProvider),
                         UsernamePasswordAuthenticationFilter.class

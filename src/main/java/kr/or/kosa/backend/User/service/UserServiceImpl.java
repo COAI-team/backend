@@ -214,4 +214,54 @@ public class UserServiceImpl implements UserService {
         dto.setEnabled(user.getEnabled());
         return dto;
     }
+
+    @Override
+    public void sendPasswordResetLink(String email) {
+
+        User user = userMapper.findByEmail(email);
+        if (user == null) {
+            throw new CustomException(ErrorCode.USER_NOT_FOUND);
+        }
+
+        // 비밀번호 재설정 토큰 생성 (UUID)
+        String token = UUID.randomUUID().toString();
+
+        String redisKey = "reset:token:" + token;
+        redisTemplate.opsForValue().set(redisKey, email, 30, TimeUnit.MINUTES);
+
+        // 프론트엔드의 비밀번호 재설정 페이지 URL
+        String resetLink = "https://your-frontend.com/reset-password?token=" + token;
+
+        // 이메일 보내기
+        emailVerificationService.send(
+                email,
+                "[서비스명] 비밀번호 재설정",
+                "아래 링크를 클릭하여 비밀번호를 재설정하세요.\n" +
+                        resetLink + "\n" +
+                        "링크는 30분 동안만 유효합니다."
+        );
+    }
+
+    @Override
+    public void resetPassword(PasswordResetConfirmDto dto) {
+
+        String redisKey = "reset:token:" + dto.getToken();
+        String email = redisTemplate.opsForValue().get(redisKey);
+
+        if (email == null) {
+            throw new CustomException(ErrorCode.INVALID_OR_EXPIRED_TOKEN);
+        }
+
+        User user = userMapper.findByEmail(email);
+        if (user == null) {
+            throw new CustomException(ErrorCode.USER_NOT_FOUND);
+        }
+
+        // 비밀번호 암호화 후 저장
+        String encPassword = passwordEncoder.encode(dto.getNewPassword());
+        userMapper.updatePassword(user.getId(), encPassword);
+
+        // 토큰 삭제
+        redisTemplate.delete(redisKey);
+    }
 }

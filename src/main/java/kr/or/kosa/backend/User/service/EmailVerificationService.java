@@ -10,4 +10,6 @@ public interface EmailVerificationService {
 
     /** 인증 체크 */
     boolean isVerified(String email);
+
+    void send(String to, String subject, String text);
 }
