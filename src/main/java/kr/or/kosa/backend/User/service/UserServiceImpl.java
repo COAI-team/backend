@@ -1,10 +1,11 @@
 package kr.or.kosa.backend.user.service;
 
-import kr.or.kosa.backend.exception.CustomException;
-import kr.or.kosa.backend.exception.ErrorCode;
+
+import kr.or.kosa.backend.commons.exception.custom.CustomBusinessException;
 import kr.or.kosa.backend.security.jwt.JwtProvider;
 import kr.or.kosa.backend.user.domain.User;
 import kr.or.kosa.backend.user.dto.*;
+import kr.or.kosa.backend.user.exception.UserErrorCode;
 import kr.or.kosa.backend.user.mapper.UserMapper;
 
 import lombok.RequiredArgsConstructor;
@@ -49,15 +50,15 @@ public class UserServiceImpl implements UserService {
         }
 
         if (!emailVerificationService.isVerified(dto.getEmail())) {
-            throw new CustomException(ErrorCode.EMAIL_NOT_VERIFIED);
+            throw new CustomBusinessException(UserErrorCode.EMAIL_NOT_VERIFIED);
         }
 
         if (userMapper.findByEmail(dto.getEmail()) != null) {
-            throw new CustomException(ErrorCode.EMAIL_DUPLICATE);
+            throw new CustomBusinessException(UserErrorCode.EMAIL_DUPLICATE);
         }
 
         if (userMapper.findByNickname(dto.getNickname()) != null) {
-            throw new CustomException(ErrorCode.NICKNAME_DUPLICATE);
+            throw new CustomBusinessException(UserErrorCode.NICKNAME_DUPLICATE);
         }
 
         User user = new User();
@@ -83,21 +84,21 @@ public class UserServiceImpl implements UserService {
         }
 
         if (imageFile.getSize() > 5 * 1024 * 1024) {
-            throw new CustomException(ErrorCode.INVALID_IMAGE_SIZE);
+            throw new CustomBusinessException(UserErrorCode.INVALID_IMAGE_SIZE);
         }
 
         String contentType = imageFile.getContentType();
         if (contentType == null ||
                 !(contentType.equals("image/jpeg") || contentType.equals("image/png"))) {
-            throw new CustomException(ErrorCode.INVALID_IMAGE_EXTENSION);
+            throw new CustomBusinessException(UserErrorCode.INVALID_IMAGE_EXTENSION);
         }
 
         try {
             if (ImageIO.read(imageFile.getInputStream()) == null) {
-                throw new CustomException(ErrorCode.INVALID_IMAGE_FILE);
+                throw new CustomBusinessException(UserErrorCode.INVALID_IMAGE_FILE);
             }
         } catch (IOException e) {
-            throw new CustomException(ErrorCode.INVALID_IMAGE_FILE);
+            throw new CustomBusinessException(UserErrorCode.INVALID_IMAGE_FILE);
         }
 
         String safeNickname = nickname.replaceAll("[^a-zA-Z0-9가-힣_\\-]", "_");
@@ -105,7 +106,7 @@ public class UserServiceImpl implements UserService {
 
         File folder = new File(userFolder);
         if (!folder.exists() && !folder.mkdirs()) {
-            throw new CustomException(ErrorCode.FILE_SAVE_ERROR);
+            throw new CustomBusinessException(UserErrorCode.FILE_SAVE_ERROR);
         }
 
         String fileName = UUID.randomUUID().toString() + "_" + imageFile.getOriginalFilename();
@@ -115,7 +116,7 @@ public class UserServiceImpl implements UserService {
             Files.copy(imageFile.getInputStream(), filePath);
         } catch (IOException e) {
             log.error("프로필 이미지 저장 실패", e);
-            throw new CustomException(ErrorCode.FILE_SAVE_ERROR);
+            throw new CustomBusinessException(UserErrorCode.FILE_SAVE_ERROR);
         }
 
         return "/profile-images/" + safeNickname + "/profile/" + fileName;
@@ -126,11 +127,11 @@ public class UserServiceImpl implements UserService {
         User user = userMapper.findByEmail(dto.getEmail());
 
         if (user == null) {
-            throw new CustomException(ErrorCode.USER_NOT_FOUND);
+            throw new CustomBusinessException(UserErrorCode.USER_NOT_FOUND);
         }
 
         if (!passwordEncoder.matches(dto.getPassword(), user.getPassword())) {
-            throw new CustomException(ErrorCode.INVALID_PASSWORD);
+            throw new CustomBusinessException(UserErrorCode.INVALID_PASSWORD);
         }
 
         String accessToken = jwtProvider.createAccessToken(user.getId(), user.getEmail());
@@ -157,7 +158,7 @@ public class UserServiceImpl implements UserService {
         String refreshToken = bearerToken.replace("Bearer ", "");
 
         if (!jwtProvider.validateToken(refreshToken)) {
-            throw new CustomException(ErrorCode.INVALID_TOKEN);
+            throw new CustomBusinessException(UserErrorCode.INVALID_TOKEN);
         }
 
         Integer userId = jwtProvider.getUserId(refreshToken);
@@ -166,7 +167,7 @@ public class UserServiceImpl implements UserService {
         String savedToken = redisTemplate.opsForValue().get(refreshKey);
 
         if (savedToken == null || !savedToken.equals(refreshToken)) {
-            throw new CustomException(ErrorCode.INVALID_TOKEN);
+            throw new CustomBusinessException(UserErrorCode.INVALID_TOKEN);
         }
 
         return jwtProvider.createAccessToken(userId, jwtProvider.getEmail(refreshToken));
@@ -196,7 +197,7 @@ public class UserServiceImpl implements UserService {
         User user = userMapper.findById(id);
 
         if (user == null) {
-            throw new CustomException(ErrorCode.USER_NOT_FOUND);
+            throw new CustomBusinessException(UserErrorCode.USER_NOT_FOUND);
         }
 
         return toResponseDto(user);
@@ -220,7 +221,7 @@ public class UserServiceImpl implements UserService {
 
         User user = userMapper.findByEmail(email);
         if (user == null) {
-            throw new CustomException(ErrorCode.USER_NOT_FOUND);
+            throw new CustomBusinessException(UserErrorCode.USER_NOT_FOUND);
         }
 
         // 비밀번호 재설정 토큰 생성 (UUID)
@@ -249,12 +250,12 @@ public class UserServiceImpl implements UserService {
         String email = redisTemplate.opsForValue().get(redisKey);
 
         if (email == null) {
-            throw new CustomException(ErrorCode.INVALID_OR_EXPIRED_TOKEN);
+            throw new CustomBusinessException(UserErrorCode.INVALID_OR_EXPIRED_TOKEN);
         }
 
         User user = userMapper.findByEmail(email);
         if (user == null) {
-            throw new CustomException(ErrorCode.USER_NOT_FOUND);
+            throw new CustomBusinessException(UserErrorCode.USER_NOT_FOUND);
         }
 
         // 비밀번호 암호화 후 저장
