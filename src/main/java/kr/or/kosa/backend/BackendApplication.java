@@ -1,5 +1,6 @@
 package kr.or.kosa.backend;
 
+import io.github.cdimascio.dotenv.Dotenv;
 import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -8,6 +9,19 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 @MapperScan("kr.or.kosa.backend")
 public class BackendApplication {
     public static void main(String[] args) {
+
+        // 1) .env 로드
+        Dotenv dotenv = Dotenv.configure()
+                .directory("./")
+                .ignoreIfMissing()
+                .load();
+
+        // 2) 환경변수를 시스템 프로퍼티에 적용
+        dotenv.entries().forEach(entry ->
+                System.setProperty(entry.getKey(), entry.getValue())
+        );
+
+        // 3) Spring Boot 실행
         SpringApplication.run(BackendApplication.class, args);
     }
 }
