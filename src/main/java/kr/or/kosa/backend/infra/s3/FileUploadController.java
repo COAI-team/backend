@@ -8,7 +8,7 @@ import lombok.RequiredArgsConstructor;
 
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/upload")
+@RequestMapping("/upload")
 public class FileUploadController {
 
     private final S3ImageService imageService;

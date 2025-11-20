@@ -8,7 +8,7 @@ import java.util.HashMap;
 
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/freeboardlike")
+@RequestMapping("/freeboardlike")
 public class FreeboardLikeController {
 
     private final FreeboardLikeService likeService;

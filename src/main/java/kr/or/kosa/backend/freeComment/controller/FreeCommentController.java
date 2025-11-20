@@ -8,7 +8,7 @@ import kr.or.kosa.backend.freeComment.service.FreeCommentService;
 
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/freecomment")
+@RequestMapping("/freecomment")
 public class FreeCommentController {
 
     private final FreeCommentService freeCommentService;

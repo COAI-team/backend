@@ -9,7 +9,7 @@ import kr.or.kosa.backend.freeboard.service.FreeboardService;
 
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/freeboard")
+@RequestMapping("/freeboard")
 public class FreeboardController {
 
     private final FreeboardService service;
