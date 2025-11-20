@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.kosa.backend.codenose.mapper.AnalysisMapper">
+
+    <insert id="saveAnalysisHistory" parameterType="kr.or.kosa.backend.codenose.dto.CodeAnalysisHistoryDto">
+        INSERT INTO CODE_ANALYSIS_HISTORY (
+            ANALYSIS_ID, USER_ID, REPOSITORY_URL, FILE_PATH, ANALYSIS_TYPE,
+            TONE_LEVEL, CUSTOM_REQUIREMENTS, ANALYSIS_RESULT, AI_SCORE,
+            CODE_SMELLS, SUGGESTIONS, CREATED_AT
+        ) VALUES (
+            #{analysisId}, #{userId}, #{repositoryUrl}, #{filePath}, #{analysisType},
+            #{toneLevel}, #{customRequirements}, #{analysisResult, jdbcType=VARCHAR}, #{aiScore},
+            #{codeSmells, jdbcType=VARCHAR}, #{suggestions, jdbcType=VARCHAR}, #{createdAt}
+        )
+    </insert>
+
+    <select id="findAnalysisHistoryByUserId" resultType="kr.or.kosa.backend.codenose.dto.CodeAnalysisHistoryDto">
+        SELECT * FROM CODE_ANALYSIS_HISTORY WHERE USER_ID = #{userId} ORDER BY CREATED_AT DESC
+    </select>
+
+    <insert id="saveUserCodePattern" parameterType="kr.or.kosa.backend.codenose.dto.UserCodePatternDto">
+        INSERT INTO USER_CODE_PATTERNS (
+            PATTERN_ID, USER_ID, PATTERN_TYPE, FREQUENCY, LAST_DETECTED, IMPROVEMENT_STATUS
+        ) VALUES (
+            #{patternId}, #{userId}, #{patternType}, #{frequency}, #{lastDetected}, #{improvementStatus}
+        )
+    </insert>
+    
+    <select id="findUserCodePattern" resultType="kr.or.kosa.backend.codenose.dto.UserCodePatternDto">
+        SELECT * FROM USER_CODE_PATTERNS WHERE USER_ID = #{userId} AND PATTERN_TYPE = #{patternType}
+    </select>
+
+    <update id="updateUserCodePattern" parameterType="kr.or.kosa.backend.codenose.dto.UserCodePatternDto">
+        UPDATE USER_CODE_PATTERNS
+        SET
+            FREQUENCY = #{frequency},
+            LAST_DETECTED = #{lastDetected},
+            IMPROVEMENT_STATUS = #{improvementStatus}
+        WHERE PATTERN_ID = #{patternId}
+    </update>
+
+    <select id="findAllPatternsByUserId" resultType="kr.or.kosa.backend.codenose.dto.UserCodePatternDto">
+        SELECT * FROM USER_CODE_PATTERNS WHERE USER_ID = #{userId} ORDER BY FREQUENCY DESC
+    </select>
+
+</mapper>
