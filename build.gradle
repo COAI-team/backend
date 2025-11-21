@@ -47,7 +47,7 @@ dependencies {
     // --- Database (MySQL) ---
     runtimeOnly 'com.mysql:mysql-connector-j'
 
-    // --- JWT 라이브러리 추가 ---
+    // --- JWT ---
     implementation 'io.jsonwebtoken:jjwt-api:0.11.5'
     implementation 'io.jsonwebtoken:jjwt-impl:0.11.5'
     implementation 'io.jsonwebtoken:jjwt-jackson:0.11.5'
@@ -59,11 +59,10 @@ dependencies {
     // 개발 편의
     developmentOnly 'org.springframework.boot:spring-boot-devtools'
 
-    // AWS SDK v2 — S3
+    // --- AWS SDK (직접 S3 사용 가능) ---
     implementation 'software.amazon.awssdk:s3:2.25.39'
-
-    // 파일 업로드용 (스프링 기본 포함)
-    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation 'io.awspring.cloud:spring-cloud-aws-starter-s3:3.0.2'
+    implementation 'io.awspring.cloud:spring-cloud-aws-starter:3.0.2'
 
     // aop
     implementation 'org.springframework.boot:spring-boot-starter-aop'

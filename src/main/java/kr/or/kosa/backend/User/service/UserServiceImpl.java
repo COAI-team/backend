@@ -2,27 +2,21 @@ package kr.or.kosa.backend.user.service;
 
 
 import kr.or.kosa.backend.commons.exception.custom.CustomBusinessException;
+import kr.or.kosa.backend.infra.s3.S3Uploader;
 import kr.or.kosa.backend.security.jwt.JwtProvider;
 import kr.or.kosa.backend.user.domain.User;
 import kr.or.kosa.backend.user.dto.*;
 import kr.or.kosa.backend.user.exception.UserErrorCode;
 import kr.or.kosa.backend.user.mapper.UserMapper;
-
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
-import javax.imageio.ImageIO;
-import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -36,23 +30,19 @@ public class UserServiceImpl implements UserService {
     private final EmailVerificationService emailVerificationService;
     private final JwtProvider jwtProvider;
     private final StringRedisTemplate redisTemplate;
-
-    @Value("${file.upload-dir}")
-    private String uploadDir;
+    private final S3Uploader s3Uploader;
 
     private static final long REFRESH_TOKEN_EXPIRE_DAYS = 14;
 
     @Override
     public int register(UserRegisterRequestDto dto, MultipartFile imageFile) {
 
-        if (!uploadDir.endsWith("/")) {
-            uploadDir = uploadDir + "/";
-        }
-
+        // 1. 이메일 인증 확인
         if (!emailVerificationService.isVerified(dto.getEmail())) {
             throw new CustomBusinessException(UserErrorCode.EMAIL_NOT_VERIFIED);
         }
 
+        // 2. 중복 체크
         if (userMapper.findByEmail(dto.getEmail()) != null) {
             throw new CustomBusinessException(UserErrorCode.EMAIL_DUPLICATE);
         }
@@ -61,6 +51,7 @@ public class UserServiceImpl implements UserService {
             throw new CustomBusinessException(UserErrorCode.NICKNAME_DUPLICATE);
         }
 
+        // 3. User 저장 (이미지 제외)
         User user = new User();
         user.setEmail(dto.getEmail());
         user.setPassword(passwordEncoder.encode(dto.getPassword()));
@@ -72,58 +63,32 @@ public class UserServiceImpl implements UserService {
         userMapper.insertUser(user);
         int userId = user.getId();
 
-        String imageUrl = handleUserImageUpload(dto.getNickname(), imageFile);
+        // 4. 프로필 이미지 S3 업로드
+        String imageUrl;
+
+        if (imageFile != null && !imageFile.isEmpty()) {
+
+            String folderPath = "profile-images/" + dto.getNickname() + "/profile";
+
+            try {
+                imageUrl = s3Uploader.upload(imageFile, folderPath);
+            } catch (IOException e) {
+                throw new CustomBusinessException(UserErrorCode.FILE_SAVE_ERROR);
+            }
+
+        } else {
+            imageUrl = "https://codenemsy.s3.ap-northeast-2.amazonaws.com/profile-images/default.png";
+        }
+
+        // 5. DB에 이미지 URL 저장
         userMapper.updateUserImage(userId, imageUrl);
 
         return userId;
     }
 
-    private String handleUserImageUpload(String nickname, MultipartFile imageFile) {
-        if (imageFile == null || imageFile.isEmpty()) {
-            return "/profile-images/default.png";
-        }
-
-        if (imageFile.getSize() > 5 * 1024 * 1024) {
-            throw new CustomBusinessException(UserErrorCode.INVALID_IMAGE_SIZE);
-        }
-
-        String contentType = imageFile.getContentType();
-        if (contentType == null ||
-                !(contentType.equals("image/jpeg") || contentType.equals("image/png"))) {
-            throw new CustomBusinessException(UserErrorCode.INVALID_IMAGE_EXTENSION);
-        }
-
-        try {
-            if (ImageIO.read(imageFile.getInputStream()) == null) {
-                throw new CustomBusinessException(UserErrorCode.INVALID_IMAGE_FILE);
-            }
-        } catch (IOException e) {
-            throw new CustomBusinessException(UserErrorCode.INVALID_IMAGE_FILE);
-        }
-
-        String safeNickname = nickname.replaceAll("[^a-zA-Z0-9가-힣_\\-]", "_");
-        String userFolder = uploadDir + safeNickname + "/profile/";
-
-        File folder = new File(userFolder);
-        if (!folder.exists() && !folder.mkdirs()) {
-            throw new CustomBusinessException(UserErrorCode.FILE_SAVE_ERROR);
-        }
-
-        String fileName = UUID.randomUUID().toString() + "_" + imageFile.getOriginalFilename();
-        Path filePath = Paths.get(userFolder + fileName);
-
-        try {
-            Files.copy(imageFile.getInputStream(), filePath);
-        } catch (IOException e) {
-            log.error("프로필 이미지 저장 실패", e);
-            throw new CustomBusinessException(UserErrorCode.FILE_SAVE_ERROR);
-        }
-
-        return "/profile-images/" + safeNickname + "/profile/" + fileName;
-    }
-
     @Override
     public UserLoginResponseDto login(UserLoginRequestDto dto) {
+
         User user = userMapper.findByEmail(dto.getEmail());
 
         if (user == null) {
@@ -134,10 +99,14 @@ public class UserServiceImpl implements UserService {
             throw new CustomBusinessException(UserErrorCode.INVALID_PASSWORD);
         }
 
+        // 🔥 Base64 변환 제거 → S3 URL 그대로 사용
+        String profileImageUrl = user.getImage();
+
+        // 🔑 토큰 생성
         String accessToken = jwtProvider.createAccessToken(user.getId(), user.getEmail());
         String refreshToken = jwtProvider.createRefreshToken(user.getId(), user.getEmail());
 
-        // 🔥 RefreshToken을 Redis에 저장 (DB 대신)
+        // 💾 Redis에 RefreshToken 저장
         String refreshKey = "auth:refresh:" + user.getId();
         redisTemplate.opsForValue().set(
                 refreshKey,
@@ -146,10 +115,23 @@ public class UserServiceImpl implements UserService {
                 TimeUnit.DAYS
         );
 
+        // 🎯 User DTO 생성
+        UserResponseDto userDto = UserResponseDto.builder()
+                .id(user.getId())
+                .email(user.getEmail())
+                .name(user.getName())
+                .nickname(user.getNickname())
+                .image(profileImageUrl)
+                .grade(user.getGrade())
+                .role(user.getRole())
+                .enabled(user.getEnabled())
+                .build();
+
+        // 🎯 응답 반환
         return UserLoginResponseDto.builder()
                 .accessToken(accessToken)
                 .refreshToken(refreshToken)
-                .user(toResponseDto(user))
+                .user(userDto)
                 .build();
     }
 
@@ -203,17 +185,17 @@ public class UserServiceImpl implements UserService {
         return toResponseDto(user);
     }
 
-    private UserResponseDto toResponseDto(User user) {
-        UserResponseDto dto = new UserResponseDto();
-        dto.setId(user.getId());
-        dto.setEmail(user.getEmail());
-        dto.setName(user.getName());
-        dto.setNickname(user.getNickname());
-        dto.setImage(user.getImage());
-        dto.setGrade(user.getGrade());
-        dto.setRole(user.getRole());
-        dto.setEnabled(user.getEnabled());
-        return dto;
+    public UserResponseDto toResponseDto(User user) {
+        return UserResponseDto.builder()
+                .id(user.getId())
+                .email(user.getEmail())
+                .name(user.getName())
+                .nickname(user.getNickname())
+                .image(user.getImage())   // 원본 경로 그대로 사용
+                .grade(user.getGrade())
+                .role(user.getRole())
+                .enabled(user.getEnabled())
+                .build();
     }
 
     @Override
