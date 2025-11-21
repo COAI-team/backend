@@ -1,7 +1,8 @@
 package kr.or.kosa.backend.codenose.controller;
 
-import kr.or.kosa.backend.codenose.dto.AnalysisRequestDto;
-// import kr.or.kosa.backend.codenose.service.AnalysisService; // Commented out
+import kr.or.kosa.backend.codenose.dto.dtoReal.AnalysisRequestDTO;
+import kr.or.kosa.backend.codenose.service.AnalysisService;
+import kr.or.kosa.backend.commons.response.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -14,15 +15,20 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class AnalysisController {
 
-    // private final AnalysisService analysisService; // Commented out
+    private final AnalysisService analysisService;
 
+    /**
+     * 기존 분석 엔드포인트 (코드를 직접 전달하는 방식)
+     * POST /api/analysis/analyze
+     * Body: { "code": "...", "analysisTypes": [...], "toneLevel": 3, "customRequirements": "...", "userId": 1 }
+     */
     @PostMapping("/analyze")
-    public ResponseEntity<String> analyzeCode(@RequestBody AnalysisRequestDto requestDto) {
+    public ResponseEntity<String> analyzeCode(@RequestBody AnalysisRequestDTO requestDto) {
         // In a real app, you would get the userId from the security context
         // For example:
         // Long userId = ((UserDetails) SecurityContextHolder.getContext().getAuthentication().getPrincipal()).getId();
         // requestDto.setUserId(userId);
-        
+
         // String result = analysisService.analyzeCode(requestDto); // Original call
         String dummyResult = """
             {
@@ -46,5 +52,28 @@ public class AnalysisController {
             }
             """;
         return ResponseEntity.ok(dummyResult);
+    }
+
+    /**
+     * 저장된 파일을 분석하는 새로운 엔드포인트 (2단계: AI 분석)
+     * POST /api/analysis/analyze-stored
+     * Body: {
+     *   "repositoryUrl": "https://github.com/user/repo",
+     *   "filePath": "src/main/java/Example.java",
+     *   "code": "실제 코드 내용...",
+     *   "analysisTypes": ["code_smell", "design_pattern"],
+     *   "toneLevel": 3,
+     *   "customRequirements": "특정 패턴에 집중해주세요",
+     *   "userId": 1
+     * }
+     */
+    @PostMapping("/analyze-stored")
+    public ResponseEntity<ApiResponse<String>> analyzeStoredFile(@RequestBody AnalysisRequestDTO requestDto) {
+        // TODO: 실제로는 SecurityContext에서 userId를 가져와야 함
+        // Long userId = ((UserDetails) SecurityContextHolder.getContext().getAuthentication().getPrincipal()).getId();
+        // requestDto.setUserId(userId);
+
+        String result = analysisService.analyzeStoredFile(requestDto);
+        return ResponseEntity.ok(ApiResponse.success(result));
     }
 }
