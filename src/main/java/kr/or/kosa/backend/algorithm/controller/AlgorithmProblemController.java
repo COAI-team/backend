@@ -1,6 +1,9 @@
 package kr.or.kosa.backend.algorithm.controller;
 
 import kr.or.kosa.backend.algorithm.domain.AlgoProblem;
+import kr.or.kosa.backend.algorithm.dto.ProblemGenerationRequestDto;
+import kr.or.kosa.backend.algorithm.dto.ProblemGenerationResponseDto;
+import kr.or.kosa.backend.algorithm.service.AIProblemGeneratorService;
 import kr.or.kosa.backend.algorithm.service.AlgorithmProblemService;
 import kr.or.kosa.backend.commons.response.ApiResponse;
 import lombok.RequiredArgsConstructor;
@@ -13,8 +16,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 알고리즘 문제 컨트롤러 - Phase 1
- * 기본 조회 API만 구현
+ * 알고리즘 문제 컨트롤러 - Phase 1-3
+ * 기본 조회 API + AI 문제 생성 API
  */
 @RestController
 @RequestMapping("/api/algo/problems")
@@ -23,6 +26,56 @@ import java.util.Map;
 public class AlgorithmProblemController {
 
     private final AlgorithmProblemService algorithmProblemService;
+    private final AIProblemGeneratorService aiProblemGeneratorService;
+
+    /**
+     * AI 문제 생성 API
+     * POST /api/algo/problems/generate
+     */
+    @PostMapping("/generate")
+    public ResponseEntity<ApiResponse<ProblemGenerationResponseDto>> generateProblem(
+            @RequestBody ProblemGenerationRequestDto request) {
+
+        log.info("AI 문제 생성 요청 - 난이도: {}, 주제: {}", request.getDifficulty(), request.getTopic());
+
+        try {
+            // 1. 요청 데이터 검증
+            if (request.getDifficulty() == null) {
+                return ResponseEntity.badRequest()
+                        .body(ApiResponse.error("4001", "난이도를 선택해주세요"));
+            }
+
+            if (request.getTopic() == null || request.getTopic().trim().isEmpty()) {
+                return ResponseEntity.badRequest()
+                        .body(ApiResponse.error("4002", "문제 주제를 입력해주세요"));
+            }
+
+            // 2. AI 문제 생성 서비스 호출
+            ProblemGenerationResponseDto response = aiProblemGeneratorService.generateProblem(request);
+
+            // 3. 생성 결과 확인
+            if (response.getStatus() == ProblemGenerationResponseDto.GenerationStatus.SUCCESS) {
+                log.info("AI 문제 생성 성공 - 제목: {}, 소요시간: {}초",
+                        response.getProblem().getAlgoProblemTitle(),
+                        response.getGenerationTime());
+
+                return ResponseEntity.ok(ApiResponse.success(response));
+
+            } else {
+                log.error("AI 문제 생성 실패 - 상태: {}, 에러: {}",
+                        response.getStatus(), response.getErrorMessage());
+
+                return ResponseEntity.internalServerError()
+                        .body(ApiResponse.error("5001",
+                                "AI 문제 생성에 실패했습니다: " + response.getErrorMessage()));
+            }
+
+        } catch (Exception e) {
+            log.error("AI 문제 생성 중 예외 발생", e);
+            return ResponseEntity.internalServerError()
+                    .body(ApiResponse.error("5000", "문제 생성 중 서버 오류가 발생했습니다"));
+        }
+    }
 
     /**
      * 문제 목록 조회 (페이징)
