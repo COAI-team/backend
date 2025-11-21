@@ -44,6 +44,6 @@ out/
 ### VS Code ###
 .vscode/
 # 환경변수 파일이 있다면
-.env
+src/main/java/kr/or/kosa/backend/config/.env
 .env.*
 application.yml

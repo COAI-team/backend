@@ -38,25 +38,14 @@ public class SecurityConfig {
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
 
+                // 모든 URL 허용
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(
-                                "/users/login",
-                                "/users/register",
-                                "/users/refresh",
-                                "/users/password/reset/request",
-                                "/users/password/reset/confirm",
-                                "/email/**"
-                        ).permitAll()
-                        .anyRequest().authenticated()
-                )
-
-                .addFilterBefore(
-                        new JwtAuthenticationFilter(jwtProvider),
-                        UsernamePasswordAuthenticationFilter.class
+                        .anyRequest().permitAll()
                 );
 
         return http.build();
     }
+
 
     @Bean
     public PasswordEncoder passwordEncoder() {

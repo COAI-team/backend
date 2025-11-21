@@ -4,8 +4,8 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="kr.or.kosa.backend.codenose.mapper.AnalysisMapper">
 
-    <insert id="saveAnalysisHistory" parameterType="kr.or.kosa.backend.codenose.dto.CodeAnalysisHistoryDto">
-        INSERT INTO CODE_ANALYSIS_HISTORY (
+    <insert id="saveAnalysisHistory" parameterType="kr.or.kosa.backend.codenose.dto.dtoReal.CodeResultDTO">
+        INSERT INTO CODERESULT (
             ANALYSIS_ID, USER_ID, REPOSITORY_URL, FILE_PATH, ANALYSIS_TYPE,
             TONE_LEVEL, CUSTOM_REQUIREMENTS, ANALYSIS_RESULT, AI_SCORE,
             CODE_SMELLS, SUGGESTIONS, CREATED_AT
@@ -16,24 +16,24 @@
         )
     </insert>
 
-    <select id="findAnalysisHistoryByUserId" resultType="kr.or.kosa.backend.codenose.dto.CodeAnalysisHistoryDto">
-        SELECT * FROM CODE_ANALYSIS_HISTORY WHERE USER_ID = #{userId} ORDER BY CREATED_AT DESC
+    <select id="findAnalysisHistoryByUserId" resultType="kr.or.kosa.backend.codenose.dto.dtoReal.CodeResultDTO">
+        SELECT * FROM CODEANALYSISHISTORY WHERE USER_ID = #{userId} ORDER BY CREATED_AT DESC
     </select>
 
-    <insert id="saveUserCodePattern" parameterType="kr.or.kosa.backend.codenose.dto.UserCodePatternDto">
-        INSERT INTO USER_CODE_PATTERNS (
+    <insert id="saveUserCodePattern" parameterType="kr.or.kosa.backend.codenose.dto.dtoReal.UserCodePatternDTO">
+        INSERT INTO USERCODEPATTERNS (
             PATTERN_ID, USER_ID, PATTERN_TYPE, FREQUENCY, LAST_DETECTED, IMPROVEMENT_STATUS
         ) VALUES (
             #{patternId}, #{userId}, #{patternType}, #{frequency}, #{lastDetected}, #{improvementStatus}
         )
     </insert>
-    
-    <select id="findUserCodePattern" resultType="kr.or.kosa.backend.codenose.dto.UserCodePatternDto">
-        SELECT * FROM USER_CODE_PATTERNS WHERE USER_ID = #{userId} AND PATTERN_TYPE = #{patternType}
+
+    <select id="findUserCodePattern" resultType="kr.or.kosa.backend.codenose.dto.dtoReal.UserCodePatternDTO">
+        SELECT * FROM USERCODEPATTERNS WHERE USER_ID = #{userId} AND PATTERN_TYPE = #{patternType}
     </select>
 
-    <update id="updateUserCodePattern" parameterType="kr.or.kosa.backend.codenose.dto.UserCodePatternDto">
-        UPDATE USER_CODE_PATTERNS
+    <update id="updateUserCodePattern" parameterType="kr.or.kosa.backend.codenose.dto.dtoReal.UserCodePatternDTO">
+        UPDATE USERCODEPATTERNS
         SET
             FREQUENCY = #{frequency},
             LAST_DETECTED = #{lastDetected},
@@ -41,8 +41,40 @@
         WHERE PATTERN_ID = #{patternId}
     </update>
 
-    <select id="findAllPatternsByUserId" resultType="kr.or.kosa.backend.codenose.dto.UserCodePatternDto">
-        SELECT * FROM USER_CODE_PATTERNS WHERE USER_ID = #{userId} ORDER BY FREQUENCY DESC
+    <select id="findAllPatternsByUserId" resultType="kr.or.kosa.backend.codenose.dto.dtoReal.UserCodePatternDTO">
+        SELECT * FROM USERCODEPATTERNS WHERE USER_ID = #{userId} ORDER BY FREQUENCY DESC
     </select>
+
+    <!-- 파일 내용 임시 저장 (분석 전) -->
+    <insert id="saveFileContent" parameterType="kr.or.kosa.backend.codenose.dto.dtoReal.CodeResultDTO">
+        INSERT INTO CODERESULT (
+            ANALYSIS_ID, USER_ID, REPOSITORY_URL, FILE_PATH, CREATED_AT
+        ) VALUES (
+            #{analysisId}, #{userId}, #{repositoryUrl}, #{filePath}, #{createdAt}
+        )
+    </insert>
+
+    <!-- repositoryUrl + filePath로 최신 파일 내용 조회 -->
+    <select id="findLatestFileContent" resultType="kr.or.kosa.backend.codenose.dto.dtoReal.CodeResultDTO">
+        SELECT * FROM CODERESULT
+        WHERE REPOSITORY_URL = #{repositoryUrl}
+          AND FILE_PATH = #{filePath}
+        ORDER BY CREATED_AT DESC
+        LIMIT 1
+    </select>
+
+    <!-- 분석 결과로 업데이트 -->
+    <update id="updateAnalysisResult" parameterType="kr.or.kosa.backend.codenose.dto.dtoReal.CodeResultDTO">
+        UPDATE CODERESULT
+        SET
+            ANALYSIS_TYPE = #{analysisType},
+            TONE_LEVEL = #{toneLevel},
+            CUSTOM_REQUIREMENTS = #{customRequirements},
+            ANALYSIS_RESULT = #{analysisResult, jdbcType=VARCHAR},
+            AI_SCORE = #{aiScore},
+            CODE_SMELLS = #{codeSmells, jdbcType=VARCHAR},
+            SUGGESTIONS = #{suggestions, jdbcType=VARCHAR}
+        WHERE ANALYSIS_ID = #{analysisId}
+    </update>
 
 </mapper>
