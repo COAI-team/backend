@@ -75,12 +75,23 @@ dependencies {
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 
+    // WebFlux - WebClient 사용
+    implementation 'org.springframework.boot:spring-boot-starter-webflux'
+
+    if (isAppleSilicon()) {
+        runtimeOnly("io.netty:netty-resolver-dns-native-macos:4.1.94.Final:osx-aarch_64")
+    }
 }
 dependencyManagement {
     imports {
         mavenBom "org.springframework.ai:spring-ai-bom:$springAiVersion"
     }
 }
+
+def isAppleSilicon() {
+    return System.getProperty("os.name") == "Mac OS X" && System.getProperty("os.arch") == "aarch64"
+}
+
 
 tasks.named('test') {
     useJUnitPlatform()

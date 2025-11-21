@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- 파일 경로: resources/mappers/algorithm/AlgorithmProblemMapper.xml -->
+
+<mapper namespace="kr.or.kosa.backend.algorithm.mapper.AlgorithmProblemMapper">
+
+    <!-- ResultMap 정의 -->
+    <resultMap id="AlgoProblemResultMap" type="kr.or.kosa.backend.algorithm.domain.AlgoProblem">
+        <id property="algoProblemId" column="ALGO_PROBLEM_ID"/>
+        <result property="algoProblemTitle" column="ALGO_PROBLEM_TITLE"/>
+        <result property="algoProblemDescription" column="ALGO_PROBLEM_DESCRIPTION"/>
+        <result property="algoProblemDifficulty" column="ALGO_PROBLEM_DIFFICULTY"
+                typeHandler="org.apache.ibatis.type.EnumTypeHandler"/>
+        <result property="algoProblemSource" column="ALGO_PROBLEM_SOURCE"
+                typeHandler="org.apache.ibatis.type.EnumTypeHandler"/>
+        <result property="language" column="LANGUAGE"/>
+        <result property="timelimit" column="TIMELIMIT"/>
+        <result property="memorylimit" column="MEMORYLIMIT"/>
+        <result property="algoCreater" column="ALGO_CREATER"/>
+        <result property="algoCreatedAt" column="ALGO_CREATED_AT"/>
+        <result property="algoUpdatedAt" column="ALGO_UPDATED_AT"/>
+        <result property="algoProblemTags" column="ALGO_PROBLEM_TAGS"/>
+        <result property="algoProblemStatus" column="ALGO_PROBLEM_STATUS"/>
+    </resultMap>
+
+    <!-- 기본 컬럼 정의 -->
+    <sql id="problemColumns">
+        ALGO_PROBLEM_ID,
+        ALGO_PROBLEM_TITLE,
+        ALGO_PROBLEM_DESCRIPTION,
+        ALGO_PROBLEM_DIFFICULTY,
+        ALGO_PROBLEM_SOURCE,
+        LANGUAGE,
+        TIMELIMIT,
+        MEMORYLIMIT,
+        ALGO_CREATER,
+        ALGO_CREATED_AT,
+        ALGO_UPDATED_AT,
+        ALGO_PROBLEM_TAGS,
+        ALGO_PROBLEM_STATUS
+    </sql>
+
+    <!-- 전체 문제 목록 조회 (페이징) -->
+    <select id="selectProblems" resultMap="AlgoProblemResultMap">
+        SELECT
+        <include refid="problemColumns"/>
+        FROM ALGO_PROBLEMS
+        WHERE ALGO_PROBLEM_STATUS = 1
+        ORDER BY ALGO_CREATED_AT DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <!-- 전체 문제 수 조회 -->
+    <select id="countAllProblems" resultType="int">
+        SELECT COUNT(*)
+        FROM ALGO_PROBLEMS
+        WHERE ALGO_PROBLEM_STATUS = 1
+    </select>
+
+    <!-- 문제 상세 조회 -->
+    <select id="selectProblemById" resultMap="AlgoProblemResultMap">
+        SELECT
+        <include refid="problemColumns"/>
+        FROM ALGO_PROBLEMS
+        WHERE ALGO_PROBLEM_ID = #{problemId}
+        AND ALGO_PROBLEM_STATUS = 1
+    </select>
+
+    <!-- 문제 존재 여부 확인 -->
+    <select id="existsProblemById" resultType="boolean">
+        SELECT COUNT(*) > 0
+        FROM ALGO_PROBLEMS
+        WHERE ALGO_PROBLEM_ID = #{problemId}
+        AND ALGO_PROBLEM_STATUS = 1
+    </select>
+
+</mapper>
