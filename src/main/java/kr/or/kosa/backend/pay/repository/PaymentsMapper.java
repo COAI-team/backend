@@ -1,7 +1,7 @@
-package kr.or.kosa.backend.Pay.repository;
+package kr.or.kosa.backend.pay.repository;
 
 
-import kr.or.kosa.backend.Pay.entity.Payments;
+import kr.or.kosa.backend.pay.entity.Payments;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 

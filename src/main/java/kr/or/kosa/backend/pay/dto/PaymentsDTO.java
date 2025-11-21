@@ -1,4 +1,4 @@
-package kr.or.kosa.backend.Pay.dto;
+package kr.or.kosa.backend.pay.dto;
 
 import lombok.*;
 

@@ -32,16 +32,16 @@ public class AIProblemGeneratorService {
     private final ObjectMapper objectMapper;
 
     // OpenAI API 설정 (application.yml에서 주입)
-    @Value("${openai.api.key}")
+    @Value("${spring.ai.openai.api-key}")
     private String openaiApiKey;
 
-    @Value("${openai.api.base-url}")
+    @Value("${spring.ai.openai.base-url}")
     private String openaiApiUrl;
 
-    @Value("${openai.api.model}")
+    @Value("${spring.ai.openai.chat.model}")
     private String openaiModel;
 
-    @Value("${openai.api.max-tokens:2000}")
+    @Value("${spring.ai.openai.chat.max-tokens:2000}")
     private Integer maxTokens;
 
     // 생성자 주입

@@ -15,7 +15,7 @@ public class InsightsService {
     private final AnalysisMapper analysisMapper;
 
     public List<CodeResultDTO> getCodeResult(Long userId) {
-        return analysisMapper.findCodResultyByUserId(userId);
+        return analysisMapper.findAnalysisHistoryByUserId(userId);
     }
 
     public List<UserCodePatternDTO> getUserCodePatterns(Long userId) {

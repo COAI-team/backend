@@ -1,4 +1,4 @@
-package kr.or.kosa.backend.algorithm.config;
+package kr.or.kosa.backend.config.algorithm;
 
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;

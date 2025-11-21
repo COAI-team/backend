@@ -1,4 +1,4 @@
-package kr.or.kosa.backend.Pay.entity;
+package kr.or.kosa.backend.pay.entity;
 
 //import jakarta.persistence.Entity;
 //import jakarta.persistence.Id;

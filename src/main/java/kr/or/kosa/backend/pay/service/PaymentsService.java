@@ -1,7 +1,7 @@
-package kr.or.kosa.backend.Pay.service;
+package kr.or.kosa.backend.pay.service;
 
-import kr.or.kosa.backend.Pay.entity.Payments;
-import kr.or.kosa.backend.Pay.entity.Subscription;
+import kr.or.kosa.backend.pay.entity.Payments;
+import kr.or.kosa.backend.pay.entity.Subscription;
 
 import java.util.List;
 import java.util.Optional;

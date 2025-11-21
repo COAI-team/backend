@@ -1,9 +1,9 @@
-package kr.or.kosa.backend.Pay.service;
+package kr.or.kosa.backend.pay.service;
 
-import kr.or.kosa.backend.Pay.entity.Payments;
-import kr.or.kosa.backend.Pay.entity.Subscription;
-import kr.or.kosa.backend.Pay.repository.PaymentsMapper;
-import kr.or.kosa.backend.Pay.repository.SubscriptionMapper;
+import kr.or.kosa.backend.pay.entity.Payments;
+import kr.or.kosa.backend.pay.entity.Subscription;
+import kr.or.kosa.backend.pay.repository.PaymentsMapper;
+import kr.or.kosa.backend.pay.repository.SubscriptionMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;

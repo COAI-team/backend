@@ -1,8 +1,8 @@
-package kr.or.kosa.backend.Pay.controller;
+package kr.or.kosa.backend.pay.controller;
 
-import kr.or.kosa.backend.Pay.entity.Payments;
-import kr.or.kosa.backend.Pay.entity.Subscription;
-import kr.or.kosa.backend.Pay.service.PaymentsService;
+import kr.or.kosa.backend.pay.entity.Payments;
+import kr.or.kosa.backend.pay.entity.Subscription;
+import kr.or.kosa.backend.pay.service.PaymentsService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;

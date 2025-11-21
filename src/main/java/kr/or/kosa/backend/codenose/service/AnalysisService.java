@@ -180,7 +180,7 @@ public class AnalysisService {
             history.setCodeSmells(objectMapper.writeValueAsString(jsonNode.path("codeSmells")));
             history.setSuggestions(objectMapper.writeValueAsString(jsonNode.path("suggestions")));
 
-            analysisMapper.saveCodeResult(history);
+            analysisMapper.saveAnalysisHistory(history);
             
             // Update user code patterns based on the result
             updateUserPatterns(requestDto.getUserId(), jsonNode.path("codeSmells"));
