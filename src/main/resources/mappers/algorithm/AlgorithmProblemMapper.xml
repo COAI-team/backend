@@ -76,4 +76,34 @@
         AND ALGO_PROBLEM_STATUS = 1
     </select>
 
+    <!-- AI 생성 문제 저장 -->
+    <!-- 1. 문제 저장 (AUTO_INCREMENT) -->
+    <insert id="insertProblem"
+            parameterType="kr.or.kosa.backend.algorithm.domain.AlgoProblem"
+            useGeneratedKeys="true"
+            keyProperty="algoProblemId"
+            keyColumn="ALGO_PROBLEM_ID">
+        INSERT INTO ALGO_PROBLEMS (
+            ALGO_PROBLEM_TITLE, ALGO_PROBLEM_DESCRIPTION, ALGO_PROBLEM_DIFFICULTY, ALGO_PROBLEM_SOURCE,
+            LANGUAGE, TIMELIMIT, MEMORYLIMIT, ALGO_CREATER,
+            ALGO_CREATED_AT, ALGO_UPDATED_AT, ALGO_PROBLEM_TAGS, ALGO_PROBLEM_STATUS
+        ) VALUES (
+            #{algoProblemTitle}, #{algoProblemDescription}, #{algoProblemDifficulty}, #{algoProblemSource},
+            #{language}, #{timelimit}, #{memorylimit}, #{algoCreater},
+            #{algoCreatedAt}, #{algoUpdatedAt}, #{algoProblemTags}, #{algoProblemStatus}
+        )
+    </insert>
+
+    <!-- 2. 테스트케이스 저장 -->
+    <insert id="insertTestcase"
+            parameterType="kr.or.kosa.backend.algorithm.domain.AlgoTestcase"
+            useGeneratedKeys="true"
+            keyProperty="testcaseId"
+            keyColumn="TESTCASE_ID">
+        INSERT INTO ALGO_TESTCASES (
+            ALGO_PROBLEM_ID, INPUT_DATA, EXPECTED_OUTPUT, IS_SAMPLE
+        ) VALUES (
+            #{algoProblemId}, #{inputData}, #{expectedOutput}, #{isSample}
+        )
+    </insert>
 </mapper>

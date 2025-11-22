@@ -1,6 +1,7 @@
 package kr.or.kosa.backend.algorithm.mapper;
 
 import kr.or.kosa.backend.algorithm.domain.AlgoProblem;
+import kr.or.kosa.backend.algorithm.domain.AlgoTestcase;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -40,4 +41,26 @@ public interface AlgorithmProblemMapper {
      * @return 존재 여부
      */
     boolean existsProblemById(@Param("problemId") Long problemId);
+
+    // ===== AI 생성 문제 저장 메서드 =====
+    /**
+     * 문제 저장 (AI 생성 또는 수동 등록)
+     * @param problem 문제 엔티티
+     * @return 저장된 행 수
+     */
+    int insertProblem(AlgoProblem problem);
+
+    /**
+     * 테스트케이스 저장
+     * @param testcase 테스트케이스 엔티티
+     * @return 저장된 행 수
+     */
+    int insertTestcase(AlgoTestcase testcase);
+
+    /**
+     * 문제 ID로 테스트케이스 목록 조회
+     * @param problemId 문제 ID
+     * @return 테스트케이스 목록
+     */
+    List<AlgoTestcase> selectTestcasesByProblemId(@Param("problemId") Long problemId);
 }
