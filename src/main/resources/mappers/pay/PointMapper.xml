@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="kr.or.kosa.backend.pay.repository.PointMapper">
+
+    <!-- UserPoint 매핑 -->
+    <resultMap id="UserPointResultMap"
+               type="kr.or.kosa.backend.pay.entity.UserPoint">
+        <id     column="user_id"    property="userId"/>
+        <result column="balance"    property="balance"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <!-- PointHistory 매핑 (조회는 아직 안 쓰더라도 정의해두면 편함) -->
+    <resultMap id="PointHistoryResultMap"
+               type="kr.or.kosa.backend.pay.entity.PointHistory">
+        <id     column="id"               property="id"/>
+        <result column="user_id"          property="userId"/>
+        <result column="change_amount"    property="changeAmount"/>
+        <result column="type"             property="type"/>
+        <result column="payment_order_id" property="paymentOrderId"/>
+        <result column="description"      property="description"/>
+        <result column="created_at"       property="createdAt"/>
+    </resultMap>
+
+    <!-- 잔액 조회 -->
+    <select id="findUserPointByUserId"
+            resultMap="UserPointResultMap">
+        SELECT
+        user_id,
+        balance,
+        updated_at
+        FROM user_points
+        WHERE user_id = #{userId}
+    </select>
+
+    <!-- 신규 유저 포인트 row 생성 -->
+    <insert id="insertUserPoint"
+            parameterType="kr.or.kosa.backend.pay.entity.UserPoint">
+        INSERT INTO user_points (
+        user_id,
+        balance,
+        updated_at
+        )
+        VALUES (
+        #{userId},
+        #{balance},
+        NOW()
+        )
+    </insert>
+
+    <!-- 포인트 사용: 잔액 부족 시 row 0개 업데이트 -->
+    <update id="usePoint">
+        UPDATE user_points
+        SET balance = balance - #{usePoint}
+        WHERE user_id = #{userId}
+        AND balance >= #{usePoint}
+    </update>
+
+    <!-- 포인트 환불(복구) -->
+    <update id="refundPoint">
+        UPDATE user_points
+        SET balance = balance + #{refundPoint}
+        WHERE user_id = #{userId}
+    </update>
+
+    <!-- 포인트 내역 기록 -->
+    <insert id="insertPointHistory"
+            parameterType="kr.or.kosa.backend.pay.entity.PointHistory">
+        INSERT INTO point_history (
+        user_id,
+        change_amount,
+        type,
+        payment_order_id,
+        description,
+        created_at
+        )
+        VALUES (
+        #{userId},
+        #{changeAmount},
+        #{type},
+        #{paymentOrderId},
+        #{description},
+        NOW()
+        )
+    </insert>
+
+</mapper>

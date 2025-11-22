@@ -2,10 +2,6 @@ package kr.or.kosa.backend.pay.entity;
 
 import lombok.*;
 
-/**
- * payments 테이블과 매핑되는 VO (MyBatis용)
- * JPA 사용 안 하므로 @Entity, @Table, @Id 등 전부 제거
- */
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
@@ -31,6 +27,12 @@ public class Payments {
 
     // 고객 이름 (표시용)
     private String customerName;
+
+    // 원래 플랜 가격 (포인트 적용 전 금액)
+    private int originalAmount;
+
+    // 사용한 포인트
+    private int usedPoint;
 
     // 결제 금액 (원)
     private int amount;

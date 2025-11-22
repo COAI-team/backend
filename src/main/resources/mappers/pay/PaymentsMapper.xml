@@ -6,15 +6,17 @@
 <mapper namespace="kr.or.kosa.backend.pay.repository.PaymentsMapper">
 
     <resultMap id="PaymentsResultMap" type="kr.or.kosa.backend.pay.entity.Payments">
-        <id     column="order_id"    property="orderId"/>
-        <result column="user_id"     property="userId"/>
-        <result column="plan_code"   property="planCode"/>
-        <result column="payment_key" property="paymentKey"/>
-        <result column="order_name"  property="orderName"/>
-        <result column="customer_name" property="customerName"/>
-        <result column="amount"      property="amount"/>
-        <result column="status"      property="status"/>
-        <result column="requested_at" property="requestedAt"/>
+        <id     column="order_id"        property="orderId"/>
+        <result column="user_id"         property="userId"/>
+        <result column="plan_code"       property="planCode"/>
+        <result column="payment_key"     property="paymentKey"/>
+        <result column="order_name"      property="orderName"/>
+        <result column="customer_name"   property="customerName"/>
+        <result column="original_amount" property="originalAmount"/>
+        <result column="used_point"      property="usedPoint"/>
+        <result column="amount"          property="amount"/>
+        <result column="status"          property="status"/>
+        <result column="requested_at"    property="requestedAt"/>
     </resultMap>
 
     <insert id="insertPayment"
@@ -25,6 +27,8 @@
         plan_code,
         order_name,
         customer_name,
+        original_amount,
+        used_point,
         amount,
         status,
         requested_at
@@ -35,6 +39,8 @@
         #{planCode},
         #{orderName},
         #{customerName},
+        #{originalAmount},
+        #{usedPoint},
         #{amount},
         #{status},
         #{requestedAt}
@@ -50,6 +56,8 @@
         payment_key,
         order_name,
         customer_name,
+        original_amount,
+        used_point,
         amount,
         status,
         requested_at
@@ -66,6 +74,8 @@
         payment_key,
         order_name,
         customer_name,
+        original_amount,
+        used_point,
         amount,
         status,
         requested_at
