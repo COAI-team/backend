@@ -1,4 +1,4 @@
-package kr.or.kosa.backend.algorithm.config;
+package kr.or.kosa.backend.config;
 
 import io.netty.channel.ChannelOption;
 import io.netty.handler.timeout.ReadTimeoutHandler;
