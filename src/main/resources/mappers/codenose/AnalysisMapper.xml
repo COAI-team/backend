@@ -2,7 +2,7 @@
 <!DOCTYPE mapper
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="kr.or.kosa.backend.codenose.mapper.AnalysisMapper">
+<mapper namespace="kr.or.kosa.backend.codenose.mappers.AnalysisMapper">
 
     <insert id="saveAnalysisHistory" parameterType="kr.or.kosa.backend.codenose.dto.dtoReal.CodeResultDTO">
         INSERT INTO CODERESULT (

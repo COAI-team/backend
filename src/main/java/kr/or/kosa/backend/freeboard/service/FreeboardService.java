@@ -6,8 +6,6 @@ import org.springframework.stereotype.Service;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import kr.or.kosa.backend.freeboard.domain.Freeboard;
 import kr.or.kosa.backend.freeboard.mapper.FreeboardMapper;
@@ -42,38 +40,14 @@ public class FreeboardService {
 
     // 작성
     public void write(Freeboard board) {
-        String represent = board.getFreeboardRepresentImage();
-
-        // 사용자가 대표 이미지 선택 안하면 첫 번째 이미지를 대표 이미지로
-        if (represent == null || represent.isBlank()) {
-            represent = extractFirstImage(board.getFreeboardContent());
-            board.setFreeboardRepresentImage(represent);
-        }
-
+        // 프론트에서 이미 대표 이미지를 추출해서 보내줌
+        // representImage가 null이거나 빈 값이면 그대로 저장 (이미지 없는 글)
         mapper.insert(board);
-    }
-
-    private String extractFirstImage(String content) {
-        if (content == null) return null;
-
-        Pattern pattern = Pattern.compile("<img[^>]*src=[\"']?([^>\"']+)[\"']?[^>]*>");
-        Matcher matcher = pattern.matcher(content);
-
-        if (matcher.find()) {
-            return matcher.group(1);
-        }
-        return null;
     }
 
     // 수정
     public void edit(Freeboard board) {
-        String represent = board.getFreeboardRepresentImage();
-
-        if (represent == null || represent.isBlank()) {
-            represent = extractFirstImage(board.getFreeboardContent());
-            board.setFreeboardRepresentImage(represent);
-        }
-
+        // 프론트에서 이미 대표 이미지를 추출해서 보내줌
         mapper.update(board);
     }
 

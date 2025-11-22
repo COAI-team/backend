@@ -3,7 +3,7 @@
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
-<mapper namespace="kr.or.kosa.backend.tag.mapper.TagMapper">
+<mapper namespace="kr.or.kosa.backend.tag.mappers.TagMapper">
 
     <!-- 모든 태그 조회 -->
     <select id="findAllTags" resultType="kr.or.kosa.backend.tag.domain.Tag">

@@ -4,7 +4,7 @@
 
 <!-- 파일 경로: resources/mappers/algorithm/AlgorithmProblemMapper.xml -->
 
-<mapper namespace="kr.or.kosa.backend.algorithm.mapper.AlgorithmProblemMapper">
+<mapper namespace="kr.or.kosa.backend.algorithm.mappers.AlgorithmProblemMapper">
 
     <!-- ResultMap 정의 -->
     <resultMap id="AlgoProblemResultMap" type="kr.or.kosa.backend.algorithm.domain.AlgoProblem">
