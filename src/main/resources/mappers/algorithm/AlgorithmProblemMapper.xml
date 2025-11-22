@@ -106,4 +106,28 @@
             #{algoProblemId}, #{inputData}, #{expectedOutput}, #{isSample}
         )
     </insert>
+
+    <!-- 샘플 테스트케이스 조회 -->
+    <select id="selectSampleTestCasesByProblemId" resultMap="algoTestcaseResultMap">
+        SELECT * FROM ALGO_TESTCASES
+        WHERE ALGO_PROBLEM_ID = #{problemId}
+        AND IS_SAMPLE = 1
+        ORDER BY TESTCASE_ID ASC
+    </select>
+
+    <!-- 모든 테스트케이스 조회 -->
+    <select id="selectTestCasesByProblemId" resultMap="algoTestcaseResultMap">
+        SELECT * FROM ALGO_TESTCASES
+        WHERE ALGO_PROBLEM_ID = #{problemId}
+        ORDER BY TESTCASE_ID ASC
+    </select>
+
+    <!-- algoTestcaseResultMap이 기존 파일에 없다면 추가 -->
+    <resultMap id="algoTestcaseResultMap" type="kr.or.kosa.backend.algorithm.domain.AlgoTestcase">
+        <id property="testcaseId" column="TESTCASE_ID"/>
+        <result property="algoProblemId" column="ALGO_PROBLEM_ID"/>
+        <result property="inputData" column="INPUT_DATA"/>
+        <result property="expectedOutput" column="EXPECTED_OUTPUT"/>
+        <result property="isSample" column="IS_SAMPLE"/>
+    </resultMap>
 </mapper>

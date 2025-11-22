@@ -63,4 +63,14 @@ public interface AlgorithmProblemMapper {
      * @return 테스트케이스 목록
      */
     List<AlgoTestcase> selectTestcasesByProblemId(@Param("problemId") Long problemId);
+
+    /**
+     * 샘플 테스트케이스 조회 (is_sample = true)
+     */
+    List<AlgoTestcase> selectSampleTestCasesByProblemId(@Param("problemId") Long problemId);
+
+    /**
+     * 모든 테스트케이스 조회
+     */
+    List<AlgoTestcase> selectTestCasesByProblemId(@Param("problemId") Long problemId);
 }
