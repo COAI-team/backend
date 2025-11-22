@@ -1,4 +1,4 @@
-package kr.or.kosa.backend.pay;
+package kr.or.kosa.backend.Pay;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;

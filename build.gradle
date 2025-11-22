@@ -3,6 +3,9 @@ plugins {
     id 'org.springframework.boot' version '3.5.7'
     id 'io.spring.dependency-management' version '1.1.7'
 }
+ext {
+    springAiVersion = "1.1.0"
+}
 
 group = 'kr.or.kosa'
 version = '0.0.1-SNAPSHOT'
@@ -39,11 +42,12 @@ dependencies {
     // --- MyBatis ---
     implementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter:3.0.4'
     implementation 'io.github.cdimascio:dotenv-java:2.2.3'
+    implementation 'org.springframework.ai:spring-ai-starter-model-openai'
 
     // --- Database (MySQL) ---
     runtimeOnly 'com.mysql:mysql-connector-j'
 
-    // --- JWT 라이브러리 추가 ---
+    // --- JWT ---
     implementation 'io.jsonwebtoken:jjwt-api:0.11.5'
     implementation 'io.jsonwebtoken:jjwt-impl:0.11.5'
     implementation 'io.jsonwebtoken:jjwt-jackson:0.11.5'
@@ -55,11 +59,10 @@ dependencies {
     // 개발 편의
     developmentOnly 'org.springframework.boot:spring-boot-devtools'
 
-    // AWS SDK v2 — S3
+    // --- AWS SDK (직접 S3 사용 가능) ---
     implementation 'software.amazon.awssdk:s3:2.25.39'
-
-    // 파일 업로드용 (스프링 기본 포함)
-    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation 'io.awspring.cloud:spring-cloud-aws-starter-s3:3.0.2'
+    implementation 'io.awspring.cloud:spring-cloud-aws-starter:3.0.2'
 
     // aop
     implementation 'org.springframework.boot:spring-boot-starter-aop'
@@ -71,7 +74,23 @@ dependencies {
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 
+    // WebFlux - WebClient 사용
+    implementation 'org.springframework.boot:spring-boot-starter-webflux'
+
+    if (isAppleSilicon()) {
+        runtimeOnly("io.netty:netty-resolver-dns-native-macos:4.1.94.Final:osx-aarch_64")
+    }
 }
+dependencyManagement {
+    imports {
+        mavenBom "org.springframework.ai:spring-ai-bom:$springAiVersion"
+    }
+}
+
+def isAppleSilicon() {
+    return System.getProperty("os.name") == "Mac OS X" && System.getProperty("os.arch") == "aarch64"
+}
+
 
 tasks.named('test') {
     useJUnitPlatform()

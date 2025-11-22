@@ -1,7 +1,7 @@
 package kr.or.kosa.backend.codenose.controller;
 
-import kr.or.kosa.backend.codenose.dto.CodeAnalysisHistoryDto;
-import kr.or.kosa.backend.codenose.dto.UserCodePatternDto;
+import kr.or.kosa.backend.codenose.dto.dtoReal.CodeResultDTO;
+import kr.or.kosa.backend.codenose.dto.dtoReal.UserCodePatternDTO;
 import kr.or.kosa.backend.codenose.service.InsightsService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -17,16 +17,16 @@ public class InsightsController {
     private final InsightsService insightsService;
 
     @GetMapping("/history/{userId}")
-    public ResponseEntity<List<CodeAnalysisHistoryDto>> getAnalysisHistory(@PathVariable Long userId) {
+    public ResponseEntity<List<CodeResultDTO>> getAnalysisHistory(@PathVariable Long userId) {
         // In a real app, userId would come from the security context
-        List<CodeAnalysisHistoryDto> history = insightsService.getAnalysisHistory(userId);
+        List<CodeResultDTO> history = insightsService.getCodeResult(userId);
         return ResponseEntity.ok(history);
     }
 
     @GetMapping("/patterns/{userId}")
-    public ResponseEntity<List<UserCodePatternDto>> getUserPatterns(@PathVariable Long userId) {
+    public ResponseEntity<List<UserCodePatternDTO>> getUserPatterns(@PathVariable Long userId) {
         // In a real app, userId would come from the security context
-        List<UserCodePatternDto> patterns = insightsService.getUserCodePatterns(userId);
+        List<UserCodePatternDTO> patterns = insightsService.getUserCodePatterns(userId);
         return ResponseEntity.ok(patterns);
     }
 }
