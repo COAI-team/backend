@@ -6,9 +6,12 @@ import kr.or.kosa.backend.algorithm.dto.ProblemGenerationResponseDto;
 import kr.or.kosa.backend.algorithm.service.AIProblemGeneratorService;
 import kr.or.kosa.backend.algorithm.service.AlgorithmProblemService;
 import kr.or.kosa.backend.commons.response.ApiResponse;
+import kr.or.kosa.backend.security.jwt.JwtAuthentication;
+import kr.or.kosa.backend.security.jwt.JwtUserDetails;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -29,12 +32,13 @@ public class AlgorithmProblemController {
     private final AIProblemGeneratorService aiProblemGeneratorService;
 
     /**
-     * AI 문제 생성 API
+     * AI 문제 생성 및 DB 저장
      * POST /api/algo/problems/generate
      */
     @PostMapping("/generate")
-    public ResponseEntity<ApiResponse<ProblemGenerationResponseDto>> generateProblem(
-            @RequestBody ProblemGenerationRequestDto request) {
+    public ResponseEntity<ApiResponse<Map<String, Object>>> generateProblem(
+            @RequestBody ProblemGenerationRequestDto request,
+            @AuthenticationPrincipal JwtAuthentication authentication) {
 
         log.info("AI 문제 생성 요청 - 난이도: {}, 주제: {}", request.getDifficulty(), request.getTopic());
 
@@ -50,30 +54,53 @@ public class AlgorithmProblemController {
                         .body(ApiResponse.error("4002", "문제 주제를 입력해주세요"));
             }
 
-            // 2. AI 문제 생성 서비스 호출
-            ProblemGenerationResponseDto response = aiProblemGeneratorService.generateProblem(request);
+            // 2. AI 문제 생성
+            ProblemGenerationResponseDto aiResponse = aiProblemGeneratorService.generateProblem(request);
 
             // 3. 생성 결과 확인
-            if (response.getStatus() == ProblemGenerationResponseDto.GenerationStatus.SUCCESS) {
-                log.info("AI 문제 생성 성공 - 제목: {}, 소요시간: {}초",
-                        response.getProblem().getAlgoProblemTitle(),
-                        response.getGenerationTime());
-
-                return ResponseEntity.ok(ApiResponse.success(response));
-
-            } else {
+            if (aiResponse.getStatus() != ProblemGenerationResponseDto.GenerationStatus.SUCCESS) {
                 log.error("AI 문제 생성 실패 - 상태: {}, 에러: {}",
-                        response.getStatus(), response.getErrorMessage());
+                        aiResponse.getStatus(), aiResponse.getErrorMessage());
 
                 return ResponseEntity.internalServerError()
                         .body(ApiResponse.error("5001",
-                                "AI 문제 생성에 실패했습니다: " + response.getErrorMessage()));
+                                "AI 문제 생성에 실패했습니다: " + aiResponse.getErrorMessage()));
             }
+
+            // 4. userId 추출 (JwtAuthentication → JwtUserDetails → id) 추후 수정 필요
+            Long userId = null;
+            if (authentication != null) {
+                JwtUserDetails userDetails = (JwtUserDetails) authentication.getPrincipal();
+                userId = userDetails.id().longValue(); // Integer → Long 변환
+                log.debug("인증된 사용자 - userId: {}, email: {}", userId, userDetails.email());
+            } else {
+                log.debug("인증되지 않은 사용자 - 익명으로 문제 생성");
+            }
+
+            // 5. DB에 저장
+            Long problemId = algorithmProblemService.saveGeneratedProblem(aiResponse, userId);
+
+            log.info("AI 문제 생성 및 저장 완료 - 문제 ID: {}, 제목: {}, 생성자 ID: {}, 소요시간: {}초",
+                    problemId,
+                    aiResponse.getProblem().getAlgoProblemTitle(),
+                    userId != null ? userId : "익명",
+                    aiResponse.getGenerationTime());
+
+            // 6. 응답 데이터 구성
+            Map<String, Object> responseData = new HashMap<>();
+            responseData.put("problemId", problemId);
+            responseData.put("title", aiResponse.getProblem().getAlgoProblemTitle());
+            responseData.put("description", aiResponse.getProblem().getAlgoProblemDescription());
+            responseData.put("difficulty", aiResponse.getProblem().getAlgoProblemDifficulty());
+            responseData.put("testCaseCount", aiResponse.getTestCases() != null ? aiResponse.getTestCases().size() : 0);
+            responseData.put("generationTime", aiResponse.getGenerationTime());
+
+            return ResponseEntity.ok(ApiResponse.success(responseData));
 
         } catch (Exception e) {
             log.error("AI 문제 생성 중 예외 발생", e);
             return ResponseEntity.internalServerError()
-                    .body(ApiResponse.error("5000", "문제 생성 중 서버 오류가 발생했습니다"));
+                    .body(ApiResponse.error("5000", "문제 생성 중 서버 오류가 발생했습니다: " + e.getMessage()));
         }
     }
 

@@ -1,6 +1,8 @@
 package kr.or.kosa.backend.algorithm.service;
 
 import kr.or.kosa.backend.algorithm.domain.AlgoProblem;
+import kr.or.kosa.backend.algorithm.domain.AlgoTestcase;
+import kr.or.kosa.backend.algorithm.dto.ProblemGenerationResponseDto;
 import kr.or.kosa.backend.algorithm.mapper.AlgorithmProblemMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -155,5 +157,75 @@ public class AlgorithmProblemService {
         }
 
         return size;
+    }
+
+    // ===== AI 생성 문제 저장 메서드 =====
+    /**
+            * AI 생성 문제를 DB에 저장
+     * @param responseDto AI 생성 결과
+     * @param userId 생성자 ID (null 가능)
+     * @return 저장된 문제 ID
+     */
+    @Transactional
+    public Long saveGeneratedProblem(ProblemGenerationResponseDto responseDto, Long userId) {
+        try {
+            log.info("AI 생성 문제 저장 시작 - 제목: {}", responseDto.getProblem().getAlgoProblemTitle());
+
+            // 1. 문제 엔티티 준비
+            AlgoProblem problem = responseDto.getProblem();
+            problem.setAlgoCreater(userId); // 생성자 ID 설정
+
+            // 2. 문제 저장 (AUTO_INCREMENT로 ID 자동 생성)
+            int insertResult = algorithmProblemMapper.insertProblem(problem);
+
+            if (insertResult == 0) {
+                throw new RuntimeException("문제 저장 실패");
+            }
+
+            log.info("문제 저장 완료 - ID: {}, 제목: {}",
+                    problem.getAlgoProblemId(), problem.getAlgoProblemTitle());
+
+            // 3. 테스트케이스 저장
+            if (responseDto.getTestCases() != null && !responseDto.getTestCases().isEmpty()) {
+                saveTestcases(problem.getAlgoProblemId(), responseDto.getTestCases());
+            }
+
+            // 4. ResponseDto에 생성된 ID 설정
+            responseDto.setProblemId(problem.getAlgoProblemId());
+
+            return problem.getAlgoProblemId();
+
+        } catch (Exception e) {
+            log.error("AI 생성 문제 저장 중 오류 발생", e);
+            throw new RuntimeException("AI 생성 문제 저장 실패: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * 테스트케이스 일괄 저장
+     */
+    @Transactional
+    private void saveTestcases(Long problemId, List<AlgoTestcase> testcases) {
+        try {
+            int savedCount = 0;
+
+            for (AlgoTestcase testcase : testcases) {
+                testcase.setAlgoProblemId(problemId);
+
+                int result = algorithmProblemMapper.insertTestcase(testcase);
+
+                if (result == 0) {
+                    throw new RuntimeException("테스트케이스 저장 실패 - 문제 ID: " + problemId);
+                }
+
+                savedCount++;
+            }
+
+            log.info("테스트케이스 저장 완료 - 문제 ID: {}, 저장 개수: {}", problemId, savedCount);
+
+        } catch (Exception e) {
+            log.error("테스트케이스 저장 중 오류 발생", e);
+            throw new RuntimeException("테스트케이스 저장 실패: " + e.getMessage(), e);
+        }
     }
 }
