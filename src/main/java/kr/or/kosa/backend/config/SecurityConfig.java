@@ -39,23 +39,17 @@ public class SecurityConfig {
                 )
 
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(
-                                "/users/register",
-                                "/users/login",
-                                "/users/refresh",
-                                "/users/logout",
-                                "/users/password/reset/**",
-                                "/email/**",
-                                "/payments/**"
-                        ).permitAll()
-                        .requestMatchers("/users/password/update").authenticated()
-                        .anyRequest().authenticated()
-                )
-
-                .addFilterBefore(
-                        new JwtAuthenticationFilter(jwtProvider),
-                        UsernamePasswordAuthenticationFilter.class
+//                        .requestMatchers(
+//                                "/**"
+//                        )
+//                        .permitAll()
+                                .anyRequest().permitAll()
                 );
+
+//                .addFilterBefore(
+//                        new JwtAuthenticationFilter(jwtProvider),
+//                        UsernamePasswordAuthenticationFilter.class
+//                );
 
         return http.build();
     }
@@ -70,4 +64,3 @@ public class SecurityConfig {
             throws Exception {
         return config.getAuthenticationManager();
     }
-}

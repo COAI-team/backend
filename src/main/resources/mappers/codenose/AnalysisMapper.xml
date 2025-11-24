@@ -137,10 +137,10 @@
                      #{analysisType},
                      #{toneLevel},
                      #{customRequirements},
-                     #{analysisResult, jdbcType=VARCHAR},
+                     #{analysisResult},
                      #{aiScore},
-                     #{codeSmells, jdbcType=VARCHAR},
-                     #{suggestions, jdbcType=VARCHAR},
+                     #{codeSmells},
+                     #{suggestions},
                      #{createdAt}
                  )
     </insert>
