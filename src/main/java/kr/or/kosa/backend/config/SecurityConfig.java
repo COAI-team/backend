@@ -40,14 +40,15 @@ public class SecurityConfig {
 
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
-                                "/users/login",
                                 "/users/register",
+                                "/users/login",
                                 "/users/refresh",
-                                "/users/password/reset/request",
-                                "/users/password/reset/confirm",
+                                "/users/logout",
+                                "/users/password/reset/**",
                                 "/email/**",
                                 "/payments/**"
                         ).permitAll()
+                        .requestMatchers("/users/password/update").authenticated()
                         .anyRequest().authenticated()
                 )
 

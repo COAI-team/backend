@@ -6,34 +6,34 @@
 
     <!-- ========= Domain 매핑 ========= -->
     <resultMap id="UserMap" type="kr.or.kosa.backend.user.domain.User">
-        <id property="id" column="id"/>
-        <result property="email" column="email"/>
-        <result property="password" column="password"/>
-        <result property="name" column="name"/>
-        <result property="nickname" column="nickname"/>
-        <result property="image" column="image"/>
-        <result property="grade" column="grade"/>
-        <result property="role" column="role"/>
-        <result property="githubToken" column="github_token"/>
-        <result property="refreshToken" column="refresh_token"/>
-        <result property="isDeleted" column="is_deleted"/>
-        <result property="deletedAt" column="deleted_at"/>
-        <result property="createdAt" column="created_at"/>
-        <result property="updatedAt" column="updated_at"/>
-        <result property="enabled" column="enabled"/>
+        <id property="id" column="USER_ID"/>
+        <result property="email" column="USER_EMAIL"/>
+        <result property="password" column="USER_PW"/>
+        <result property="name" column="USER_NAME"/>
+        <result property="nickname" column="USER_NICKNAME"/>
+        <result property="image" column="USER_IMAGE"/>
+        <result property="grade" column="USER_GRADE"/>
+        <result property="role" column="USER_ROLE"/>
+        <result property="githubToken" column="USER_GITHUBTOKEN"/>
+        <result property="refreshToken" column="USER_REFRESHTOKEN"/>
+        <result property="isDeleted" column="USER_ISDELETED"/>
+        <result property="deletedAt" column="USER_DELETEDAT"/>
+        <result property="createdAt" column="USER_CREATEDAT"/>
+        <result property="updatedAt" column="USER_UPDATEDAT"/>
+        <result property="enabled" column="USER_ENABLED"/>
     </resultMap>
 
     <!-- ========= SELECT ========= -->
     <select id="findByEmail" resultMap="UserMap">
-        SELECT * FROM users WHERE email = #{email}
+        SELECT * FROM USERS WHERE USER_EMAIL = #{email}
     </select>
 
     <select id="findByNickname" resultMap="UserMap">
-        SELECT * FROM users WHERE nickname = #{nickname}
+        SELECT * FROM USERS WHERE USER_NICKNAME = #{nickname}
     </select>
 
     <select id="findById" resultMap="UserMap">
-        SELECT * FROM users WHERE id = #{id}
+        SELECT * FROM USERS WHERE USER_ID = #{id}
     </select>
 
     <!-- ========= INSERT ========= -->
@@ -41,57 +41,57 @@
             parameterType="kr.or.kosa.backend.user.domain.User"
             useGeneratedKeys="true"
             keyProperty="id">
-        INSERT INTO users (
-            email, password, name, nickname, image
+        INSERT INTO USERS (
+            USER_EMAIL, USER_PW, USER_NAME, USER_NICKNAME, USER_IMAGE
         ) VALUES (
                      #{email}, #{password}, #{name}, #{nickname}, #{image}
                  )
     </insert>
 
     <insert id="insertGithubUser" parameterType="kr.or.kosa.backend.user.domain.User">
-        INSERT INTO users (
-            email, name, nickname, image, github_token, role
+        INSERT INTO USERS (
+            USER_EMAIL, USER_NAME, USER_NICKNAME, USER_IMAGE, USER_GITHUBTOKEN, USER_ROLE, USER_PW
         ) VALUES (
-                     #{email}, #{name}, #{nickname}, #{image}, #{githubToken}, #{role}
+                     #{email}, #{name}, #{nickname}, #{image}, #{githubToken}, #{role}, 'GITHUB_USER'
                  )
     </insert>
 
     <!-- ========= UPDATE ========= -->
     <update id="updateUser" parameterType="kr.or.kosa.backend.user.domain.User">
-        UPDATE users
-        SET name = #{name},
-            nickname = #{nickname},
-            image = #{image}
-        WHERE id = #{id}
+        UPDATE USERS
+        SET USER_NAME = #{name},
+            USER_NICKNAME = #{nickname},
+            USER_IMAGE = #{image}
+        WHERE USER_ID = #{id}
     </update>
 
     <update id="updateGithubToken" parameterType="kr.or.kosa.backend.user.domain.User">
-        UPDATE users
-        SET github_token = #{githubToken}
-        WHERE id = #{id}
+        UPDATE USERS
+        SET USER_GITHUBTOKEN = #{githubToken}
+        WHERE USER_ID = #{id}
     </update>
 
     <update id="updateUserImage">
-        UPDATE users
-        SET image = #{image}
-        WHERE id = #{id}
+        UPDATE USERS
+        SET USER_IMAGE = #{image}
+        WHERE USER_ID = #{id}
     </update>
 
     <update id="updateRefreshToken">
-        UPDATE users
-        SET refresh_token = #{token}
-        WHERE id = #{id}
+        UPDATE USERS
+        SET USER_REFRESHTOKEN = #{token}
+        WHERE USER_ID = #{id}
     </update>
 
     <update id="updatePassword">
-        UPDATE users
-        SET password = #{password}
-        WHERE id = #{id}
+        UPDATE USERS
+        SET USER_PW = #{password}
+        WHERE USER_ID = #{id}
     </update>
 
     <!-- ========= DELETE ========= -->
     <delete id="deleteUser">
-        DELETE FROM users WHERE id = #{id}
+        DELETE FROM USERS WHERE USER_ID = #{id}
     </delete>
 
 </mapper>
