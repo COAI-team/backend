@@ -22,7 +22,14 @@ import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 /**
- * 알고리즘 문제 풀이 서비스 (ALG-04, ALG-07) - 수정 버전
+ * 알고리즘 문제 풀이 핵심 서비스 (간소화 버전)
+ * - 문제 풀이 시작 (ALG-04)
+ * - 코드 제출 및 채점 (ALG-07)
+ * - 제출 결과 조회
+ * - 공유 상태 관리 (ALG-09)
+ * - 사용자 제출 이력 (ALG-11)
+ *
+ * 분리된 기능: AI 평가 및 점수 계산 → AlgorithmEvaluationService
  */
 @Service
 @RequiredArgsConstructor
@@ -32,6 +39,7 @@ public class AlgorithmSolvingService {
     private final AlgorithmProblemMapper problemMapper;
     private final AlgorithmSubmissionMapper submissionMapper;
     private final Judge0Service judge0Service;
+    private final AlgorithmEvaluationService evaluationService; // ✅ 의존성 주입 확인
 
     /**
      * 문제 풀이 시작 (ALG-04)
@@ -70,32 +78,32 @@ public class AlgorithmSolvingService {
     }
 
     /**
-     * 코드 제출 및 채점 (ALG-07)
+     * 코드 제출 및 채점 (ALG-07) - 통합 플로우
      */
     @Transactional
     public SubmissionResponseDto submitCode(SubmissionRequestDto request, Long userId) {
-        log.info("코드 제출 - problemId: {}, userId: {}, language: {}",
+        log.info("코드 제출 시작 - problemId: {}, userId: {}, language: {}",
                 request.getProblemId(), userId, request.getLanguage());
 
-        // 요청 데이터 검증
+        // 1. 요청 데이터 검증
         request.validate();
 
-        // 1. 문제 존재 확인
+        // 2. 문제 존재 확인
         AlgoProblem problem = problemMapper.selectProblemById(request.getProblemId());
         if (problem == null) {
             throw new IllegalArgumentException("존재하지 않는 문제입니다");
         }
 
-        // 2. 제출 엔티티 생성 및 저장
+        // 3. 제출 엔티티 생성 및 저장
         AlgoSubmission submission = createSubmission(request, userId, problem);
         submissionMapper.insertSubmission(submission);
 
         log.info("제출 저장 완료 - submissionId: {}", submission.getAlgosubmissionId());
 
-        // 3. 비동기로 Judge0 채점 시작
-        processJudgingAsync(submission.getAlgosubmissionId(), request, problem);
+        // 4. 비동기로 Judge0 채점 및 AI 평가 프로세스 시작
+        processCompleteJudgingFlow(submission.getAlgosubmissionId(), request, problem);
 
-        // 4. 즉시 응답 반환 (PENDING 상태)
+        // 5. 즉시 응답 반환 (PENDING 상태)
         return convertToSubmissionResponse(submission, problem, null);
     }
 
@@ -112,7 +120,6 @@ public class AlgorithmSolvingService {
         }
 
         AlgoProblem problem = problemMapper.selectProblemById(submission.getAlgoProblemId());
-
         return convertToSubmissionResponse(submission, problem, null);
     }
 
@@ -154,11 +161,12 @@ public class AlgorithmSolvingService {
     }
 
     /**
-     * 비동기 채점 처리
+     * 통합 채점 및 평가 프로세스 (비동기)
+     * - Judge0 채점 후 즉시 AI 평가 시작
      */
     @Async
-    protected void processJudgingAsync(Long submissionId, SubmissionRequestDto request, AlgoProblem problem) {
-        log.info("비동기 채점 시작 - submissionId: {}", submissionId);
+    protected void processCompleteJudgingFlow(Long submissionId, SubmissionRequestDto request, AlgoProblem problem) {
+        log.info("통합 채점 프로세스 시작 - submissionId: {}", submissionId);
 
         try {
             // 1. 모든 테스트케이스 조회
@@ -171,30 +179,88 @@ public class AlgorithmSolvingService {
                             .build())
                     .collect(Collectors.toList());
 
-            // 2. Judge0로 채점
+            // 2. Judge0 채점 실행
             CompletableFuture<Judge0Service.JudgeResultDto> judgeFuture =
                     judge0Service.judgeCode(request.getSourceCode(), request.getLanguage(), testCaseDtos);
 
             Judge0Service.JudgeResultDto judgeResult = judgeFuture.get();
 
-            // 3. 점수 계산
-            BigDecimal finalScore = calculateFinalScore(judgeResult, request, problem);
+            // 3. Judge 결과만으로 기본 제출 정보 업데이트
+            updateSubmissionWithJudgeResult(submissionId, judgeResult, request);
 
-            // 4. 제출 결과 업데이트
-            AlgoSubmission submission = submissionMapper.selectSubmissionById(submissionId);
-            updateSubmissionWithResult(submission, judgeResult, finalScore, request);
-            submissionMapper.updateSubmission(submission);
+            log.info("Judge0 채점 완료 - submissionId: {}, result: {}",
+                    submissionId, judgeResult.getOverallResult());
 
-            log.info("채점 완료 - submissionId: {}, result: {}, score: {}",
-                    submissionId, judgeResult.getOverallResult(), finalScore);
+            // 4. AI 평가 및 점수 계산 비동기 시작 (분리된 서비스)
+            evaluationService.processEvaluationAsync(submissionId, problem, judgeResult);
 
         } catch (Exception e) {
-            log.error("채점 중 오류 발생 - submissionId: {}", submissionId, e);
+            log.error("통합 채점 프로세스 중 오류 발생 - submissionId: {}", submissionId, e);
+            markSubmissionFailed(submissionId, e.getMessage());
+        }
+    }
 
-            // 에러 상태로 업데이트
+    /**
+     * Judge 결과로만 제출 업데이트 (기본 점수)
+     */
+    private void updateSubmissionWithJudgeResult(Long submissionId, Judge0Service.JudgeResultDto judgeResult,
+                                                 SubmissionRequestDto request) {
+        AlgoSubmission submission = submissionMapper.selectSubmissionById(submissionId);
+        if (submission == null) return;
+
+        // Judge 결과 설정
+        submission.setJudgeResult(AlgoSubmission.JudgeResult.valueOf(judgeResult.getOverallResult()));
+        submission.setExecutionTime(judgeResult.getMaxExecutionTime());
+        submission.setMemoryUsage(judgeResult.getMaxMemoryUsage());
+        submission.setPassedTestCount(judgeResult.getPassedTestCount());
+        submission.setTotalTestCount(judgeResult.getTotalTestCount());
+
+        // 종료 시간 설정
+        if (request.getEndTime() == null) {
+            submission.setEndSolving(LocalDateTime.now());
+            if (submission.getStartSolving() != null) {
+                submission.setSolvingDurationSeconds(
+                        (int) Duration.between(submission.getStartSolving(), submission.getEndSolving()).getSeconds());
+            }
+        }
+
+        // 기본 점수 계산 (Judge 결과만으로)
+        BigDecimal basicScore = calculateBasicScore(judgeResult);
+        submission.setFinalScore(basicScore);
+
+        submissionMapper.updateSubmission(submission);
+    }
+
+    /**
+     * 기본 점수 계산 (Judge 결과만 사용)
+     */
+    private BigDecimal calculateBasicScore(Judge0Service.JudgeResultDto judgeResult) {
+        if ("AC".equals(judgeResult.getOverallResult())) {
+            return new BigDecimal("100");
+        }
+
+        if (judgeResult.getPassedTestCount() > 0 && judgeResult.getTotalTestCount() > 0) {
+            double partialScore = (double) judgeResult.getPassedTestCount() /
+                    judgeResult.getTotalTestCount() * 100;
+            return new BigDecimal(partialScore).setScale(2, RoundingMode.HALF_UP);
+        }
+
+        return BigDecimal.ZERO;
+    }
+
+    /**
+     * 제출 실패 표시
+     */
+    private void markSubmissionFailed(Long submissionId, String errorMessage) {
+        try {
             AlgoSubmission submission = submissionMapper.selectSubmissionById(submissionId);
-            submission.setJudgeResult(AlgoSubmission.JudgeResult.PENDING);
-            submissionMapper.updateSubmission(submission);
+            if (submission != null) {
+                submission.setJudgeResult(AlgoSubmission.JudgeResult.PENDING);
+                submission.setAiFeedbackStatus(AlgoSubmission.AiFeedbackStatus.FAILED);
+                submissionMapper.updateSubmission(submission);
+            }
+        } catch (Exception e) {
+            log.error("제출 실패 표시 중 오류 - submissionId: {}", submissionId, e);
         }
     }
 
@@ -204,7 +270,6 @@ public class AlgorithmSolvingService {
     private AlgoSubmission createSubmission(SubmissionRequestDto request, Long userId, AlgoProblem problem) {
         LocalDateTime now = LocalDateTime.now();
 
-        // 풀이 시간 계산
         Integer solvingDuration = null;
         if (request.getStartTime() != null && request.getEndTime() != null) {
             solvingDuration = (int) Duration.between(request.getStartTime(), request.getEndTime()).getSeconds();
@@ -231,96 +296,7 @@ public class AlgorithmSolvingService {
                 .build();
     }
 
-    /**
-     * 채점 결과로 제출 업데이트
-     */
-    private void updateSubmissionWithResult(AlgoSubmission submission,
-                                            Judge0Service.JudgeResultDto judgeResult,
-                                            BigDecimal finalScore,
-                                            SubmissionRequestDto request) {
-        submission.setJudgeResult(AlgoSubmission.JudgeResult.valueOf(judgeResult.getOverallResult()));
-        submission.setExecutionTime(judgeResult.getMaxExecutionTime());
-        submission.setMemoryUsage(judgeResult.getMaxMemoryUsage());
-        submission.setPassedTestCount(judgeResult.getPassedTestCount());
-        submission.setTotalTestCount(judgeResult.getTotalTestCount());
-        submission.setFinalScore(finalScore);
-
-        if (request.getEndTime() == null) {
-            submission.setEndSolving(LocalDateTime.now());
-            if (submission.getStartSolving() != null) {
-                submission.setSolvingDurationSeconds(
-                        (int) Duration.between(submission.getStartSolving(), submission.getEndSolving()).getSeconds());
-            }
-        }
-
-        // 시간 효율성 점수 계산
-        BigDecimal timeEfficiencyScore = calculateTimeEfficiencyScore(submission, judgeResult);
-        submission.setTimeEfficiencyScore(timeEfficiencyScore);
-    }
-
-    /**
-     * 최종 점수 계산
-     */
-    private BigDecimal calculateFinalScore(Judge0Service.JudgeResultDto judgeResult,
-                                           SubmissionRequestDto request,
-                                           AlgoProblem problem) {
-        // Judge 결과 점수 (40%)
-        BigDecimal judgeScore = BigDecimal.ZERO;
-        if ("AC".equals(judgeResult.getOverallResult())) {
-            judgeScore = new BigDecimal("100");
-        } else if (judgeResult.getPassedTestCount() > 0) {
-            // 부분 점수
-            double partialScore = (double) judgeResult.getPassedTestCount() / judgeResult.getTotalTestCount() * 50;
-            judgeScore = new BigDecimal(partialScore).setScale(2, RoundingMode.HALF_UP);
-        }
-
-        // 난이도별 가산점
-        BigDecimal difficultyMultiplier = getDifficultyMultiplier(problem.getAlgoProblemDifficulty());
-
-        // 기본 점수 계산 (AI 점수와 시간 효율성은 나중에 업데이트)
-        BigDecimal finalScore = judgeScore.multiply(difficultyMultiplier)
-                .multiply(new BigDecimal("0.7")) // 70% 가중치
-                .setScale(2, RoundingMode.HALF_UP);
-
-        return finalScore;
-    }
-
-    /**
-     * 시간 효율성 점수 계산
-     */
-    private BigDecimal calculateTimeEfficiencyScore(AlgoSubmission submission, Judge0Service.JudgeResultDto judgeResult) {
-        if (submission.getSolvingDurationSeconds() == null) {
-            return new BigDecimal("50"); // 기본 점수
-        }
-
-        // 30분(1800초) 기준으로 계산
-        int timeLimit = 1800; // 30분
-        int actualTime = submission.getSolvingDurationSeconds();
-
-        if (actualTime >= timeLimit) {
-            return new BigDecimal("10"); // 최소 점수
-        }
-
-        double efficiency = (double) (timeLimit - actualTime) / timeLimit * 100;
-        return new BigDecimal(efficiency).setScale(2, RoundingMode.HALF_UP);
-    }
-
-    /**
-     * 난이도별 가중치
-     */
-    private BigDecimal getDifficultyMultiplier(kr.or.kosa.backend.algorithm.domain.ProblemDifficulty difficulty) {
-        switch (difficulty) {
-            case BRONZE: return new BigDecimal("1.0");
-            case SILVER: return new BigDecimal("1.2");
-            case GOLD: return new BigDecimal("1.5");
-            case PLATINUM: return new BigDecimal("2.0");
-            default: return new BigDecimal("1.0");
-        }
-    }
-
-    /**
-     * 테스트케이스 DTO 변환
-     */
+    // DTO 변환 메소드들은 기존과 동일하게 유지
     private List<ProblemSolveResponseDto.TestCaseDto> convertToTestCaseDtos(List<AlgoTestcase> testCases) {
         return testCases.stream()
                 .map(tc -> ProblemSolveResponseDto.TestCaseDto.builder()
@@ -331,9 +307,6 @@ public class AlgorithmSolvingService {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * 이전 제출 정보 변환
-     */
     private ProblemSolveResponseDto.SubmissionSummaryDto convertToPreviousSubmission(AlgoSubmission submission) {
         if (submission == null) {
             return null;
@@ -347,9 +320,6 @@ public class AlgorithmSolvingService {
                 .build();
     }
 
-    /**
-     * 제출 응답 DTO 변환
-     */
     private SubmissionResponseDto convertToSubmissionResponse(AlgoSubmission submission,
                                                               AlgoProblem problem,
                                                               List<Judge0Service.TestCaseResultDto> testCaseResults) {
@@ -366,7 +336,6 @@ public class AlgorithmSolvingService {
                 .passedTestCount(submission.getPassedTestCount())
                 .totalTestCount(submission.getTotalTestCount())
                 .testPassRate(submission.getTestPassRate())
-                .testCaseResults(convertTestCaseResults(testCaseResults))
                 .aiFeedback(submission.getAiFeedback())
                 .aiFeedbackStatus(submission.getAiFeedbackStatus() != null ?
                         submission.getAiFeedbackStatus().name() : "PENDING")
@@ -384,9 +353,6 @@ public class AlgorithmSolvingService {
                 .build();
     }
 
-    /**
-     * 채점 상태 판정
-     */
     private String determineJudgeStatus(AlgoSubmission submission) {
         if (submission.getJudgeResult() == null || submission.getJudgeResult() == AlgoSubmission.JudgeResult.PENDING) {
             return "PENDING";
@@ -394,31 +360,6 @@ public class AlgorithmSolvingService {
         return "COMPLETED";
     }
 
-    /**
-     * 테스트케이스 결과 변환
-     */
-    private List<SubmissionResponseDto.TestCaseResultDto> convertTestCaseResults(
-            List<Judge0Service.TestCaseResultDto> testCaseResults) {
-        if (testCaseResults == null) {
-            return null;
-        }
-
-        return testCaseResults.stream()
-                .map(tcr -> SubmissionResponseDto.TestCaseResultDto.builder()
-                        .testCaseNumber(tcr.getTestCaseNumber())
-                        .input(tcr.getInput())
-                        .expectedOutput(tcr.getExpectedOutput())
-                        .actualOutput(tcr.getActualOutput())
-                        .result(tcr.getResult())
-                        .executionTime(tcr.getExecutionTime())
-                        .errorMessage(tcr.getErrorMessage())
-                        .build())
-                .collect(Collectors.toList());
-    }
-
-    /**
-     * 점수 세부사항 생성
-     */
     private SubmissionResponseDto.ScoreBreakdownDto createScoreBreakdown(AlgoSubmission submission) {
         return SubmissionResponseDto.ScoreBreakdownDto.builder()
                 .judgeScore(calculateJudgeScore(submission))
@@ -426,13 +367,10 @@ public class AlgorithmSolvingService {
                 .timeScore(submission.getTimeEfficiencyScore() != null ?
                         submission.getTimeEfficiencyScore() : BigDecimal.ZERO)
                 .focusScore(submission.getFocusScore() != null ? submission.getFocusScore() : BigDecimal.ZERO)
-                .scoreWeights("Judge(40%) + AI(30%) + Time(20%) + Focus(10%)")
+                .scoreWeights("Judge(40%) + AI(30%) + Time(30%)")
                 .build();
     }
 
-    /**
-     * Judge 점수 계산
-     */
     private BigDecimal calculateJudgeScore(AlgoSubmission submission) {
         if (submission.getJudgeResult() == AlgoSubmission.JudgeResult.AC) {
             return new BigDecimal("100");
