@@ -23,7 +23,7 @@ import java.util.concurrent.CompletableFuture;
  * 기존 기능 + AI 코드 평가 + 점수 계산 테스트 추가
  */
 @RestController
-@RequestMapping("/api/algo/test")
+@RequestMapping("/algo/test")
 @RequiredArgsConstructor
 @Slf4j
 public class AlgorithmTestController {
@@ -293,7 +293,7 @@ public class AlgorithmTestController {
 /**
  * AI 코드 평가 테스트 요청 DTO
  */
-@lombok.Data
+@Data
 class CodeEvaluationTestRequest {
     private String sourceCode;
     private String problemDescription;

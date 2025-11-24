@@ -23,7 +23,7 @@ import java.util.Map;
  * 기본 조회 API + AI 문제 생성 API
  */
 @RestController
-@RequestMapping("/api/algo/problems")
+@RequestMapping("/algo/problems")
 @RequiredArgsConstructor
 @Slf4j
 public class AlgorithmProblemController {
