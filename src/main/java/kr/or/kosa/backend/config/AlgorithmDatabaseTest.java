@@ -1,8 +1,4 @@
-<<<<<<< HEAD
 //package kr.or.kosa.backend.config;
-=======
-//package kr.or.kosa.backend.algorithm.config;
->>>>>>> e7ff1775264083eb7a2eea340fbb52d4e52ccaa4
 //
 //import lombok.RequiredArgsConstructor;
 //import lombok.extern.slf4j.Slf4j;
