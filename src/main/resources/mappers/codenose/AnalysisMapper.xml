@@ -136,11 +136,11 @@
                      #{filePath},
                      #{analysisType},
                      #{toneLevel},
-                     #{customRequirements},
-                     #{analysisResult},
+                     #{customRequirements, jdbcType=VARCHAR},
+                     #{analysisResult, jdbcType=LONGVARCHAR},
                      #{aiScore},
-                     #{codeSmells},
-                     #{suggestions},
+                     #{codeSmells, jdbcType=LONGVARCHAR},
+                     #{suggestions, jdbcType=LONGVARCHAR},
                      #{createdAt}
                  )
     </insert>

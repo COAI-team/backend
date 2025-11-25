@@ -31,6 +31,8 @@ public class PromptGenerator {
             1.  "aiScore": An overall score for the code from 0 to 100.
             2.  "codeSmells": A list of identified code smells. Each item should have a "name" and "description".
             3.  "suggestions": A list of concrete suggestions for improvement. Each suggestion should include the problematic code snippet and the proposed replacement.
+
+            IMPORTANT: Output ONLY the JSON object. Do not include any conversational text or markdown formatting outside the JSON object.
             """;
 
     /**

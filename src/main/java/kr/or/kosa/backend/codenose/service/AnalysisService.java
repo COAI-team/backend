@@ -314,29 +314,23 @@ public class AnalysisService {
     }
 
     /**
-     * AI 응답에서 마크다운 코드 블록 제거
+     * AI 응답에서 JSON 부분만 추출
      * 
      * @param response AI 원본 응답
      * @return 정제된 JSON 문자열
      */
     private String cleanMarkdownCodeBlock(String response) {
         if (response == null) {
-            return response;
+            return "{}";
         }
 
-        // ```json ... ``` 또는 ``` ... ``` 패턴 제거
         String cleaned = response.trim();
 
-        // 시작 부분의 ```json 또는 ``` 제거
-        if (cleaned.startsWith("```json")) {
-            cleaned = cleaned.substring(7).trim();
-        } else if (cleaned.startsWith("```")) {
-            cleaned = cleaned.substring(3).trim();
-        }
+        int firstBrace = cleaned.indexOf("{");
+        int lastBrace = cleaned.lastIndexOf("}");
 
-        // 끝 부분의 ``` 제거
-        if (cleaned.endsWith("```")) {
-            cleaned = cleaned.substring(0, cleaned.length() - 3).trim();
+        if (firstBrace != -1 && lastBrace != -1 && firstBrace < lastBrace) {
+            return cleaned.substring(firstBrace, lastBrace + 1);
         }
 
         return cleaned;
