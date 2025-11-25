@@ -1,5 +1,6 @@
 package kr.or.kosa.backend.pay.service;
 
+import kr.or.kosa.backend.pay.dto.UpgradeQuoteResponse;
 import kr.or.kosa.backend.pay.entity.Payments;
 import kr.or.kosa.backend.pay.entity.Subscription;
 
@@ -22,4 +23,9 @@ public interface PaymentsService {
 
     // 4. 결제 취소 및 환불 처리
     Payments cancelPayment(String paymentKey, String cancelReason);
+
+    // 🔥 추가: BASIC → PRO 업그레이드 시 추가 결제 금액 계산
+    UpgradeQuoteResponse getUpgradeQuote(String userId, String targetPlanCode);
+
+
 }

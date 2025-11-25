@@ -1,5 +1,6 @@
 package kr.or.kosa.backend.pay.controller;
 
+import kr.or.kosa.backend.pay.dto.UpgradeQuoteResponse;
 import kr.or.kosa.backend.pay.entity.Payments;
 import kr.or.kosa.backend.pay.entity.Subscription;
 import kr.or.kosa.backend.pay.service.PaymentsService;
@@ -180,6 +181,35 @@ public class PaymentsController {
             errorResponse.put("code", "INTERNAL_SERVER_ERROR");
             errorResponse.put("message", "환불 처리 중 알 수 없는 서버 오류가 발생했습니다.");
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
+    }
+
+    /**
+     * BASIC → PRO 업그레이드 시, 남은 일수 기준 추가 결제 금액 안내
+     *
+     * 예: GET /payments/upgrade-quote?userId=TEST_USER_001&planCode=PRO
+     */
+    @GetMapping("/upgrade-quote")
+    public ResponseEntity<?> getUpgradeQuote(
+            @RequestParam String userId,
+            @RequestParam String planCode
+    ) {
+        try {
+            UpgradeQuoteResponse quote = paymentsService.getUpgradeQuote(userId, planCode);
+            return ResponseEntity.ok(quote);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of(
+                            "code", "UPGRADE_QUOTE_VALIDATION_ERROR",
+                            "message", e.getMessage()
+                    ));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of(
+                            "code", "UPGRADE_QUOTE_INTERNAL_ERROR",
+                            "message", "업그레이드 견적 계산 중 서버 오류가 발생했습니다."
+                    ));
         }
     }
 }

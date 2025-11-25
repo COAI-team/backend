@@ -10,7 +10,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
+import kr.or.kosa.backend.pay.dto.UpgradeQuoteResponse;
 
+
+import java.time.temporal.ChronoUnit;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
@@ -216,26 +219,78 @@ public class PaymentsServiceImpl implements PaymentsService {
      * 구독권 부여 로직
      */
     private void grantSubscriptionToUser(String orderId) {
+        // 1) 결제 정보 조회
         Payments payment = paymentsMapper.findPaymentByOrderId(orderId)
                 .orElseThrow(() -> new IllegalArgumentException("결제 정보를 찾을 수 없습니다."));
 
+        // 2) 유저 식별 (userId 우선, 없으면 customerName fallback)
         String userId = payment.getUserId();
         if (userId == null || userId.isEmpty()) {
             userId = payment.getCustomerName();
         }
 
-        String subscriptionType = payment.getPlanCode();
-        if (subscriptionType == null || subscriptionType.isEmpty()) {
-            subscriptionType = payment.getOrderName();
+        // 3) 구독 타입 (planCode가 정석, 없으면 orderName 사용)
+        String planCode = payment.getPlanCode();
+        if (planCode == null || planCode.isEmpty()) {
+            planCode = payment.getOrderName(); // 예: "Basic 구독권" 같은 문자열
         }
 
         LocalDateTime now = LocalDateTime.now();
+
+        // 🔥 4) BASIC → PRO 업그레이드 처리
+        // - 결제 planCode가 PRO이고
+        // - 해당 유저의 ACTIVE BASIC 구독이 존재하면
+        if (userId != null
+                && !userId.isEmpty()
+                && "PRO".equalsIgnoreCase(planCode)) {
+
+            // 최신 ACTIVE BASIC 하나 찾기
+            Optional<Subscription> basicOpt =
+                    subscriptionMapper.findLatestActiveSubscriptionByUserIdAndType(userId, "BASIC");
+
+            if (basicOpt.isPresent()) {
+                Subscription basicSub = basicOpt.get();
+
+                LocalDateTime basicEnd = basicSub.getEndDate();
+
+                // BASIC 구독의 종료일이 아직 지나지 않았다면 → 업그레이드로 처리
+                if (basicEnd != null && basicEnd.isAfter(now)) {
+
+                    // (1) 기존 BASIC 구독 비활성화
+                    //     - 상태를 CANCELED로 바꿔서 ACTIVE 목록에서 빠지게
+                    subscriptionMapper.updateSubscriptionStatusToCanceled(
+                            basicSub.getOrderId(),
+                            "CANCELED"
+                    );
+
+                    // (2) PRO 구독 생성: "지금 ~ BASIC 종료일"까지만 유효
+                    Subscription proSubscription = Subscription.builder()
+                            .userId(userId)
+                            .orderId(orderId)          // 이번 PRO 결제 orderId
+                            .subscriptionType("PRO")   // 명시적으로 PRO
+                            .startDate(now)
+                            .endDate(basicEnd)         // 🔥 핵심: 새로 30일이 아니라 BASIC 남은 기간만
+                            .status("ACTIVE")
+                            .build();
+
+                    int inserted = subscriptionMapper.insertSubscription(proSubscription);
+                    if (inserted != 1) {
+                        throw new RuntimeException("구독권 업그레이드 정보 DB 저장 실패");
+                    }
+
+                    // 여기서 바로 return → 아래 "신규 30일 구독" 로직은 실행 안 됨
+                    return;
+                }
+            }
+        }
+
+        // 5) 그 외 케이스는 기존처럼 "새 30일 구독" 생성
         LocalDateTime endDate = now.plusMonths(1);
 
         Subscription newSubscription = Subscription.builder()
                 .userId(userId)
                 .orderId(orderId)
-                .subscriptionType(subscriptionType)
+                .subscriptionType(planCode)
                 .startDate(now)
                 .endDate(endDate)
                 .status("ACTIVE")
@@ -246,6 +301,7 @@ public class PaymentsServiceImpl implements PaymentsService {
             throw new RuntimeException("구독권 정보 DB 저장 실패");
         }
     }
+
 
     /**
      * 토스페이먼츠 환불/취소 처리
@@ -372,5 +428,144 @@ public class PaymentsServiceImpl implements PaymentsService {
             // 파싱 실패 시 null 리턴해서 제한 로직에서 그냥 무시하도록
             return null;
         }
+    }
+
+    // 구독을 "한 달"로 볼 때 기준 일수
+    private static final long SUBSCRIPTION_DAYS = 30L;
+
+    // 플랜 월 요금 (TODO: 나중에 DB나 설정으로 빼도 됨)
+    private int getMonthlyPrice(String planCode) {
+        if (planCode == null) return 0;
+        switch (planCode.toUpperCase()) {
+            case "BASIC":
+                return 39800;
+            case "PRO":
+                return 42900;
+            default:
+                return 0; // 정의되지 않은 플랜
+        }
+    }
+
+    @Override
+    public UpgradeQuoteResponse getUpgradeQuote(String userId, String targetPlanCode) {
+
+        if (userId == null || userId.isBlank()) {
+            throw new IllegalArgumentException("userId는 필수입니다.");
+        }
+        if (targetPlanCode == null || targetPlanCode.isBlank()) {
+            throw new IllegalArgumentException("planCode는 필수입니다.");
+        }
+
+        String normalizedTarget = targetPlanCode.toUpperCase();
+
+        // 지금은 BASIC → PRO만 업그레이드로 취급
+        if (!"PRO".equals(normalizedTarget)) {
+            return UpgradeQuoteResponse.builder()
+                    .upgrade(false)
+                    .fromPlan(null)
+                    .toPlan(normalizedTarget)
+                    .usedDays(0)
+                    .remainingDays(0)
+                    .extraAmount(0)
+                    .basicEndDate(null)
+                    .build();
+        }
+
+        // 최신 ACTIVE BASIC 구독 1개 조회
+        return subscriptionMapper.findLatestActiveSubscriptionByUserIdAndType(userId, "BASIC")
+                .map(basicSub -> {
+
+                    LocalDateTime now = LocalDateTime.now();
+                    LocalDateTime start = basicSub.getStartDate();
+                    LocalDateTime end = basicSub.getEndDate();
+
+                    // 이미 끝난 BASIC이면 업그레이드 대상 아님
+                    if (end == null || !end.isAfter(now)) {
+                        return UpgradeQuoteResponse.builder()
+                                .upgrade(false)
+                                .fromPlan("BASIC")
+                                .toPlan("PRO")
+                                .usedDays(0)
+                                .remainingDays(0)
+                                .extraAmount(0)
+                                .basicEndDate(null)
+                                .build();
+                    }
+
+                    // 전체 구독 기간(일수) 계산
+                    long totalDays = 0;
+                    if (start != null && end != null) {
+                        totalDays = ChronoUnit.DAYS.between(start.toLocalDate(), end.toLocalDate());
+                    }
+                    if (totalDays <= 0) {
+                        totalDays = SUBSCRIPTION_DAYS; // 안전장치
+                    }
+
+                    // 사용한 일수
+                    long usedDays = 0;
+                    if (start != null) {
+                        usedDays = ChronoUnit.DAYS.between(start.toLocalDate(), now.toLocalDate());
+                        if (usedDays < 0) usedDays = 0;
+                        if (usedDays > totalDays) usedDays = totalDays;
+                    }
+
+                    long remainingDays = totalDays - usedDays;
+                    if (remainingDays <= 0) {
+                        return UpgradeQuoteResponse.builder()
+                                .upgrade(false)
+                                .fromPlan("BASIC")
+                                .toPlan("PRO")
+                                .usedDays(usedDays)
+                                .remainingDays(0)
+                                .extraAmount(0)
+                                .basicEndDate(null)
+                                .build();
+                    }
+
+                    int basicPrice = getMonthlyPrice("BASIC");
+                    int proPrice   = getMonthlyPrice("PRO");
+                    int diff       = proPrice - basicPrice;
+
+                    if (diff <= 0) {
+                        // 말이 안 되는 설정이면 그냥 업그레이드 없음 처리
+                        return UpgradeQuoteResponse.builder()
+                                .upgrade(false)
+                                .fromPlan("BASIC")
+                                .toPlan("PRO")
+                                .usedDays(usedDays)
+                                .remainingDays(remainingDays)
+                                .extraAmount(0)
+                                .basicEndDate(null)
+                                .build();
+                    }
+
+                    // 프리로레이션: 월 차액 * (남은일수 / 전체일수)
+                    double rawExtra = diff * (remainingDays / (double) totalDays);
+                    int extraAmount = (int) Math.ceil(rawExtra); // 필요하면 10원 단위 반올림도 가능
+
+                    String endStr = end.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+
+                    return UpgradeQuoteResponse.builder()
+                            .upgrade(true)
+                            .fromPlan("BASIC")
+                            .toPlan("PRO")
+                            .usedDays(usedDays)
+                            .remainingDays(remainingDays)
+                            .extraAmount(extraAmount)
+                            .basicEndDate(endStr)
+                            .build();
+                })
+                .orElseGet(() ->
+                        // ACTIVE BASIC 구독이 없으면 업그레이드 상황 아님
+                        UpgradeQuoteResponse.builder()
+                                .upgrade(false)
+                                .fromPlan(null)
+                                .toPlan("PRO")
+                                .usedDays(0)
+                                .remainingDays(0)
+                                .extraAmount(0)
+                                .basicEndDate(null)
+                                .build()
+                );
     }
 }

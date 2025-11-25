@@ -7,13 +7,13 @@
 
     <resultMap id="SubscriptionResultMap"
                type="kr.or.kosa.backend.pay.entity.Subscription">
-        <id     column="subscription_id"  property="subscriptionId"/>
-        <result column="user_id"          property="userId"/>
-        <result column="order_id"         property="orderId"/>
+        <id     column="subscription_id"   property="subscriptionId"/>
+        <result column="user_id"           property="userId"/>
+        <result column="order_id"          property="orderId"/>
         <result column="subscription_type" property="subscriptionType"/>
-        <result column="start_date"       property="startDate"/>
-        <result column="end_date"         property="endDate"/>
-        <result column="status"           property="status"/>
+        <result column="start_date"        property="startDate"/>
+        <result column="end_date"          property="endDate"/>
+        <result column="status"            property="status"/>
     </resultMap>
 
     <insert id="insertSubscription"
@@ -38,6 +38,7 @@
         )
     </insert>
 
+    <!-- 사용자의 ACTIVE 구독 전체 -->
     <select id="findActiveSubscriptionsByUserId"
             resultMap="SubscriptionResultMap">
         SELECT
@@ -54,6 +55,7 @@
         ORDER BY end_date DESC
     </select>
 
+    <!-- orderId로 단건 조회 -->
     <select id="findSubscriptionByOrderId"
             resultMap="SubscriptionResultMap">
         SELECT
@@ -68,6 +70,26 @@
         WHERE order_id = #{orderId}
     </select>
 
+    <!-- 🔥 추가: BASIC ACTIVE 중 가장 최신 한 건 -->
+    <select id="findLatestActiveSubscriptionByUserIdAndType"
+            resultMap="SubscriptionResultMap">
+        SELECT
+        subscription_id,
+        user_id,
+        order_id,
+        subscription_type,
+        start_date,
+        end_date,
+        status
+        FROM subscriptions
+        WHERE user_id = #{userId}
+        AND subscription_type = #{subscriptionType}
+        AND status = 'ACTIVE'
+        ORDER BY end_date DESC
+        LIMIT 1
+    </select>
+
+    <!-- 구독 상태 CANCELED 등으로 변경 -->
     <update id="updateSubscriptionStatusToCanceled">
         UPDATE subscriptions
         SET status = #{status}
