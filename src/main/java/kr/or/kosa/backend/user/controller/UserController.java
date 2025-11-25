@@ -1,6 +1,7 @@
 package kr.or.kosa.backend.user.controller;
 
 import jakarta.validation.Valid;
+import kr.or.kosa.backend.security.jwt.JwtUserDetails;
 import kr.or.kosa.backend.user.dto.*;
 import kr.or.kosa.backend.user.service.UserService;
 import kr.or.kosa.backend.security.jwt.JwtProvider;
@@ -8,6 +9,7 @@ import kr.or.kosa.backend.security.jwt.JwtProvider;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -70,27 +72,60 @@ public class UserController {
         ));
     }
 
+    // ============================================================================
+    // 비밀번호 재설정 (토큰 기반)
+    // ============================================================================
+
     /**
-     * 임시 비밀번호 발급
+     * 비밀번호 재설정 이메일 요청
      */
     @PostMapping("/password/reset/request")
-    public ResponseEntity<Map<String, Boolean>> requestPasswordReset(@RequestBody Map<String, String> body) {
+    public ResponseEntity<Map<String, Object>> requestPasswordReset(@RequestBody Map<String, String> body) {
         userService.sendPasswordResetLink(body.get("email"));
-        return ResponseEntity.ok(Map.of(KEY_SUCCESS, true));
+        return ResponseEntity.ok(Map.of(
+                KEY_SUCCESS, true,
+                KEY_MESSAGE, "비밀번호 재설정 이메일이 발송되었습니다."
+        ));
     }
 
     /**
-     * 비밀번호 변경 (로그인 후)
+     * 비밀번호 재설정 토큰 유효성 검증
+     */
+    @GetMapping("/password/reset/validate")
+    public ResponseEntity<Map<String, Object>> validateResetToken(@RequestParam String token) {
+
+        boolean valid = userService.isResetTokenValid(token);
+
+        return ResponseEntity.ok(Map.of(
+                KEY_SUCCESS, valid,
+                KEY_MESSAGE, valid ? "유효한 토큰입니다." : "토큰이 만료되었거나 잘못되었습니다."
+        ));
+    }
+
+    /**
+     * 새 비밀번호 설정
+     */
+    @PostMapping("/password/reset/confirm")
+    public ResponseEntity<Map<String, Object>> confirmPasswordReset(
+            @RequestBody PasswordResetConfirmRequest dto
+    ) {
+        userService.resetPassword(dto.getToken(), dto.getNewPassword());
+
+        return ResponseEntity.ok(Map.of(
+                KEY_SUCCESS, true,
+                KEY_MESSAGE, "비밀번호가 성공적으로 변경되었습니다."
+        ));
+    }
+
+    /**
+     * 로그인 상태에서 비밀번호 변경
      */
     @PutMapping("/password/update")
     public ResponseEntity<Map<String, Object>> updatePassword(
-            @RequestHeader("Authorization") String token,
+            @AuthenticationPrincipal JwtUserDetails user,
             @RequestBody PasswordUpdateRequestDto dto
     ) {
-        String rawToken = token.replace("Bearer ", "");
-        Integer userId = jwtProvider.getUserId(rawToken);
-
-        userService.updatePassword(userId, dto);
+        userService.updatePassword(user.id(), dto);
 
         return ResponseEntity.ok(Map.of(
                 KEY_SUCCESS, true,

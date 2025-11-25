@@ -17,7 +17,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 @Slf4j
@@ -32,12 +31,16 @@ public class UserServiceImpl implements UserService {
     private final StringRedisTemplate redisTemplate;
     private final S3Uploader s3Uploader;
 
-    private static final long REFRESH_TOKEN_EXPIRE_DAYS = 14;
+    // ⭐ 새로 추가
+    private final PasswordResetTokenService passwordResetTokenService;
 
-    // ⭐ 중복 문자열 상수화 (Magic String 제거)
+    private static final long REFRESH_TOKEN_EXPIRE_DAYS = 14;
     private static final String REFRESH_KEY_PREFIX = "auth:refresh:";
     private static final String BLACKLIST_KEY_PREFIX = "auth:blacklist:";
 
+    // -----------------------------
+    // 회원가입
+    // -----------------------------
     @Override
     public int register(UserRegisterRequestDto dto, MultipartFile imageFile) {
 
@@ -82,6 +85,9 @@ public class UserServiceImpl implements UserService {
         return userId;
     }
 
+    // -----------------------------
+    // 로그인
+    // -----------------------------
     @Override
     public UserLoginResponseDto login(UserLoginRequestDto dto) {
 
@@ -97,7 +103,6 @@ public class UserServiceImpl implements UserService {
         String accessToken = jwtProvider.createAccessToken(user.getId(), user.getEmail());
         String refreshToken = jwtProvider.createRefreshToken(user.getId(), user.getEmail());
 
-        // ⭐ 상수 사용
         redisTemplate.opsForValue().set(
                 REFRESH_KEY_PREFIX + user.getId(),
                 refreshToken,
@@ -123,6 +128,9 @@ public class UserServiceImpl implements UserService {
                 .build();
     }
 
+    // -----------------------------
+    // Access Token 재발급
+    // -----------------------------
     @Override
     public String refresh(String bearerToken) {
         String refreshToken = bearerToken.replace("Bearer ", "");
@@ -133,7 +141,6 @@ public class UserServiceImpl implements UserService {
 
         Integer userId = jwtProvider.getUserId(refreshToken);
 
-        // ⭐ 상수 사용
         String savedToken = redisTemplate.opsForValue().get(REFRESH_KEY_PREFIX + userId);
 
         if (savedToken == null || !savedToken.equals(refreshToken)) {
@@ -143,6 +150,9 @@ public class UserServiceImpl implements UserService {
         return jwtProvider.createAccessToken(userId, jwtProvider.getEmail(refreshToken));
     }
 
+    // -----------------------------
+    // 로그아웃
+    // -----------------------------
     @Override
     public void logout(String bearerToken) {
         String token = bearerToken.replace("Bearer ", "");
@@ -151,13 +161,10 @@ public class UserServiceImpl implements UserService {
 
         Integer userId = jwtProvider.getUserId(token);
 
-        // ⭐ 상수 사용
         redisTemplate.delete(REFRESH_KEY_PREFIX + userId);
 
         long expireAt = jwtProvider.getTokenRemainingTime(token);
         if (expireAt > 0) {
-
-            // ⭐ 상수 사용
             redisTemplate.opsForValue().set(
                     BLACKLIST_KEY_PREFIX + token,
                     "logout",
@@ -167,6 +174,13 @@ public class UserServiceImpl implements UserService {
         }
     }
 
+    // ============================================================================
+    // 비밀번호 재설정 (토큰 기반 도입)
+    // ============================================================================
+
+    /**
+     * 비밀번호 재설정 이메일 발송
+     */
     @Override
     public void sendPasswordResetLink(String email) {
 
@@ -175,24 +189,56 @@ public class UserServiceImpl implements UserService {
             throw new CustomBusinessException(UserErrorCode.USER_NOT_FOUND);
         }
 
-        String tempPassword = UUID.randomUUID().toString()
-                .replace("-", "")
-                .substring(0, 10);
+        // 1) 토큰 생성
+        String token = passwordResetTokenService.createResetToken(user.getId());
 
-        userMapper.updatePassword(
-                user.getId(),
-                passwordEncoder.encode(tempPassword)
-        );
+        // 2) 이메일 전송
+        String resetUrl = "http://localhost:5173/reset-password?token=" + token;
 
         emailVerificationService.send(
                 email,
-                "[서비스명] 임시 비밀번호 안내",
-                "임시 비밀번호는 아래와 같습니다.\n\n" +
-                        tempPassword + "\n\n" +
-                        "로그인 후 반드시 비밀번호를 변경해주세요."
+                "[서비스명] 비밀번호 재설정 안내",
+                "아래 링크를 클릭하여 비밀번호를 재설정하세요.\n\n" +
+                        resetUrl + "\n\n" +
+                        "본 링크는 15분 동안 유효합니다."
         );
     }
 
+    /**
+     * 토큰 유효성 체크
+     */
+    @Override
+    public boolean isResetTokenValid(String token) {
+        return passwordResetTokenService.validateToken(token) != null;
+    }
+
+    /**
+     * 새 비밀번호 설정 (토큰 기반)
+     */
+    @Override
+    public void resetPassword(String token, String newPassword) {
+
+        Integer userId = passwordResetTokenService.validateToken(token);
+        if (userId == null) {
+            throw new CustomBusinessException(UserErrorCode.INVALID_OR_EXPIRED_TOKEN);
+        }
+
+        User user = userMapper.findById(userId);
+        if (user == null) {
+            throw new CustomBusinessException(UserErrorCode.USER_NOT_FOUND);
+        }
+
+        String encryptedPassword = passwordEncoder.encode(newPassword);
+
+        userMapper.updatePassword(userId, encryptedPassword);
+
+        // 1회성 → 삭제
+        passwordResetTokenService.deleteToken(token);
+    }
+
+    // -----------------------------
+    // 로그인된 사용자 비밀번호 변경
+    // -----------------------------
     @Override
     public void updatePassword(Integer userId, PasswordUpdateRequestDto dto) {
 
