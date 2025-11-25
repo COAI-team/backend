@@ -6,6 +6,16 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
+@MapperScan({
+        "kr.or.kosa.backend.user.mapper",
+        "kr.or.kosa.backend.pay.repository",
+        "kr.or.kosa.backend.freeboard.mapper",
+        "kr.or.kosa.backend.freeboardLike.mapper",
+        "kr.or.kosa.backend.tag.mapper",
+        "kr.or.kosa.backend.freeComment.mapper",
+        "kr.or.kosa.backend.algorithm.mapper",
+        "kr.or.kosa.backend.codenose.mapper"
+})
 //@MapperScan("kr.or.kosa.backend")
 public class BackendApplication {
     public static void main(String[] args) {

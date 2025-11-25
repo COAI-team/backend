@@ -43,6 +43,7 @@ dependencies {
     implementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter:3.0.4'
     implementation 'io.github.cdimascio:dotenv-java:2.2.3'
     implementation 'org.springframework.ai:spring-ai-starter-model-openai'
+    implementation 'org.springframework.ai:spring-ai-starter-vector-store-qdrant'
 
     // --- Database (MySQL) ---
     runtimeOnly 'com.mysql:mysql-connector-j'

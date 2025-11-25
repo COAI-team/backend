@@ -13,10 +13,23 @@ public interface UserService {
 
     void logout(String token);
 
-    UserResponseDto getById(Integer id);
-
+    /**
+     * 비밀번호 재설정 이메일 요청 (토큰 발송)
+     */
     void sendPasswordResetLink(String email);
 
-    void resetPassword(PasswordResetConfirmDto dto);
-}
+    /**
+     * 토큰 유효성 검증
+     */
+    boolean isResetTokenValid(String token);
 
+    /**
+     * 토큰 기반 비밀번호 재설정
+     */
+    void resetPassword(String token, String newPassword);
+
+    /**
+     * 로그인 상태에서 비밀번호 변경
+     */
+    void updatePassword(Integer userId, PasswordUpdateRequestDto dto);
+}

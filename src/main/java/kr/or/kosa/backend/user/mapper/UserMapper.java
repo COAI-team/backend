@@ -15,18 +15,9 @@ public interface UserMapper {
 
     void insertUser(User user);
 
-    int updateUser(User user);
-
     void updateUserImage(
             @Param("id") int id,
             @Param("image") String image
-    );
-
-    int deleteUser(Integer id);
-
-    void updateRefreshToken(
-            @Param("id") int id,
-            @Param("token") String token
     );
 
     void updatePassword(

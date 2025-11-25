@@ -1,12 +1,15 @@
 package kr.or.kosa.backend.user.controller;
 
 import jakarta.validation.Valid;
+import kr.or.kosa.backend.security.jwt.JwtUserDetails;
 import kr.or.kosa.backend.user.dto.*;
 import kr.or.kosa.backend.user.service.UserService;
+import kr.or.kosa.backend.security.jwt.JwtProvider;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -18,17 +21,20 @@ import java.util.Map;
 public class UserController {
 
     private final UserService userService;
-    
+    private final JwtProvider jwtProvider;
+
     private static final String KEY_SUCCESS = "success";
     private static final String KEY_MESSAGE = "message";
 
+    /**
+     * 회원가입
+     */
     @PostMapping(value = "/register", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<Map<String, Object>> register(
             @Valid @ModelAttribute UserRegisterRequestDto dto,
             @RequestPart(value = "image", required = false) MultipartFile image
     ) {
         int userId = userService.register(dto, image);
-
         return ResponseEntity.ok(Map.of(
                 KEY_SUCCESS, true,
                 KEY_MESSAGE, "회원가입이 완료되었습니다.",
@@ -36,18 +42,27 @@ public class UserController {
         ));
     }
 
+    /**
+     * 로그인
+     */
     @PostMapping("/login")
     public ResponseEntity<UserLoginResponseDto> login(@RequestBody UserLoginRequestDto dto) {
-        UserLoginResponseDto response = userService.login(dto);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(userService.login(dto));
     }
 
+    /**
+     * AccessToken 재발급
+     */
     @PostMapping("/refresh")
     public ResponseEntity<Map<String, String>> refresh(@RequestHeader("Authorization") String token) {
-        String newAccessToken = userService.refresh(token);
-        return ResponseEntity.ok(Map.of("accessToken", newAccessToken));
+        return ResponseEntity.ok(Map.of(
+                "accessToken", userService.refresh(token)
+        ));
     }
 
+    /**
+     * 로그아웃
+     */
     @PostMapping("/logout")
     public ResponseEntity<Map<String, Object>> logout(@RequestHeader("Authorization") String token) {
         userService.logout(token);
@@ -57,23 +72,64 @@ public class UserController {
         ));
     }
 
-    @GetMapping("/{id}")
-    public ResponseEntity<UserResponseDto> getUser(@PathVariable Integer id) {
-        return ResponseEntity.ok(userService.getById(id));
-    }
+    // ============================================================================
+    // 비밀번호 재설정 (토큰 기반)
+    // ============================================================================
 
+    /**
+     * 비밀번호 재설정 이메일 요청
+     */
     @PostMapping("/password/reset/request")
-    public ResponseEntity<Map<String, Boolean>> requestPasswordReset(@RequestBody Map<String, String> body) {
+    public ResponseEntity<Map<String, Object>> requestPasswordReset(@RequestBody Map<String, String> body) {
         userService.sendPasswordResetLink(body.get("email"));
-        return ResponseEntity.ok(Map.of(KEY_SUCCESS, true));
-    }
-
-    @PostMapping("/password/reset/confirm")
-    public ResponseEntity<Map<String, Object>> confirmPasswordReset(@RequestBody PasswordResetConfirmDto dto) {
-        userService.resetPassword(dto);
         return ResponseEntity.ok(Map.of(
                 KEY_SUCCESS, true,
-                KEY_MESSAGE, "비밀번호가 변경되었습니다."
+                KEY_MESSAGE, "비밀번호 재설정 이메일이 발송되었습니다."
+        ));
+    }
+
+    /**
+     * 비밀번호 재설정 토큰 유효성 검증
+     */
+    @GetMapping("/password/reset/validate")
+    public ResponseEntity<Map<String, Object>> validateResetToken(@RequestParam String token) {
+
+        boolean valid = userService.isResetTokenValid(token);
+
+        return ResponseEntity.ok(Map.of(
+                KEY_SUCCESS, valid,
+                KEY_MESSAGE, valid ? "유효한 토큰입니다." : "토큰이 만료되었거나 잘못되었습니다."
+        ));
+    }
+
+    /**
+     * 새 비밀번호 설정
+     */
+    @PostMapping("/password/reset/confirm")
+    public ResponseEntity<Map<String, Object>> confirmPasswordReset(
+            @RequestBody PasswordResetConfirmRequest dto
+    ) {
+        userService.resetPassword(dto.getToken(), dto.getNewPassword());
+
+        return ResponseEntity.ok(Map.of(
+                KEY_SUCCESS, true,
+                KEY_MESSAGE, "비밀번호가 성공적으로 변경되었습니다."
+        ));
+    }
+
+    /**
+     * 로그인 상태에서 비밀번호 변경
+     */
+    @PutMapping("/password/update")
+    public ResponseEntity<Map<String, Object>> updatePassword(
+            @AuthenticationPrincipal JwtUserDetails user,
+            @RequestBody PasswordUpdateRequestDto dto
+    ) {
+        userService.updatePassword(user.id(), dto);
+
+        return ResponseEntity.ok(Map.of(
+                KEY_SUCCESS, true,
+                KEY_MESSAGE, "비밀번호가 성공적으로 변경되었습니다."
         ));
     }
 }

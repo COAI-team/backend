@@ -2,6 +2,7 @@ package kr.or.kosa.backend.codenose.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import kr.or.kosa.backend.codenose.dto.RagDto;
 import kr.or.kosa.backend.codenose.dto.dtoReal.AnalysisRequestDTO;
 import kr.or.kosa.backend.codenose.dto.dtoReal.CodeResultDTO;
 import kr.or.kosa.backend.codenose.dto.dtoReal.GithubFileDTO;
@@ -11,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.Message;
+import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.Prompt;
@@ -32,28 +34,31 @@ public class AnalysisService {
     private final AnalysisMapper analysisMapper;
     private final ObjectMapper objectMapper;
     private final ChatClient chatClient;
+    private final RagService ragService; // Injected
 
     @Autowired
     public AnalysisService(
             ChatClient.Builder chatClientBuilder,
             AnalysisMapper analysisMapper,
-            ObjectMapper objectMapper
-    ) {
+            ObjectMapper objectMapper,
+            RagService ragService) {
         this.chatClient = chatClientBuilder.build();
         this.analysisMapper = analysisMapper;
         this.objectMapper = objectMapper;
+        this.ragService = ragService;
     }
 
     private final String systemPrompt = """
-            당신은 코드 분석 전문가입니다. 
+            당신은 코드 분석 전문가입니다.
             사용자가 제공한 코드를 분석하고 개선점을 제시해주세요.
             """;
 
     /**
      * 코드 분석 수행 (간단 버전)
-     * @param userId 사용자 ID
+     * 
+     * @param userId      사용자 ID
      * @param userMessage 사용자 메시지
-     * @param requestDto 분석 요청 DTO
+     * @param requestDto  분석 요청 DTO
      * @return AI 분석 결과
      */
     public String analyzeCode(String userId, String userMessage, AnalysisRequestDTO requestDto) {
@@ -72,6 +77,22 @@ public class AnalysisService {
             // DB에 저장
             saveAnalysis(requestDto, aiResponseContent);
 
+            // RAG VectorDB에 저장
+            try {
+                RagDto.IngestRequest ingestRequest = new RagDto.IngestRequest(
+                        userId,
+                        requestDto.getCode(),
+                        aiResponseContent,
+                        "unknown", // Language detection needed or pass from frontend
+                        "Direct Analysis",
+                        "Direct Code Input",
+                        requestDto.getCustomRequirements());
+                ragService.ingestCode(ingestRequest);
+            } catch (Exception e) {
+                log.error("Failed to ingest code to RAG system", e);
+                // Don't fail the main request if RAG ingestion fails
+            }
+
             return aiResponseContent;
 
         } catch (Exception e) {
@@ -82,19 +103,18 @@ public class AnalysisService {
 
     /**
      * 저장된 GitHub 파일을 조회하여 AI 분석 수행
+     * 
      * @param requestDto 분석 요청 DTO
      * @return AI 분석 결과 (JSON 문자열)
      */
     public String analyzeStoredFile(AnalysisRequestDTO requestDto) {
         try {
             // 1. DB에서 저장된 GitHub 파일 내용 조회
-            GithubFileDTO storedFile = analysisMapper.findFileById(requestDto.getAnalysisId()
-
-            );
+            GithubFileDTO storedFile = analysisMapper.findFileById(requestDto.getAnalysisId());
 
             if (storedFile == null) {
                 throw new RuntimeException("저장된 파일을 찾을 수 없습니다. repositoryUrl: "
-                        +  ", filePath: " + requestDto.getFilePath() + ", analysisId: " + requestDto.getAnalysisId());
+                        + ", filePath: " + requestDto.getFilePath() + ", analysisId: " + requestDto.getAnalysisId());
             }
 
             log.info("파일 조회 완료 - fileId: {}, fileName: {}, contentLength: {}",
@@ -102,19 +122,24 @@ public class AnalysisService {
                     storedFile.getFileName(),
                     storedFile.getFileContent().length());
 
-            // 2. 프롬프트 생성 (toneLevel에 따른 시스템 프롬프트)
+            // 2. 사용자 컨텍스트 조회 (RAG)
+            String userContext = ragService.retrieveUserContext(String.valueOf(requestDto.getUserId()));
+            log.info("Retrieved user context for analysis: {}",
+                    userContext.substring(0, Math.min(userContext.length(), 100)) + "...");
+
+            // 3. 프롬프트 생성 (toneLevel에 따른 시스템 프롬프트 + User Context)
             String systemPromptWithTone = PromptGenerator.createSystemPrompt(
                     requestDto.getAnalysisTypes(),
                     requestDto.getToneLevel(),
-                    requestDto.getCustomRequirements()
-            );
+                    requestDto.getCustomRequirements(),
+                    userContext);
 
-            // 3. AI 메시지 구성 (저장된 파일 내용 사용)
+            // 4. AI 메시지 구성 (저장된 파일 내용 사용)
             List<Message> messages = new ArrayList<>();
-            messages.add(new SystemPromptTemplate(systemPromptWithTone).createMessage());
+            messages.add(new SystemMessage(systemPromptWithTone));
             messages.add(new UserMessage("다음 코드를 분석해주세요:\n\n" + storedFile.getFileContent()));
 
-            // 4. AI 호출
+            // 5. AI 호출
             Prompt prompt = new Prompt(messages);
             ChatResponse response = chatClient.prompt(prompt).call().chatResponse();
             String aiResponseContent = response.getResult().getOutput().getText();
@@ -131,6 +156,23 @@ public class AnalysisService {
             log.info("AI 분석 완료 - analysisId: {}, fileId: {}, toneLevel: {}",
                     analysisId, storedFile.getFileId(), requestDto.getToneLevel());
 
+            // 7. RAG VectorDB에 저장
+            try {
+                RagDto.IngestRequest ingestRequest = new RagDto.IngestRequest(
+                        String.valueOf(requestDto.getUserId()),
+                        storedFile.getFileContent(),
+                        cleanedResponse,
+                        storedFile.getFileName().substring(storedFile.getFileName().lastIndexOf(".") + 1), // Simple
+                                                                                                           // extension
+                                                                                                           // check
+                        storedFile.getFilePath(),
+                        "Stored File Analysis",
+                        requestDto.getCustomRequirements());
+                ragService.ingestCode(ingestRequest);
+            } catch (Exception e) {
+                log.error("Failed to ingest stored file analysis to RAG system", e);
+            }
+
             return cleanedResponse;
 
         } catch (Exception e) {
@@ -141,12 +183,14 @@ public class AnalysisService {
 
     /**
      * 분석 결과를 CODE_ANALYSIS_HISTORY 테이블에 저장
-     * @param storedFile GitHub 파일 정보
-     * @param requestDto 분석 요청 정보
+     * 
+     * @param storedFile        GitHub 파일 정보
+     * @param requestDto        분석 요청 정보
      * @param aiResponseContent AI 분석 결과
      * @return 저장된 analysisId
      */
-    private String saveAnalysisResult(GithubFileDTO storedFile, AnalysisRequestDTO requestDto, String aiResponseContent) {
+    private String saveAnalysisResult(GithubFileDTO storedFile, AnalysisRequestDTO requestDto,
+            String aiResponseContent) {
         try {
             JsonNode jsonNode = objectMapper.readTree(aiResponseContent);
 
@@ -175,8 +219,6 @@ public class AnalysisService {
             throw new RuntimeException("분석 결과 저장에 실패했습니다.", e);
         }
     }
-
-
 
     /**
      * 분석 결과를 DB에 저장 (기존 analyzeCode 메서드용)
@@ -272,28 +314,23 @@ public class AnalysisService {
     }
 
     /**
-     * AI 응답에서 마크다운 코드 블록 제거
+     * AI 응답에서 JSON 부분만 추출
+     * 
      * @param response AI 원본 응답
      * @return 정제된 JSON 문자열
      */
     private String cleanMarkdownCodeBlock(String response) {
         if (response == null) {
-            return response;
+            return "{}";
         }
 
-        // ```json ... ``` 또는 ``` ... ``` 패턴 제거
         String cleaned = response.trim();
 
-        // 시작 부분의 ```json 또는 ``` 제거
-        if (cleaned.startsWith("```json")) {
-            cleaned = cleaned.substring(7).trim();
-        } else if (cleaned.startsWith("```")) {
-            cleaned = cleaned.substring(3).trim();
-        }
+        int firstBrace = cleaned.indexOf("{");
+        int lastBrace = cleaned.lastIndexOf("}");
 
-        // 끝 부분의 ``` 제거
-        if (cleaned.endsWith("```")) {
-            cleaned = cleaned.substring(0, cleaned.length() - 3).trim();
+        if (firstBrace != -1 && lastBrace != -1 && firstBrace < lastBrace) {
+            return cleaned.substring(firstBrace, lastBrace + 1);
         }
 
         return cleaned;
