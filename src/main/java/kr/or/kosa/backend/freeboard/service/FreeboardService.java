@@ -55,30 +55,40 @@ public class FreeboardService {
     // 게시글 작성
     @Transactional
     public Long write(FreeboardDto dto, Long userId) {
-        Freeboard freeboard = new Freeboard();
-        freeboard.setUserId(userId);
-        freeboard.setFreeboardTitle(dto.getFreeboardTitle());
-        freeboard.setFreeboardRepresentImage(dto.getFreeboardRepresentImage());
+
+        String jsonContent;
+        String plainText;
 
         try {
-            freeboard.setFreeboardContent(dto.toJsonContent(objectMapper));
-            freeboard.setFreeboardPlainText(dto.toPlainText(objectMapper));
+            jsonContent = dto.toJsonContent(objectMapper);
+            plainText = dto.toPlainText(objectMapper);
         } catch (Exception e) {
             log.error("JSON 변환 실패", e);
             throw new RuntimeException("게시글 작성 중 오류가 발생했습니다.", e);
         }
 
-        int result = mapper.insert(freeboard);
-        if (result == 0) {
+        Freeboard freeboard = Freeboard.builder()
+                .userId(userId)
+                .freeboardTitle(dto.getFreeboardTitle())
+                .freeboardContent(jsonContent)
+                .freeboardPlainText(plainText)
+                .freeboardRepresentImage(dto.getFreeboardRepresentImage())
+                .freeboardDeletedYn("N")
+                .build();
+
+        int inserted = mapper.insert(freeboard);
+        if (inserted == 0) {
             throw new RuntimeException("게시글 작성에 실패했습니다.");
         }
 
         return freeboard.getFreeboardId();
     }
 
+
     // 게시글 수정
     @Transactional
     public void edit(Long id, FreeboardDto dto, Long userId) {
+
         Freeboard existing = mapper.selectById(id);
         if (existing == null) {
             throw new IllegalArgumentException("게시글을 찾을 수 없습니다.");
@@ -87,24 +97,30 @@ public class FreeboardService {
             throw new SecurityException("게시글 수정 권한이 없습니다.");
         }
 
-        Freeboard freeboard = new Freeboard();
-        freeboard.setFreeboardId(id);
-        freeboard.setFreeboardTitle(dto.getFreeboardTitle());
-        freeboard.setFreeboardRepresentImage(dto.getFreeboardRepresentImage());
+        String jsonContent;
+        String plainText;
 
         try {
-            freeboard.setFreeboardContent(dto.toJsonContent(objectMapper));
-            freeboard.setFreeboardPlainText(dto.toPlainText(objectMapper));
+            jsonContent = dto.toJsonContent(objectMapper);
+            plainText = dto.toPlainText(objectMapper);
         } catch (Exception e) {
             log.error("JSON 변환 실패: freeboardId={}", id, e);
             throw new RuntimeException("게시글 수정 중 오류가 발생했습니다.", e);
         }
 
-        int result = mapper.update(freeboard);
-        if (result == 0) {
+        Freeboard freeboard = Freeboard.builder()
+                .freeboardId(id)   // 기존 ID 유지
+                .freeboardTitle(dto.getFreeboardTitle())
+                .freeboardContent(jsonContent)
+                .freeboardPlainText(plainText)
+                .freeboardRepresentImage(dto.getFreeboardRepresentImage())
+                .build();
+
+        if (mapper.update(freeboard) == 0) {
             throw new RuntimeException("게시글 수정에 실패했습니다.");
         }
     }
+
 
     // 게시글 삭제 (소프트 삭제)
     @Transactional

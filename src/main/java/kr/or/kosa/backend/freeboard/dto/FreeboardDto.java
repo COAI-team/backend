@@ -18,22 +18,11 @@ public class FreeboardDto {
     private Long freeboardId;
     private Long userId;
     private String freeboardTitle;
-    private List<BlockDto> blocks;
+    private List<FreeboardBlockResponse> blocks;
     private String freeboardRepresentImage;
     private Long freeboardClick;
     private LocalDateTime freeboardCreatedAt;
-
-    @Getter
-    @NoArgsConstructor
-    @AllArgsConstructor
-    @Builder
-    public static class BlockDto {
-        private String id;
-        private String type;  // "tiptap" or "code"
-        private Object content;
-        private String language;
-        private Integer order;
-    }
+    private List<String> tags;
 
     // blocks를 JSON 문자열로 변환
     public String toJsonContent(ObjectMapper objectMapper) throws Exception {
@@ -51,7 +40,7 @@ public class FreeboardDto {
 
         // 각 블록에서 텍스트 추출
         if (blocks != null) {
-            for (BlockDto block : blocks) {
+            for (FreeboardBlockResponse block : blocks) {
                 if ("tiptap".equals(block.getType())) {
                     String tiptapText = extractFromTiptap(block.getContent(), objectMapper);
                     text.append(tiptapText).append("\n");

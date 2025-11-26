@@ -1,7 +1,9 @@
 package kr.or.kosa.backend.freeboard.controller;
 
+import jakarta.validation.Valid;
 import kr.or.kosa.backend.freeboard.domain.Freeboard;
-import kr.or.kosa.backend.freeboard.dto.FreeboardDto;
+import kr.or.kosa.backend.freeboard.dto.FreeboardCreateRequest;
+import kr.or.kosa.backend.freeboard.dto.FreeboardUpdateRequest;
 import kr.or.kosa.backend.freeboard.service.FreeboardService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -19,12 +21,11 @@ public class FreeboardController {
 
     @PostMapping
     public ResponseEntity<Map<String, Object>> create(
-            @RequestBody FreeboardDto dto,
+            @Valid @RequestBody FreeboardCreateRequest request,
             @RequestAttribute(value = "userId", required = false) Long userId
     ) {
-        // 로그인 구현 전까지 임시로 userId = 1L 사용
         Long actualUserId = (userId != null) ? userId : 1L;
-        Long freeboardId = freeboardService.write(dto, actualUserId);
+        Long freeboardId = freeboardService.write(request.toDto(), actualUserId);
 
         Map<String, Object> result = new HashMap<>();
         result.put("freeboardId", freeboardId);
@@ -32,14 +33,12 @@ public class FreeboardController {
         return ResponseEntity.ok(result);
     }
 
-    // 상세 조회
     @GetMapping("/{freeboardId}")
     public ResponseEntity<Freeboard> get(@PathVariable Long freeboardId) {
         Freeboard freeboard = freeboardService.detail(freeboardId);
         return ResponseEntity.ok(freeboard);
     }
 
-    // 목록
     @GetMapping
     public ResponseEntity<Map<String, Object>> list(
             @RequestParam(defaultValue = "1") int page,
@@ -52,12 +51,11 @@ public class FreeboardController {
     @PutMapping("/{freeboardId}")
     public ResponseEntity<Void> update(
             @PathVariable Long freeboardId,
-            @RequestBody FreeboardDto dto,
+            @Valid @RequestBody FreeboardUpdateRequest request,
             @RequestAttribute(value = "userId", required = false) Long userId
     ) {
-        // 로그인 구현 전까지 임시로 userId = 1L 사용
         Long actualUserId = (userId != null) ? userId : 1L;
-        freeboardService.edit(freeboardId, dto, actualUserId);
+        freeboardService.edit(freeboardId, request.toDto(), actualUserId);
         return ResponseEntity.ok().build();
     }
 
@@ -66,7 +64,6 @@ public class FreeboardController {
             @PathVariable Long freeboardId,
             @RequestAttribute(value = "userId", required = false) Long userId
     ) {
-        // 로그인 구현 전까지 임시로 userId = 1L 사용
         Long actualUserId = (userId != null) ? userId : 1L;
         freeboardService.delete(freeboardId, actualUserId);
         return ResponseEntity.ok().build();
