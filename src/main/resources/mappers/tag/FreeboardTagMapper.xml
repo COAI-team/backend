@@ -6,14 +6,14 @@
 <mapper namespace="kr.or.kosa.backend.tag.mapper.FreeboardTagMapper">
 
     <!-- 게시글의 태그 조회 -->
-    <select id="findByFreeboardId" resultMap="freeboardTagResultMap">
+    <select id="findByFreeboardId" resultType="kr.or.kosa.cmsplusmain.domain.tag.domain.FreeboardTag">
         SELECT FREEBOARD_ID, TAG_ID, TAG_DISPLAY_NAME
         FROM FREEBOARD_TAG
         WHERE FREEBOARD_ID = #{freeboardId}
     </select>
 
     <!-- 여러 게시글의 태그 한번에 조회 (N+1 방지) -->
-    <select id="findByFreeboardIdIn" resultMap="freeboardTagResultMap">
+    <select id="findByFreeboardIdIn" resultType="kr.or.kosa.cmsplusmain.domain.tag.domain.FreeboardTag">
         SELECT FREEBOARD_ID, TAG_ID, TAG_DISPLAY_NAME
         FROM FREEBOARD_TAG
         WHERE FREEBOARD_ID IN
@@ -23,7 +23,7 @@
     </select>
 
     <!-- 태그로 게시글 검색 -->
-    <select id="findByTagId" resultMap="freeboardTagResultMap">
+    <select id="findByTagId" resultType="kr.or.kosa.cmsplusmain.domain.tag.domain.FreeboardTag">
         SELECT FREEBOARD_ID, TAG_ID, TAG_DISPLAY_NAME
         FROM FREEBOARD_TAG
         WHERE TAG_ID = #{tagId}

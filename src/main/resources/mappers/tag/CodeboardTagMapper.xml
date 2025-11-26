@@ -6,14 +6,14 @@
 <mapper namespace="kr.or.kosa.backend.tag.mapper.CodeboardTagMapper">
 
     <!-- 게시글의 태그 조회 -->
-    <select id="findByCodeboardId" resultMap="codeboardTagResultMap">
+    <select id="findByCodeboardId" resultType="kr.or.kosa.cmsplusmain.domain.tag.domain.CodeboardTag">
         SELECT CODEBOARD_ID, TAG_ID, TAG_DISPLAY_NAME
         FROM CODEBOARD_TAG
         WHERE CODEBOARD_ID = #{codeboardId}
     </select>
 
     <!-- 여러 게시글의 태그 한번에 조회 (N+1 방지) -->
-    <select id="findByCodeboardIdIn" resultMap="codeboardTagResultMap">
+    <select id="findByCodeboardIdIn" resultType="kr.or.kosa.cmsplusmain.domain.tag.domain.CodeboardTag">
         SELECT CODEBOARD_ID, TAG_ID, TAG_DISPLAY_NAME
         FROM CODEBOARD_TAG
         WHERE CODEBOARD_ID IN
@@ -23,7 +23,7 @@
     </select>
 
     <!-- 태그로 게시글 검색 -->
-    <select id="findByTagId" resultMap="codeboardTagResultMap">
+    <select id="findByTagId" resultType="kr.or.kosa.cmsplusmain.domain.tag.domain.CodeboardTag">
         SELECT CODEBOARD_ID, TAG_ID, TAG_DISPLAY_NAME
         FROM CODEBOARD_TAG
         WHERE TAG_ID = #{tagId}
