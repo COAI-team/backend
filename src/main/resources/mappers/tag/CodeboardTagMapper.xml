@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="kr.or.kosa.backend.tag.mapper.CodeboardTagMapper">
+
+    <!-- 게시글의 태그 조회 -->
+    <select id="findByCodeboardId" resultType="kr.or.kosa.backend.tag.domain.CodeboardTag">
+        SELECT CODEBOARD_ID, TAG_ID, TAG_DISPLAY_NAME
+        FROM CODEBOARD_TAG
+        WHERE CODEBOARD_ID = #{codeboardId}
+    </select>
+
+    <!-- 여러 게시글의 태그 조회 -->
+    <select id="findByCodeboardIdIn" resultType="kr.or.kosa.backend.tag.domain.CodeboardTag">
+        SELECT CODEBOARD_ID, TAG_ID, TAG_DISPLAY_NAME
+        FROM CODEBOARD_TAG
+        WHERE CODEBOARD_ID IN
+        <foreach collection="codeboardIds" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
+    <!-- 태그로 게시글 검색 -->
+    <select id="findByTagId" resultType="kr.or.kosa.backend.tag.domain.CodeboardTag">
+        SELECT CODEBOARD_ID, TAG_ID, TAG_DISPLAY_NAME
+        FROM CODEBOARD_TAG
+        WHERE TAG_ID = #{tagId}
+    </select>
+
+    <!-- 태그 저장 -->
+    <insert id="insert">
+        INSERT INTO CODEBOARD_TAG (CODEBOARD_ID, TAG_ID, TAG_DISPLAY_NAME)
+        VALUES (#{codeboardId}, #{tagId}, #{tagDisplayName})
+    </insert>
+
+    <!-- 게시글의 모든 태그 삭제 -->
+    <delete id="deleteByCodeboardId">
+        DELETE FROM CODEBOARD_TAG
+        WHERE CODEBOARD_ID = #{codeboardId}
+    </delete>
+
+    <!-- 태그 사용 횟수 -->
+    <select id="countByTagId" resultType="long">
+        SELECT COUNT(*)
+        FROM CODEBOARD_TAG
+        WHERE TAG_ID = #{tagId}
+    </select>
+
+</mapper>

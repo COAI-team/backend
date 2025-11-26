@@ -46,7 +46,8 @@ dependencies {
     implementation 'org.springframework.ai:spring-ai-starter-vector-store-qdrant'
 
     // --- Database (MySQL) ---
-    runtimeOnly 'com.mysql:mysql-connector-j'
+    //    runtimeOnly 'com.mysql:mysql-connector-j'
+    implementation 'org.mariadb.jdbc:mariadb-java-client:3.3.3'
 
     // --- JWT ---
     implementation 'io.jsonwebtoken:jjwt-api:0.11.5'
@@ -71,6 +72,9 @@ dependencies {
     // 로그백
     implementation 'net.logstash.logback:logstash-logback-encoder:7.3'
 
+    // 링크 프리뷰
+    implementation 'org.jsoup:jsoup:1.17.2'
+
     // 테스트
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
@@ -92,6 +96,13 @@ def isAppleSilicon() {
     return System.getProperty("os.name") == "Mac OS X" && System.getProperty("os.arch") == "aarch64"
 }
 
+bootJar {
+    mainClass = 'kr.or.kosa.backend.BackendApplication'
+}
+
+bootRun {
+    mainClass = 'kr.or.kosa.backend.BackendApplication'
+}
 
 tasks.named('test') {
     useJUnitPlatform()

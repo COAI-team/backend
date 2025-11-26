@@ -15,30 +15,30 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(BaseBusinessException.class)
     public ResponseEntity<ApiResponse<Void>>handleBaseSystemException(
-        BaseBusinessException ex
+            BaseBusinessException ex
     ){
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-            .body(ApiResponse.error(ex.getErrorCode().getCode(), ex.getMessage()));
+                .body(ApiResponse.error(ex.getErrorCode().getCode(), ex.getMessage()));
     }
 
     @ExceptionHandler(BaseSystemException.class)
     public ResponseEntity<ApiResponse<Void>> handleBaseSystemException(
-        BaseSystemException ex
+            BaseSystemException ex
     ){
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-            .body(ApiResponse.error(ex.getErrorCode().getCode(), ex.getMessage()));
+                .body(ApiResponse.error(ex.getErrorCode().getCode(), ex.getMessage()));
     }
 
     // controller에서 들어오는 파라미터 값에 대해서 valid, notnull, blank 일때 니오는 exception
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiResponse<Void>>handleMethodArgumentNotValidException(
-        MethodArgumentNotValidException ex
+            MethodArgumentNotValidException ex
     ){
         String errorMessage = ex.getBindingResult()
-            .getAllErrors()
-            .get(0)
-            .getDefaultMessage();
+                .getAllErrors()
+                .get(0)
+                .getDefaultMessage();
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-            .body(ApiResponse.error("VALIDATION ERROR", errorMessage));
+                .body(ApiResponse.error("VALIDATION ERROR", errorMessage));
     }
 }

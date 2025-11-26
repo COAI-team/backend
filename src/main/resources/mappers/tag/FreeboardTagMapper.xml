@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="kr.or.kosa.backend.tag.mapper.FreeboardTagMapper">
+
+    <!-- 게시글의 태그 조회 -->
+    <select id="findByFreeboardId" resultType="kr.or.kosa.backend.tag.domain.FreeboardTag">
+        SELECT FREEBOARD_ID, TAG_ID, TAG_DISPLAY_NAME
+        FROM FREEBOARD_TAG
+        WHERE FREEBOARD_ID = #{freeboardId}
+    </select>
+
+    <!-- 여러 게시글의 태그 한번에 조회 (N+1 방지) -->
+    <select id="findByFreeboardIdIn" resultType="kr.or.kosa.backend.tag.domain.FreeboardTag">
+        SELECT FREEBOARD_ID, TAG_ID, TAG_DISPLAY_NAME
+        FROM FREEBOARD_TAG
+        WHERE FREEBOARD_ID IN
+        <foreach collection="freeboardIds" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
+    <!-- 태그로 게시글 검색 -->
+    <select id="findByTagId" resultType="kr.or.kosa.backend.tag.domain.FreeboardTag">
+        SELECT FREEBOARD_ID, TAG_ID, TAG_DISPLAY_NAME
+        FROM FREEBOARD_TAG
+        WHERE TAG_ID = #{tagId}
+    </select>
+
+    <!-- 태그 저장 -->
+    <insert id="insert">
+        INSERT INTO FREEBOARD_TAG (FREEBOARD_ID, TAG_ID, TAG_DISPLAY_NAME)
+        VALUES (#{freeboardId}, #{tagId}, #{tagDisplayName})
+    </insert>
+
+    <!-- 게시글의 모든 태그 삭제 -->
+    <delete id="deleteByFreeboardId">
+        DELETE FROM FREEBOARD_TAG
+        WHERE FREEBOARD_ID = #{freeboardId}
+    </delete>
+
+    <!-- 태그 사용 횟수 -->
+    <select id="countByTagId" resultType="long">
+        SELECT COUNT(*)
+        FROM FREEBOARD_TAG
+        WHERE TAG_ID = #{tagId}
+    </select>
+
+</mapper>

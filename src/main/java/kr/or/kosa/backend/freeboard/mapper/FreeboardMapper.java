@@ -15,16 +15,16 @@ public interface FreeboardMapper {
     Freeboard selectById(Long id);
 
     // 게시글 작성
-    void insert(Freeboard board);
+    int insert(Freeboard board);
 
     // 게시글 수정
-    void update(Freeboard board);
+    int update(Freeboard board);
 
     // 게시글 삭제 (소프트 삭제)
-    void delete(Long id);
+    int delete(Long id);
 
     // 조회수 증가
-    void increaseClick(Long id);
+    int increaseClick(Long id);
 
     // 총 게시글 수 (페이징용)
     int countAll();

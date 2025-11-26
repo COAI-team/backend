@@ -1,24 +1,31 @@
 package kr.or.kosa.backend.freeboard.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import kr.or.kosa.backend.freeboard.domain.Freeboard;
+import kr.or.kosa.backend.freeboard.dto.FreeboardDto;
+import kr.or.kosa.backend.freeboard.exception.FreeboardErrorCode;
+import kr.or.kosa.backend.freeboard.exception.FreeboardException;
+import kr.or.kosa.backend.freeboard.mapper.FreeboardMapper;
+import kr.or.kosa.backend.tag.service.TagService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
-import kr.or.kosa.backend.freeboard.domain.Freeboard;
-import kr.or.kosa.backend.freeboard.mapper.FreeboardMapper;
-
+@Slf4j
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class FreeboardService {
 
     private final FreeboardMapper mapper;
+    private final ObjectMapper objectMapper;
+    private final TagService tagService;
 
-    // 페이지 단위 목록
     public Map<String, Object> listPage(int page, int size) {
         int offset = (page - 1) * size;
 
@@ -30,60 +37,115 @@ public class FreeboardService {
         result.put("totalCount", totalCount);
         result.put("page", page);
         result.put("size", size);
+        result.put("totalPages", (int) Math.ceil((double) totalCount / size));
 
         return result;
     }
 
-    // 상세 보기 (조회수 증가 포함)
+    @Transactional
     public Freeboard detail(Long id) {
         mapper.increaseClick(id);
-        return mapper.selectById(id);
-    }
 
-    // 작성
-    public void write(Freeboard board) {
-        String represent = board.getFreeboardRepresentImage();
-
-        // 사용자가 대표 이미지 선택 안하면 첫 번째 이미지를 대표 이미지로
-        if (represent == null || represent.isBlank()) {
-            represent = extractFirstImage(board.getFreeboardContent());
-            board.setFreeboardRepresentImage(represent);
+        Freeboard freeboard = mapper.selectById(id);
+        if (freeboard == null) {
+            throw new FreeboardException(FreeboardErrorCode.NOT_FOUND);
         }
 
-        mapper.insert(board);
+        List<String> tags = tagService.getFreeboardTags(id);
+        freeboard.setTags(tags);
+
+        return freeboard;
     }
 
-    private String extractFirstImage(String content) {
-        if (content == null) return null;
+    @Transactional
+    public Long write(FreeboardDto dto, Long userId) {
 
-        Pattern pattern = Pattern.compile("<img[^>]*src=[\"']?([^>\"']+)[\"']?[^>]*>");
-        Matcher matcher = pattern.matcher(content);
+        String jsonContent;
+        String plainText;
 
-        if (matcher.find()) {
-            return matcher.group(1);
-        }
-        return null;
-    }
-
-    // 수정
-    public void edit(Freeboard board) {
-        String represent = board.getFreeboardRepresentImage();
-
-        if (represent == null || represent.isBlank()) {
-            represent = extractFirstImage(board.getFreeboardContent());
-            board.setFreeboardRepresentImage(represent);
+        try {
+            jsonContent = dto.toJsonContent(objectMapper);
+            plainText = dto.toPlainText(objectMapper);
+        } catch (Exception e) {
+            log.error("JSON 변환 실패", e);
+            throw new FreeboardException(FreeboardErrorCode.JSON_PARSE_ERROR);
         }
 
-        mapper.update(board);
+        Freeboard freeboard = Freeboard.builder()
+                .userId(userId)
+                .freeboardTitle(dto.getFreeboardTitle())
+                .freeboardContent(jsonContent)
+                .freeboardPlainText(plainText)
+                .freeboardRepresentImage(dto.getFreeboardRepresentImage())
+                .freeboardDeletedYn("N")
+                .build();
+
+        int inserted = mapper.insert(freeboard);
+        if (inserted == 0) {
+            throw new FreeboardException(FreeboardErrorCode.INSERT_ERROR);
+        }
+
+        Long freeboardId = freeboard.getFreeboardId();
+
+        if (dto.getTags() != null && !dto.getTags().isEmpty()) {
+            tagService.attachTagsToFreeboard(freeboardId, dto.getTags());
+        }
+
+        return freeboardId;
     }
 
-    // 삭제
-    public void delete(Long id) {
-        mapper.delete(id);
+    @Transactional
+    public void edit(Long id, FreeboardDto dto, Long userId) {
+
+        Freeboard existing = mapper.selectById(id);
+        if (existing == null) {
+            throw new FreeboardException(FreeboardErrorCode.NOT_FOUND);
+        }
+        if (!existing.getUserId().equals(userId)) {
+            throw new FreeboardException(FreeboardErrorCode.NO_EDIT_PERMISSION);
+        }
+
+        String jsonContent;
+        String plainText;
+
+        try {
+            jsonContent = dto.toJsonContent(objectMapper);
+            plainText = dto.toPlainText(objectMapper);
+        } catch (Exception e) {
+            log.error("JSON 변환 실패: freeboardId={}", id, e);
+            throw new FreeboardException(FreeboardErrorCode.JSON_PARSE_ERROR);
+        }
+
+        Freeboard freeboard = Freeboard.builder()
+                .freeboardId(id)
+                .freeboardTitle(dto.getFreeboardTitle())
+                .freeboardContent(jsonContent)
+                .freeboardPlainText(plainText)
+                .freeboardRepresentImage(dto.getFreeboardRepresentImage())
+                .build();
+
+        if (mapper.update(freeboard) == 0) {
+            throw new FreeboardException(FreeboardErrorCode.UPDATE_ERROR);
+        }
+
+        if (dto.getTags() != null) {
+            tagService.updateFreeboardTags(id, dto.getTags());
+        }
     }
 
-    // 전체 수
-    public int totalCount() {
-        return mapper.countAll();
+    @Transactional
+    public void delete(Long id, Long userId) {
+        Freeboard existing = mapper.selectById(id);
+        if (existing == null) {
+            throw new FreeboardException(FreeboardErrorCode.NOT_FOUND);
+        }
+        if (!existing.getUserId().equals(userId)) {
+            throw new FreeboardException(FreeboardErrorCode.NO_DELETE_PERMISSION);
+        }
+
+        int result = mapper.delete(id);
+        if (result == 0) {
+            throw new FreeboardException(FreeboardErrorCode.DELETE_ERROR);
+        }
     }
 }
