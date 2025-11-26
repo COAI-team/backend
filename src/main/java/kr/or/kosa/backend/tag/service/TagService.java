@@ -87,12 +87,18 @@ public class TagService {
     // 자유게시판 게시글에 태그 저장
     @Transactional
     public void attachTagsToFreeboard(Long freeboardId, List<String> tagInputs) {
+        log.info("=== attachTagsToFreeboard 시작 ===");
+
         if (tagInputs == null || tagInputs.isEmpty()) {
+            log.warn("tagInputs가 null이거나 비어있음");
             return;
         }
 
+        log.info("태그 개수: {}", tagInputs.size());
         for (String tagInput : tagInputs) {
+            log.info("태그 처리 중: {}", tagInput);
             Tag tag = getOrCreateTag(tagInput.trim());
+            log.info("태그 ID: {}", tag.getTagId());
 
             FreeboardTag freeboardTag = FreeboardTag.builder()
                     .freeboardId(freeboardId)
@@ -101,7 +107,10 @@ public class TagService {
                     .build();
 
             int result = freeboardTagMapper.insert(freeboardTag);
+            log.info("삽입 결과: {}", result);
+
             if (result == 0) {
+                log.error("태그 삽입 실패!");
                 throw new CustomBusinessException(TagErrorCode.TAG_SAVE_FAILED);
             }
         }
@@ -138,11 +147,23 @@ public class TagService {
     // 자유게시판 게시글 태그 수정
     @Transactional
     public void updateFreeboardTags(Long freeboardId, List<String> tagInputs) {
-        freeboardTagMapper.deleteByFreeboardId(freeboardId);
+        log.info("=== updateFreeboardTags 시작 ===");
+        log.info("freeboardId: {}", freeboardId);
+        log.info("tagInputs: {}", tagInputs);
+
+        log.info("기존 태그 삭제 시작");
+        int deleted = freeboardTagMapper.deleteByFreeboardId(freeboardId);
+        log.info("삭제된 태그 수: {}", deleted);
 
         if (tagInputs != null && !tagInputs.isEmpty()) {
+            log.info("새로운 태그 저장 시작: {} 개", tagInputs.size());
             attachTagsToFreeboard(freeboardId, tagInputs);
+            log.info("태그 저장 완료");
+        } else {
+            log.warn("저장할 태그가 없음 (null 또는 empty)");
         }
+
+        log.info("=== updateFreeboardTags 완료 ===");
     }
 
     // 자동완성 검색

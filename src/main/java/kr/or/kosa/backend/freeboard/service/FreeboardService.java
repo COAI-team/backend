@@ -6,6 +6,7 @@ import kr.or.kosa.backend.freeboard.dto.FreeboardDto;
 import kr.or.kosa.backend.freeboard.exception.FreeboardErrorCode;
 import kr.or.kosa.backend.freeboard.exception.FreeboardException;
 import kr.or.kosa.backend.freeboard.mapper.FreeboardMapper;
+import kr.or.kosa.backend.tag.service.TagService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -23,6 +24,7 @@ public class FreeboardService {
 
     private final FreeboardMapper mapper;
     private final ObjectMapper objectMapper;
+    private final TagService tagService;
 
     public Map<String, Object> listPage(int page, int size) {
         int offset = (page - 1) * size;
@@ -48,6 +50,9 @@ public class FreeboardService {
         if (freeboard == null) {
             throw new FreeboardException(FreeboardErrorCode.NOT_FOUND);
         }
+
+        List<String> tags = tagService.getFreeboardTags(id);
+        freeboard.setTags(tags);
 
         return freeboard;
     }
@@ -80,7 +85,13 @@ public class FreeboardService {
             throw new FreeboardException(FreeboardErrorCode.INSERT_ERROR);
         }
 
-        return freeboard.getFreeboardId();
+        Long freeboardId = freeboard.getFreeboardId();
+
+        if (dto.getTags() != null && !dto.getTags().isEmpty()) {
+            tagService.attachTagsToFreeboard(freeboardId, dto.getTags());
+        }
+
+        return freeboardId;
     }
 
     @Transactional
@@ -115,6 +126,10 @@ public class FreeboardService {
 
         if (mapper.update(freeboard) == 0) {
             throw new FreeboardException(FreeboardErrorCode.UPDATE_ERROR);
+        }
+
+        if (dto.getTags() != null) {
+            tagService.updateFreeboardTags(id, dto.getTags());
         }
     }
 

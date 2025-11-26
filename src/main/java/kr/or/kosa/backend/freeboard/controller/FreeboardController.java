@@ -4,15 +4,18 @@ import jakarta.validation.Valid;
 import kr.or.kosa.backend.commons.response.ApiResponse;
 import kr.or.kosa.backend.freeboard.domain.Freeboard;
 import kr.or.kosa.backend.freeboard.dto.FreeboardCreateRequest;
+import kr.or.kosa.backend.freeboard.dto.FreeboardDto; // 이 import 추가!
 import kr.or.kosa.backend.freeboard.dto.FreeboardUpdateRequest;
 import kr.or.kosa.backend.freeboard.service.FreeboardService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.log4j.Log4j2;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
 import java.util.Map;
 
+@Log4j2
 @RestController
 @RequestMapping("/freeboard")
 @RequiredArgsConstructor
@@ -55,8 +58,19 @@ public class FreeboardController {
             @Valid @RequestBody FreeboardUpdateRequest request,
             @RequestAttribute(value = "userId", required = false) Long userId
     ) {
+        log.info("=== update 컨트롤러 시작 ===");
+        log.info("freeboardId: {}", freeboardId);
+        log.info("request: {}", request);
+        log.info("request.getTags(): {}", request.getTags());
+
         Long actualUserId = (userId != null) ? userId : 1L;
-        freeboardService.edit(freeboardId, request.toDto(), actualUserId);
+
+        FreeboardDto dto = request.toDto();
+        log.info("dto.getTags(): {}", dto.getTags());
+
+        freeboardService.edit(freeboardId, dto, actualUserId);
+        log.info("=== update 컨트롤러 완료 ===");
+
         return ResponseEntity.ok().build();
     }
 
