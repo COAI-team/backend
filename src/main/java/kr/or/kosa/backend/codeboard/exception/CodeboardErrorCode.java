@@ -1,8 +1,8 @@
-package kr.or.kosa.backend.codeBoard.exception;
+package kr.or.kosa.backend.codeboard.exception;
 
 import kr.or.kosa.backend.commons.exception.custom.ErrorCode;
 
-public enum CodeBoardErrorCode implements ErrorCode {
+public enum CodeboardErrorCode implements ErrorCode {
     INSERT_ERROR("CB001", "게시글 등록 중 오류가 발생했습니다."),
     UPDATE_ERROR("CB002", "게시글 수정 중 오류가 발생했습니다."),
     DELETE_ERROR("CB003", "게시글 삭제 중 오류가 발생했습니다."),
@@ -14,7 +14,7 @@ public enum CodeBoardErrorCode implements ErrorCode {
     private final String code;
     private final String message;
 
-    CodeBoardErrorCode(String code, String message) {
+    CodeboardErrorCode(String code, String message) {
         this.code = code;
         this.message = message;
     }
