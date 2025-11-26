@@ -1,12 +1,15 @@
 package kr.or.kosa.backend.user.service;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
+import java.util.Collections;
 import java.util.concurrent.TimeUnit;
 import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class PasswordResetTokenService {
@@ -14,7 +17,6 @@ public class PasswordResetTokenService {
     private final StringRedisTemplate redisTemplate;
 
     private static final String RESET_TOKEN_PREFIX = "pwd:reset:";
-
     private static final long EXPIRE_MINUTES = 15;
 
     /**
@@ -43,9 +45,15 @@ public class PasswordResetTokenService {
     }
 
     /**
-     * 토큰 즉시 삭제 (1회성)
+     * 토큰 삭제 (boolean 반환)
      */
-    public void deleteToken(String token) {
-        redisTemplate.delete(RESET_TOKEN_PREFIX + token);
+    public boolean deleteToken(String token) {
+        try {
+            Long deleted = redisTemplate.delete(Collections.singleton(RESET_TOKEN_PREFIX + token));
+            return deleted > 0;
+        } catch (Exception e) {
+            log.error("Failed to delete reset token {}: {}", token, e.getMessage());
+            return false;
+        }
     }
 }

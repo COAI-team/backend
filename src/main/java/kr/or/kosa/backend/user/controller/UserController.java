@@ -35,6 +35,7 @@ public class UserController {
             @RequestPart(value = "image", required = false) MultipartFile image
     ) {
         int userId = userService.register(dto, image);
+
         return ResponseEntity.ok(Map.of(
                 KEY_SUCCESS, true,
                 KEY_MESSAGE, "회원가입이 완료되었습니다.",
@@ -54,9 +55,13 @@ public class UserController {
      * AccessToken 재발급
      */
     @PostMapping("/refresh")
-    public ResponseEntity<Map<String, String>> refresh(@RequestHeader("Authorization") String token) {
+    public ResponseEntity<Map<String, Object>> refresh(@RequestHeader("Authorization") String token) {
+
+        String newAccessToken = userService.refresh(token);
+
         return ResponseEntity.ok(Map.of(
-                "accessToken", userService.refresh(token)
+                KEY_SUCCESS, true,
+                "accessToken", newAccessToken
         ));
     }
 
@@ -65,10 +70,12 @@ public class UserController {
      */
     @PostMapping("/logout")
     public ResponseEntity<Map<String, Object>> logout(@RequestHeader("Authorization") String token) {
-        userService.logout(token);
+
+        boolean result = userService.logout(token);
+
         return ResponseEntity.ok(Map.of(
-                KEY_SUCCESS, true,
-                KEY_MESSAGE, "로그아웃 완료"
+                KEY_SUCCESS, result,
+                KEY_MESSAGE, result ? "로그아웃 완료" : "로그아웃 실패"
         ));
     }
 
@@ -81,10 +88,12 @@ public class UserController {
      */
     @PostMapping("/password/reset/request")
     public ResponseEntity<Map<String, Object>> requestPasswordReset(@RequestBody Map<String, String> body) {
-        userService.sendPasswordResetLink(body.get("email"));
+
+        String message = userService.sendPasswordResetLink(body.get("email"));
+
         return ResponseEntity.ok(Map.of(
                 KEY_SUCCESS, true,
-                KEY_MESSAGE, "비밀번호 재설정 이메일이 발송되었습니다."
+                KEY_MESSAGE, message
         ));
     }
 
@@ -109,11 +118,13 @@ public class UserController {
     public ResponseEntity<Map<String, Object>> confirmPasswordReset(
             @RequestBody PasswordResetConfirmRequest dto
     ) {
-        userService.resetPassword(dto.getToken(), dto.getNewPassword());
+
+        boolean result = userService.resetPassword(dto.getToken(), dto.getNewPassword());
 
         return ResponseEntity.ok(Map.of(
-                KEY_SUCCESS, true,
-                KEY_MESSAGE, "비밀번호가 성공적으로 변경되었습니다."
+                KEY_SUCCESS, result,
+                KEY_MESSAGE, result ? "비밀번호가 성공적으로 변경되었습니다."
+                        : "유효하지 않은 토큰이거나 만료되었습니다."
         ));
     }
 
@@ -125,11 +136,52 @@ public class UserController {
             @AuthenticationPrincipal JwtUserDetails user,
             @RequestBody PasswordUpdateRequestDto dto
     ) {
-        userService.updatePassword(user.id(), dto);
+
+        boolean result = userService.updatePassword(user.id(), dto);
+
+        return ResponseEntity.ok(Map.of(
+                KEY_SUCCESS, result,
+                KEY_MESSAGE, result ? "비밀번호가 성공적으로 변경되었습니다."
+                        : "현재 비밀번호가 일치하지 않습니다."
+        ));
+    }
+
+    // ============================================================================
+    // 일반 정보 수정 (이름 / 닉네임 / 프로필 사진)
+    // ============================================================================
+
+    @PutMapping(value = "/me", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<Map<String, Object>> updateMyInfo(
+            @AuthenticationPrincipal JwtUserDetails user,
+            @ModelAttribute UserUpdateRequestDto dto,
+            @RequestPart(value = "image", required = false) MultipartFile image
+    ) {
+
+        UserResponseDto updated = userService.updateUserInfo(user.id(), dto, image);
 
         return ResponseEntity.ok(Map.of(
                 KEY_SUCCESS, true,
-                KEY_MESSAGE, "비밀번호가 성공적으로 변경되었습니다."
+                KEY_MESSAGE, "회원 정보가 수정되었습니다.",
+                "user", updated
+        ));
+    }
+
+    // ============================================================================
+    // 이메일 변경
+    // ============================================================================
+
+    @PutMapping("/me/email")
+    public ResponseEntity<Map<String, Object>> updateEmail(
+            @AuthenticationPrincipal JwtUserDetails user,
+            @RequestBody EmailUpdateRequestDto dto
+    ) {
+
+        String updatedEmail = userService.updateEmail(user.id(), dto.getNewEmail());
+
+        return ResponseEntity.ok(Map.of(
+                KEY_SUCCESS, true,
+                KEY_MESSAGE, "이메일이 성공적으로 변경되었습니다.",
+                "email", updatedEmail
         ));
     }
 }
