@@ -4,8 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import java.util.List;
 import kr.or.kosa.backend.tag.mapper.TagMapper;
-import kr.or.kosa.backend.tag.domain.Tag;
-import kr.or.kosa.backend.tag.dto.TagDTO;
+import kr.or.kosa.backend.tag.dto.TagDto;
 
 @Service
 @RequiredArgsConstructor
@@ -13,27 +12,27 @@ public class TagService {
 
     private final TagMapper tagMapper;
 
-    public List<Tag> getAllTags() {
+    public List<kr.or.kosa.backend.tag.domain.Tag> getAllTags() {
         return tagMapper.findAllTags();
     }
 
-    public List<Tag> getTagsByFreeboardId(Long id) {
+    public List<kr.or.kosa.backend.tag.domain.Tag> getTagsByFreeboardId(Long id) {
         return tagMapper.findTagsByFreeboardId(id);
     }
 
-    public List<Tag> getTagsByCodeboardId(Long id) {
+    public List<kr.or.kosa.backend.tag.domain.Tag> getTagsByCodeboardId(Long id) {
         return tagMapper.findTagsByCodeboardId(id);
     }
 
-    public void addTag(Tag tag) {
+    public void addTag(kr.or.kosa.backend.tag.domain.Tag tag) {
         tagMapper.insertTag(tag);
     }
 
-    public void addFreeboardTag(TagDTO dto) {
+    public void addFreeboardTag(TagDto dto) {
         tagMapper.insertFreeboardTag(dto);
     }
 
-    public void addCodeboardTag(TagDTO dto) {
+    public void addCodeboardTag(TagDto dto) {
         tagMapper.insertCodeboardTag(dto);
     }
 

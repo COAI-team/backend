@@ -1,4 +1,4 @@
-package kr.or.kosa.backend.tag.domain;
+package kr.or.kosa.backend.tag.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -9,7 +9,8 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Tag {
+public class TagDto {
     private Long tagId;
     private String tagName;
+    private String tagDisplayName;
 }

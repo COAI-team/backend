@@ -9,7 +9,8 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Tag {
+public class FreeboardTag {
+    private Long freeboardId;
     private Long tagId;
-    private String tagName;
+    private String tagDisplayName;
 }

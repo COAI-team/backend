@@ -3,8 +3,8 @@ package kr.or.kosa.backend.tag.controller;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
-import kr.or.kosa.backend.tag.domain.Tag;
-import kr.or.kosa.backend.tag.dto.TagDTO;
+
+import kr.or.kosa.backend.tag.dto.TagDto;
 import kr.or.kosa.backend.tag.service.TagService;
 
 @RestController
@@ -16,37 +16,37 @@ public class TagController {
 
     // 전체 태그 조회
     @GetMapping("/all")
-    public List<Tag> all() {
+    public List<kr.or.kosa.backend.tag.domain.Tag> all() {
         return tagService.getAllTags();
     }
 
     // 자유게시판 태그 조회
     @GetMapping("/freeboard/{id}")
-    public List<Tag> getFreeboardTags(@PathVariable Long id) {
+    public List<kr.or.kosa.backend.tag.domain.Tag> getFreeboardTags(@PathVariable Long id) {
         return tagService.getTagsByFreeboardId(id);
     }
 
     // 코드게시판 태그 조회
     @GetMapping("/codeboard/{id}")
-    public List<Tag> getCodeboardTags(@PathVariable Long id) {
+    public List<kr.or.kosa.backend.tag.domain.Tag> getCodeboardTags(@PathVariable Long id) {
         return tagService.getTagsByCodeboardId(id);
     }
 
     // 태그 등록
     @PostMapping
-    public void addTag(@RequestBody Tag tag) {
+    public void addTag(@RequestBody kr.or.kosa.backend.tag.domain.Tag tag) {
         tagService.addTag(tag);
     }
 
     // 자유게시판 매핑 등록
     @PostMapping("/freeboard")
-    public void addFreeboardTag(@RequestBody TagDTO dto) {
+    public void addFreeboardTag(@RequestBody TagDto dto) {
         tagService.addFreeboardTag(dto);
     }
 
     // 코드게시판 매핑 등록
     @PostMapping("/codeboard")
-    public void addCodeboardTag(@RequestBody TagDTO dto) {
+    public void addCodeboardTag(@RequestBody TagDto dto) {
         tagService.addCodeboardTag(dto);
     }
 

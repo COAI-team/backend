@@ -34,13 +34,13 @@
     </insert>
 
     <!-- 자유게시판 매핑 등록 -->
-    <insert id="insertFreeboardTag" parameterType="kr.or.kosa.backend.tag.dto.TagDTO">
+    <insert id="insertFreeboardTag" parameterType="kr.or.kosa.backend.tag.dto.TagDto">
         INSERT INTO boardtag (freeboard_id, tag_id)
         VALUES (#{freeboardId}, #{tagId})
     </insert>
 
     <!-- 코드게시판 매핑 등록 -->
-    <insert id="insertCodeboardTag" parameterType="kr.or.kosa.backend.tag.dto.TagDTO">
+    <insert id="insertCodeboardTag" parameterType="kr.or.kosa.backend.tag.dto.TagDto">
         INSERT INTO boardtag (codeboard_id, tag_id)
         VALUES (#{codeboardId}, #{tagId})
     </insert>
