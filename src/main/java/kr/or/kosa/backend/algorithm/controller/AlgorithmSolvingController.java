@@ -1,8 +1,6 @@
 package kr.or.kosa.backend.algorithm.controller;
 
-import kr.or.kosa.backend.algorithm.dto.ProblemSolveResponseDto;
-import kr.or.kosa.backend.algorithm.dto.SubmissionRequestDto;
-import kr.or.kosa.backend.algorithm.dto.SubmissionResponseDto;
+import kr.or.kosa.backend.algorithm.dto.*;
 import kr.or.kosa.backend.algorithm.service.AlgorithmSolvingService;
 import kr.or.kosa.backend.commons.response.ApiResponse;
 import kr.or.kosa.backend.security.jwt.JwtAuthentication;
@@ -102,6 +100,46 @@ public class AlgorithmSolvingController {
             log.error("코드 제출 중 예외 발생", e);
             return ResponseEntity.internalServerError().body(
                     new ApiResponse<>("5000", "코드 제출 처리 중 오류가 발생했습니다", null)
+            );
+        }
+    }
+
+    /**
+     * 샘플 테스트 실행 (제출 없이 코드만 실행)
+     * POST /api/algo/submissions/test
+     *
+     * - 샘플 테스트케이스(isSample=true)만 실행
+     * - DB에 저장하지 않음
+     * - AI 평가 없음
+     * - 프론트엔드의 "코드 실행" 버튼에서 호출
+     */
+    @PostMapping("/submissions/test")
+    public ResponseEntity<ApiResponse<TestRunResponseDto>> runSampleTest(
+            @RequestBody @Valid TestRunRequestDto request,
+            @AuthenticationPrincipal JwtAuthentication authentication) {
+
+        Long userId = extractUserId(authentication);
+
+        log.info("샘플 테스트 실행 요청 - problemId: {}, language: {}, userId: {}",
+                request.getProblemId(), request.getLanguage(), userId);
+
+        try {
+            TestRunResponseDto response = solvingService.runSampleTest(request);
+
+            return ResponseEntity.ok(
+                    new ApiResponse<>("0000", "테스트 실행 완료", response)
+            );
+
+        } catch (IllegalArgumentException e) {
+            log.warn("샘플 테스트 실행 실패 - error: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(
+                    new ApiResponse<>("4000", e.getMessage(), null)
+            );
+
+        } catch (Exception e) {
+            log.error("샘플 테스트 실행 중 예외 발생", e);
+            return ResponseEntity.internalServerError().body(
+                    new ApiResponse<>("5000", "테스트 실행 중 오류가 발생했습니다: " + e.getMessage(), null)
             );
         }
     }

@@ -3,12 +3,12 @@ package kr.or.kosa.backend.algorithm.service;
 import kr.or.kosa.backend.algorithm.domain.AlgoProblem;
 import kr.or.kosa.backend.algorithm.domain.AlgoSubmission;
 import kr.or.kosa.backend.algorithm.domain.AlgoTestcase;
+import kr.or.kosa.backend.algorithm.domain.ProgrammingLanguage;
 import kr.or.kosa.backend.algorithm.dto.*;
 import kr.or.kosa.backend.algorithm.mapper.AlgorithmProblemMapper;
 import kr.or.kosa.backend.algorithm.mapper.AlgorithmSubmissionMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -108,6 +108,104 @@ public class AlgorithmSolvingService {
 
         // 5. 즉시 응답 반환 (PENDING 상태)
         return convertToSubmissionResponse(submission, problem, null);
+    }
+
+    /**
+     * 샘플 테스트케이스 실행 (제출 없이 코드 실행만)
+     * - DB 저장 없음
+     * - AI 평가 없음
+     * - 샘플 테스트케이스(isSample=true)만 실행
+     */
+    public TestRunResponseDto runSampleTest(TestRunRequestDto request) {
+        log.info("샘플 테스트 실행 시작 - problemId: {}, language: {}",
+                request.getProblemId(), request.getLanguage());
+
+        // 1. 문제 존재 확인
+        AlgoProblem problem = problemMapper.selectProblemById(request.getProblemId());
+        if (problem == null) {
+            throw new IllegalArgumentException("존재하지 않는 문제입니다. ID: " + request.getProblemId());
+        }
+
+        // 2. 샘플 테스트케이스 조회 (isSample = true)
+        List<AlgoTestcase> sampleTestcases = problemMapper.selectSampleTestCasesByProblemId(request.getProblemId());
+
+        if (sampleTestcases == null || sampleTestcases.isEmpty()) {
+            throw new IllegalArgumentException("샘플 테스트케이스가 없습니다. 문제 ID: " + request.getProblemId());
+        }
+
+        log.info("샘플 테스트케이스 {} 개 조회됨", sampleTestcases.size());
+
+        // 3. 언어 문자열을 ProgrammingLanguage enum으로 변환
+        ProgrammingLanguage language;
+        try {
+            language = ProgrammingLanguage.valueOf(request.getLanguage().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("지원하지 않는 프로그래밍 언어입니다: " + request.getLanguage());
+        }
+
+        // 4. Judge0 DTO로 변환
+        List<Judge0Service.TestCaseDto> testCaseDtos = sampleTestcases.stream()
+                .map(tc -> Judge0Service.TestCaseDto.builder()
+                        .input(tc.getInputData())
+                        .expectedOutput(tc.getExpectedOutput())
+                        .build())
+                .collect(Collectors.toList());
+
+        // 5. Judge0 실행
+        try {
+            CompletableFuture<Judge0Service.JudgeResultDto> judgeFuture =
+                    judge0Service.judgeCode(request.getSourceCode(), language, testCaseDtos);
+
+            Judge0Service.JudgeResultDto judgeResult = judgeFuture.get();
+
+            log.info("샘플 테스트 실행 완료 - 결과: {}, 통과: {}/{}",
+                    judgeResult.getOverallResult(),
+                    judgeResult.getPassedTestCount(),
+                    judgeResult.getTotalTestCount());
+
+            // 6. 응답 DTO 변환 (DB 저장 없이 바로 반환)
+            return convertToTestRunResponse(judgeResult);
+
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.error("샘플 테스트 실행 중 인터럽트 발생", e);
+            throw new RuntimeException("테스트 실행이 중단되었습니다.", e);
+        } catch (Exception e) {
+            log.error("샘플 테스트 실행 중 오류 발생", e);
+            throw new RuntimeException("테스트 실행 중 오류가 발생했습니다: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Judge0 결과를 TestRunResponseDto로 변환
+     */
+    private TestRunResponseDto convertToTestRunResponse(Judge0Service.JudgeResultDto judgeResult) {
+        List<TestRunResponseDto.TestCaseResultDto> testCaseResults = null;
+
+        if (judgeResult.getTestCaseResults() != null) {
+            testCaseResults = judgeResult.getTestCaseResults().stream()
+                    .map(r -> TestRunResponseDto.TestCaseResultDto.builder()
+                            .testCaseNumber(r.getTestCaseNumber())
+                            .input(r.getInput())
+                            .expectedOutput(r.getExpectedOutput())
+                            .actualOutput(r.getActualOutput())
+                            .result(r.getResult())
+                            .executionTime(r.getExecutionTime())
+                            .memoryUsage(r.getMemoryUsage())
+                            .errorMessage(r.getErrorMessage())
+                            .build())
+                    .collect(Collectors.toList());
+        }
+
+        return TestRunResponseDto.builder()
+                .overallResult(judgeResult.getOverallResult())
+                .passedCount(judgeResult.getPassedTestCount())
+                .totalCount(judgeResult.getTotalTestCount())
+                .testPassRate(judgeResult.getTestPassRate())
+                .maxExecutionTime(judgeResult.getMaxExecutionTime())
+                .maxMemoryUsage(judgeResult.getMaxMemoryUsage())
+                .testCaseResults(testCaseResults)
+                .build();
     }
 
     /**
