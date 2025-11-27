@@ -3,6 +3,7 @@ plugins {
     id 'org.springframework.boot' version '3.5.7'
     id 'io.spring.dependency-management' version '1.1.7'
 }
+
 ext {
     springAiVersion = "1.1.0"
 }
@@ -28,64 +29,69 @@ repositories {
 }
 
 dependencies {
-    // --- Spring Boot 기본 웹 ---
+
+    /* ------------------------
+     * 기본 Spring Boot 설정
+     * ------------------------ */
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-mail'
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
-
-    // --- Spring Security 추가 ---
     implementation 'org.springframework.boot:spring-boot-starter-security'
 
-    // --- Validation ---
+    /* Validation */
     implementation 'org.springframework.boot:spring-boot-starter-validation'
 
-    // --- MyBatis ---
+    /* MyBatis */
     implementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter:3.0.4'
     implementation 'io.github.cdimascio:dotenv-java:2.2.3'
+    implementation 'org.springframework.boot:spring-boot-starter-webflux'
+    implementation 'io.projectreactor.netty:reactor-netty'
+
+    implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
+
+    /* AI */
     implementation 'org.springframework.ai:spring-ai-starter-model-openai'
     implementation 'org.springframework.ai:spring-ai-starter-vector-store-qdrant'
 
-    // --- Database (MySQL) ---
-    //    runtimeOnly 'com.mysql:mysql-connector-j'
+    /* DB (MariaDB) */
     implementation 'org.mariadb.jdbc:mariadb-java-client:3.3.3'
 
-    // --- JWT ---
+    /* JWT */
     implementation 'io.jsonwebtoken:jjwt-api:0.11.5'
     implementation 'io.jsonwebtoken:jjwt-impl:0.11.5'
     implementation 'io.jsonwebtoken:jjwt-jackson:0.11.5'
 
-    // --- Lombok ---
+    /* Lombok */
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
 
-    // 개발 편의
+    /* 개발 편의 */
     developmentOnly 'org.springframework.boot:spring-boot-devtools'
 
-    // --- AWS SDK (직접 S3 사용 가능) ---
+    /* AWS S3 */
     implementation 'software.amazon.awssdk:s3:2.25.39'
     implementation 'io.awspring.cloud:spring-cloud-aws-starter-s3:3.0.2'
     implementation 'io.awspring.cloud:spring-cloud-aws-starter:3.0.2'
 
-    // aop
+    /* AOP */
     implementation 'org.springframework.boot:spring-boot-starter-aop'
 
-    // 로그백
+    /* Logstash */
     implementation 'net.logstash.logback:logstash-logback-encoder:7.3'
 
-    // 링크 프리뷰
+    /* Jsoup */
     implementation 'org.jsoup:jsoup:1.17.2'
 
-    // 테스트
+    /* Test */
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 
-    // WebFlux - WebClient 사용
-    implementation 'org.springframework.boot:spring-boot-starter-webflux'
-
+    /* macOS native resolver (optional) */
     if (isAppleSilicon()) {
         runtimeOnly("io.netty:netty-resolver-dns-native-macos:4.1.94.Final:osx-aarch_64")
     }
 }
+
 dependencyManagement {
     imports {
         mavenBom "org.springframework.ai:spring-ai-bom:$springAiVersion"
@@ -93,7 +99,8 @@ dependencyManagement {
 }
 
 def isAppleSilicon() {
-    return System.getProperty("os.name") == "Mac OS X" && System.getProperty("os.arch") == "aarch64"
+    return System.getProperty("os.name") == "Mac OS X" &&
+            System.getProperty("os.arch") == "aarch64"
 }
 
 bootJar {

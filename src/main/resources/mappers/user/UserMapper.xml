@@ -25,15 +25,21 @@
 
     <!-- ========= SELECT ========= -->
     <select id="findByEmail" resultMap="UserMap">
-        SELECT * FROM USERS WHERE USER_EMAIL = #{email}
+        SELECT *
+        FROM USERS
+        WHERE USER_EMAIL = #{email}
     </select>
 
     <select id="findByNickname" resultMap="UserMap">
-        SELECT * FROM USERS WHERE USER_NICKNAME = #{nickname}
+        SELECT *
+        FROM USERS
+        WHERE USER_NICKNAME = #{nickname}
     </select>
 
     <select id="findById" resultMap="UserMap">
-        SELECT * FROM USERS WHERE USER_ID = #{id}
+        SELECT *
+        FROM USERS
+        WHERE USER_ID = #{id}
     </select>
 
     <!-- ========= INSERT ========= -->
@@ -48,11 +54,14 @@
                  )
     </insert>
 
-    <insert id="insertGithubUser" parameterType="kr.or.kosa.backend.user.domain.User">
+    <insert id="insertGithubUser"
+            parameterType="kr.or.kosa.backend.user.domain.User">
         INSERT INTO USERS (
-            USER_EMAIL, USER_NAME, USER_NICKNAME, USER_IMAGE, USER_GITHUBTOKEN, USER_ROLE, USER_PW
+            USER_EMAIL, USER_NAME, USER_NICKNAME, USER_IMAGE,
+            USER_GITHUBTOKEN, USER_ROLE, USER_PW
         ) VALUES (
-                     #{email}, #{name}, #{nickname}, #{image}, #{githubToken}, #{role}, 'GITHUB_USER'
+                     #{email}, #{name}, #{nickname}, #{image},
+                     #{githubToken}, #{role}, 'GITHUB_USER'
                  )
     </insert>
 
@@ -85,8 +94,7 @@
 
     <update id="updateUserInfo">
         UPDATE USERS
-        SET
-            USER_NAME = #{name},
+        SET USER_NAME = #{name},
             USER_NICKNAME = #{nickname},
             USER_UPDATEDAT = NOW()
         WHERE USER_ID = #{id}
@@ -98,7 +106,7 @@
         WHERE USER_ID = #{id}
     </update>
 
-    <!-- refresh token DB 보관하는 경우 -->
+    <!-- refresh token 보관 -->
     <update id="updateRefreshToken">
         UPDATE USERS
         SET USER_REFRESHTOKEN = #{token}
@@ -107,7 +115,54 @@
 
     <!-- ========= DELETE ========= -->
     <delete id="deleteUser">
-        DELETE FROM USERS WHERE USER_ID = #{id}
+        DELETE FROM USERS
+        WHERE USER_ID = #{id}
     </delete>
+
+    <!-- ==========================
+         90일 뒤 자동 탈퇴 처리
+    ========================== -->
+
+    <!-- 1) 탈퇴 예약 -->
+    <update id="scheduleDelete">
+        UPDATE USERS
+        SET USER_DELETEDAT = #{deletedAt},
+            USER_ISDELETED = 0
+        WHERE USER_ID = #{id}
+    </update>
+
+    <!-- 2) 탈퇴 복구 -->
+    <update id="restoreUser">
+        UPDATE USERS
+        SET USER_DELETEDAT = NULL
+        WHERE USER_ID = #{id}
+    </update>
+
+    <!-- 3) 90일 지난 계정 조회 -->
+    <select id="findUsersToDelete" resultMap="UserMap">
+        <![CDATA[
+        SELECT *
+        FROM USERS
+        WHERE USER_ISDELETED = 0
+          AND USER_DELETEDAT IS NOT NULL
+          AND USER_DELETEDAT <
+    ]]>
+    #{now}
+    </select>
+
+    <!-- 4) Soft Delete 처리 -->
+    <update id="softDeleteUser">
+        UPDATE USERS
+        SET USER_ISDELETED = 1
+        WHERE USER_ID = #{id}
+    </update>
+
+    <!-- 5) 개인정보 익명화 -->
+    <update id="anonymizeUser">
+        UPDATE USERS
+        SET USER_EMAIL = #{email},
+            USER_NAME = #{name}
+        WHERE USER_ID = #{id}
+    </update>
 
 </mapper>

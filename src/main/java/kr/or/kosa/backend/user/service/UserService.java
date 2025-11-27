@@ -26,4 +26,8 @@ public interface UserService {
     String updateEmail(Integer userId, String newEmail);
 
     UserResponseDto getUserInfo(Integer userId);
+
+    boolean requestDelete(Integer userId);
+
+    boolean restoreUser(Integer userId);
 }

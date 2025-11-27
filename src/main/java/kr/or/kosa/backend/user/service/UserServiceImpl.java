@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.time.LocalDateTime;
 import java.util.concurrent.TimeUnit;
 
 @Slf4j
@@ -373,4 +374,56 @@ public class UserServiceImpl implements UserService {
                 .build();
     }
 
+    // ============================================================
+    // 90일 뒤 탈퇴 예약
+    // ============================================================
+    @Override
+    public boolean requestDelete(Integer userId) {
+
+        User user = userMapper.findById(userId);
+        if (user == null) {
+            throw new CustomBusinessException(UserErrorCode.USER_NOT_FOUND);
+        }
+
+        // 이미 탈퇴 예약 중인지 확인
+        boolean isAlreadyScheduled =
+                user.getDeletedAt() != null &&
+                        !Boolean.TRUE.equals(user.getIsDeleted()); // 🔥 핵심 수정
+
+        if (isAlreadyScheduled) {
+            throw new CustomBusinessException(UserErrorCode.ALREADY_SCHEDULED_DELETE);
+        }
+
+        // 90일 뒤 탈퇴될 예정
+        LocalDateTime deletedAt = LocalDateTime.now().plusDays(90);
+
+        int result = userMapper.scheduleDelete(userId, deletedAt);
+
+        return result > 0;
+    }
+
+    // ============================================================
+    // 탈퇴 신청 복구
+    // ============================================================
+    @Override
+    public boolean restoreUser(Integer userId) {
+
+        User user = userMapper.findById(userId);
+        if (user == null) {
+            throw new CustomBusinessException(UserErrorCode.USER_NOT_FOUND);
+        }
+
+        // 탈퇴 예약조차 되어있지 않으면 복구 불가
+        if (user.getDeletedAt() == null) {
+            return false;
+        }
+
+        // 이미 90일이 지나 실제 삭제가 예정된 계정
+        if (user.getDeletedAt().isBefore(LocalDateTime.now())) {
+            return false;
+        }
+
+        int result = userMapper.restoreUser(userId);
+        return result > 0;
+    }
 }

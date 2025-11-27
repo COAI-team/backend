@@ -13,7 +13,9 @@ public enum UserErrorCode implements ErrorCode {
     USER_CREATE_FAIL("U501", "사용자 생성에 실패했습니다."),
     UPDATE_FAIL("U502", "정보 업데이트에 실패했습니다."),
     FILE_SAVE_ERROR("USER012", "파일 저장 중 오류가 발생했습니다."),
-    INVALID_TOKEN("USER014", "유효하지 않은 토큰입니다.");
+    INVALID_TOKEN("USER014", "유효하지 않은 토큰입니다."),
+    ALREADY_SCHEDULED_DELETE("U100", "이미 탈퇴 예약 중인 계정입니다."),
+    ACCOUNT_PENDING_DELETE("U101", "탈퇴 예약된 계정입니다. 복구 후 로그인 가능합니다.");
 
     private final String code;
     private final String message;
