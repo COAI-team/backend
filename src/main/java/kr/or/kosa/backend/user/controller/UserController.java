@@ -177,7 +177,6 @@ public class UserController {
     // ============================================================================
     // 이메일 변경
     // ============================================================================
-
     @PutMapping("/me/email")
     public ResponseEntity<Map<String, Object>> updateEmail(
             @AuthenticationPrincipal JwtUserDetails user,
@@ -190,6 +189,41 @@ public class UserController {
                 KEY_SUCCESS, true,
                 KEY_MESSAGE, "이메일이 성공적으로 변경되었습니다.",
                 "email", updatedEmail
+        ));
+    }
+
+    // ============================================================================
+    // 탈퇴 신청 (90일 뒤 삭제)
+    // ============================================================================
+
+    @DeleteMapping("/me")
+    public ResponseEntity<Map<String, Object>> requestDelete(
+            @AuthenticationPrincipal JwtUserDetails user
+    ) {
+        boolean result = userService.requestDelete(user.id());
+
+        return ResponseEntity.ok(Map.of(
+                KEY_SUCCESS, result,
+                KEY_MESSAGE, result
+                        ? "탈퇴 신청이 완료되었습니다. 90일 내 복구 가능합니다."
+                        : "탈퇴 신청에 실패했습니다."
+        ));
+    }
+
+    // ============================================================================
+    // 탈퇴 복구
+    // ============================================================================
+    @PutMapping("/me/restore")
+    public ResponseEntity<Map<String, Object>> restoreUser(
+            @AuthenticationPrincipal JwtUserDetails user
+    ) {
+        boolean result = userService.restoreUser(user.id());
+
+        return ResponseEntity.ok(Map.of(
+                KEY_SUCCESS, result,
+                KEY_MESSAGE, result
+                        ? "계정 복구가 완료되었습니다."
+                        : "복구할 수 없는 계정이거나 이미 삭제 처리되었습니다."
         ));
     }
 }
