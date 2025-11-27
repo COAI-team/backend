@@ -153,8 +153,8 @@ public class AlgorithmSolvingService {
 
         // 5. Judge0 실행
         try {
-            CompletableFuture<Judge0Service.JudgeResultDto> judgeFuture =
-                    judge0Service.judgeCode(request.getSourceCode(), language, testCaseDtos);
+            CompletableFuture<Judge0Service.JudgeResultDto> judgeFuture = judge0Service
+                    .judgeCode(request.getSourceCode(), language, testCaseDtos);
 
             Judge0Service.JudgeResultDto judgeResult = judgeFuture.get();
 
@@ -279,8 +279,8 @@ public class AlgorithmSolvingService {
                 .language(request.getLanguage())
                 .judgeResult(AlgoSubmission.JudgeResult.PENDING)
                 .aiFeedbackStatus(AlgoSubmission.AiFeedbackStatus.PENDING)
-                .aiFeedbackType(request.getFeedbackType() != null ?
-                        request.getFeedbackType() : AlgoSubmission.AiFeedbackType.COMPREHENSIVE)
+                .aiFeedbackType(request.getFeedbackType() != null ? request.getFeedbackType()
+                        : AlgoSubmission.AiFeedbackType.COMPREHENSIVE)
                 .startSolving(request.getStartTime())
                 .endSolving(request.getEndTime())
                 .solvingDurationSeconds(solvingDuration)
@@ -318,8 +318,8 @@ public class AlgorithmSolvingService {
     }
 
     private SubmissionResponseDto convertToSubmissionResponse(AlgoSubmission submission,
-                                                              AlgoProblem problem,
-                                                              List<Judge0Service.TestCaseResultDto> testCaseResults) {
+            AlgoProblem problem,
+            List<Judge0Service.TestCaseResultDto> testCaseResults) {
         return SubmissionResponseDto.builder()
                 .submissionId(submission.getAlgosubmissionId())
                 .problemId(submission.getAlgoProblemId())
@@ -334,8 +334,8 @@ public class AlgorithmSolvingService {
                 .totalTestCount(submission.getTotalTestCount())
                 .testPassRate(submission.getTestPassRate())
                 .aiFeedback(submission.getAiFeedback())
-                .aiFeedbackStatus(submission.getAiFeedbackStatus() != null ?
-                        submission.getAiFeedbackStatus().name() : "PENDING")
+                .aiFeedbackStatus(
+                        submission.getAiFeedbackStatus() != null ? submission.getAiFeedbackStatus().name() : "PENDING")
                 .aiScore(submission.getAiScore())
                 .focusScore(submission.getFocusScore())
                 .timeEfficiencyScore(submission.getTimeEfficiencyScore())
@@ -361,8 +361,8 @@ public class AlgorithmSolvingService {
         return SubmissionResponseDto.ScoreBreakdownDto.builder()
                 .judgeScore(calculateJudgeScore(submission))
                 .aiScore(submission.getAiScore() != null ? submission.getAiScore() : BigDecimal.ZERO)
-                .timeScore(submission.getTimeEfficiencyScore() != null ?
-                        submission.getTimeEfficiencyScore() : BigDecimal.ZERO)
+                .timeScore(submission.getTimeEfficiencyScore() != null ? submission.getTimeEfficiencyScore()
+                        : BigDecimal.ZERO)
                 .focusScore(submission.getFocusScore() != null ? submission.getFocusScore() : BigDecimal.ZERO)
                 .scoreWeights("Judge(40%) + AI(30%) + Time(30%)")
                 .build();
