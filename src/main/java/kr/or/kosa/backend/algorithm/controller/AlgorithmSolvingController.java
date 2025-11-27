@@ -1,7 +1,9 @@
 package kr.or.kosa.backend.algorithm.controller;
 
 import kr.or.kosa.backend.algorithm.dto.*;
+import kr.or.kosa.backend.algorithm.exception.AlgoErrorCode;
 import kr.or.kosa.backend.algorithm.service.AlgorithmSolvingService;
+import kr.or.kosa.backend.commons.exception.custom.CustomBusinessException;
 import kr.or.kosa.backend.commons.response.ApiResponse;
 import kr.or.kosa.backend.security.jwt.JwtAuthentication;
 import kr.or.kosa.backend.security.jwt.JwtUserDetails;
@@ -63,9 +65,7 @@ public class AlgorithmSolvingController {
 
         } catch (IllegalArgumentException e) {
             log.warn("문제 풀이 시작 실패 - problemId: {}, error: {}", problemId, e.getMessage());
-            return ResponseEntity.badRequest().body(
-                    new ApiResponse<>("4000", e.getMessage(), null)
-            );
+            throw new CustomBusinessException(AlgoErrorCode.PROBLEM_NOT_FOUND);
         }
     }
 
@@ -92,15 +92,11 @@ public class AlgorithmSolvingController {
 
         } catch (IllegalArgumentException e) {
             log.warn("코드 제출 실패 - error: {}", e.getMessage());
-            return ResponseEntity.badRequest().body(
-                    new ApiResponse<>("4000", e.getMessage(), null)
-            );
+            throw new CustomBusinessException(AlgoErrorCode.INVALID_INPUT);
 
         } catch (Exception e) {
             log.error("코드 제출 중 예외 발생", e);
-            return ResponseEntity.internalServerError().body(
-                    new ApiResponse<>("5000", "코드 제출 처리 중 오류가 발생했습니다", null)
-            );
+            throw new CustomBusinessException(AlgoErrorCode.SUBMISSION_SAVE_FAIL);
         }
     }
 
@@ -132,15 +128,11 @@ public class AlgorithmSolvingController {
 
         } catch (IllegalArgumentException e) {
             log.warn("샘플 테스트 실행 실패 - error: {}", e.getMessage());
-            return ResponseEntity.badRequest().body(
-                    new ApiResponse<>("4000", e.getMessage(), null)
-            );
+            throw new CustomBusinessException(AlgoErrorCode.INVALID_INPUT);
 
         } catch (Exception e) {
             log.error("샘플 테스트 실행 중 예외 발생", e);
-            return ResponseEntity.internalServerError().body(
-                    new ApiResponse<>("5000", "테스트 실행 중 오류가 발생했습니다: " + e.getMessage(), null)
-            );
+            throw new CustomBusinessException(AlgoErrorCode.TEST_RUN_FAILED);
         }
     }
 
@@ -166,9 +158,7 @@ public class AlgorithmSolvingController {
 
         } catch (IllegalArgumentException e) {
             log.warn("제출 결과 조회 실패 - submissionId: {}, error: {}", submissionId, e.getMessage());
-            return ResponseEntity.badRequest().body(
-                    new ApiResponse<>("4000", e.getMessage(), null)
-            );
+            throw new CustomBusinessException(AlgoErrorCode.SUBMISSION_NOT_FOUND);
         }
     }
 
@@ -197,9 +187,7 @@ public class AlgorithmSolvingController {
 
         } catch (IllegalArgumentException e) {
             log.warn("제출 공개 설정 실패 - error: {}", e.getMessage());
-            return ResponseEntity.badRequest().body(
-                    new ApiResponse<>("4000", e.getMessage(), null)
-            );
+            throw new CustomBusinessException(AlgoErrorCode.SUBMISSION_UPDATE_FAIL);
         }
     }
 
@@ -224,9 +212,7 @@ public class AlgorithmSolvingController {
 
         } catch (Exception e) {
             log.error("제출 이력 조회 중 예외 발생", e);
-            return ResponseEntity.internalServerError().body(
-                    new ApiResponse<>("5000", "제출 이력 조회 중 오류가 발생했습니다", null)
-            );
+            throw new CustomBusinessException(AlgoErrorCode.SUBMISSION_NOT_FOUND);
         }
     }
 }

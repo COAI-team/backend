@@ -1,7 +1,9 @@
 package kr.or.kosa.backend.algorithm.controller;
 
 import kr.or.kosa.backend.algorithm.dto.SubmissionAiStatusDto;
+import kr.or.kosa.backend.algorithm.exception.AlgoErrorCode;
 import kr.or.kosa.backend.algorithm.service.AlgorithmEvaluationService;
+import kr.or.kosa.backend.commons.exception.custom.CustomBusinessException;
 import kr.or.kosa.backend.commons.response.ApiResponse;
 import kr.or.kosa.backend.security.jwt.JwtAuthentication;
 import kr.or.kosa.backend.security.jwt.JwtUserDetails;
@@ -72,14 +74,10 @@ public class AlgorithmEvaluationController {
             return ResponseEntity.ok(ApiResponse.success(status));
 
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(
-                    new ApiResponse<>("4000", e.getMessage(), null)
-            );
+            throw new CustomBusinessException(AlgoErrorCode.INVALID_INPUT);
         } catch (Exception e) {
             log.error("평가 상태 조회 중 오류 발생", e);
-            return ResponseEntity.internalServerError().body(
-                    new ApiResponse<>("5000", "서버 오류가 발생했습니다.", null)
-            );
+            throw new CustomBusinessException(AlgoErrorCode.EVALUATION_PROCESSING_ERROR);
         }
     }
 
@@ -105,9 +103,7 @@ public class AlgorithmEvaluationController {
 
         } catch (Exception e) {
             log.error("AI 평가 재실행 중 오류 발생", e);
-            return ResponseEntity.internalServerError().body(
-                    new ApiResponse<>("5000", "AI 평가 재실행 중 오류가 발생했습니다.", null)
-            );
+            throw new CustomBusinessException(AlgoErrorCode.EVALUATION_RETRY_FAIL);
         }
     }
 }

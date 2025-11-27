@@ -3,8 +3,10 @@ package kr.or.kosa.backend.algorithm.controller;
 import kr.or.kosa.backend.algorithm.domain.AlgoProblem;
 import kr.or.kosa.backend.algorithm.dto.ProblemGenerationRequestDto;
 import kr.or.kosa.backend.algorithm.dto.ProblemGenerationResponseDto;
+import kr.or.kosa.backend.algorithm.exception.AlgoErrorCode;
 import kr.or.kosa.backend.algorithm.service.AIProblemGeneratorService;
 import kr.or.kosa.backend.algorithm.service.AlgorithmProblemService;
+import kr.or.kosa.backend.commons.exception.custom.CustomBusinessException;
 import kr.or.kosa.backend.commons.response.ApiResponse;
 import kr.or.kosa.backend.security.jwt.JwtAuthentication;
 import kr.or.kosa.backend.security.jwt.JwtUserDetails;
@@ -45,13 +47,11 @@ public class AlgorithmProblemController {
         try {
             // 1. 요청 데이터 검증
             if (request.getDifficulty() == null) {
-                return ResponseEntity.badRequest()
-                        .body(ApiResponse.error("4001", "난이도를 선택해주세요"));
+                throw new CustomBusinessException(AlgoErrorCode.INVALID_INPUT);
             }
 
             if (request.getTopic() == null || request.getTopic().trim().isEmpty()) {
-                return ResponseEntity.badRequest()
-                        .body(ApiResponse.error("4002", "문제 주제를 입력해주세요"));
+                throw new CustomBusinessException(AlgoErrorCode.INVALID_INPUT);
             }
 
             // 2. AI 문제 생성
@@ -62,9 +62,7 @@ public class AlgorithmProblemController {
                 log.error("AI 문제 생성 실패 - 상태: {}, 에러: {}",
                         aiResponse.getStatus(), aiResponse.getErrorMessage());
 
-                return ResponseEntity.internalServerError()
-                        .body(ApiResponse.error("5001",
-                                "AI 문제 생성에 실패했습니다: " + aiResponse.getErrorMessage()));
+                throw new CustomBusinessException(AlgoErrorCode.PROBLEM_GENERATION_FAIL);
             }
 
             // 4. userId 추출 (JwtAuthentication → JwtUserDetails → id) 추후 수정 필요
@@ -97,10 +95,11 @@ public class AlgorithmProblemController {
 
             return ResponseEntity.ok(ApiResponse.success(responseData));
 
+        } catch (CustomBusinessException e) {
+            throw e;
         } catch (Exception e) {
             log.error("AI 문제 생성 중 예외 발생", e);
-            return ResponseEntity.internalServerError()
-                    .body(ApiResponse.error("5000", "문제 생성 중 서버 오류가 발생했습니다: " + e.getMessage()));
+            throw new CustomBusinessException(AlgoErrorCode.PROBLEM_SAVE_FAIL);
         }
     }
 
@@ -152,8 +151,7 @@ public class AlgorithmProblemController {
 
         } catch (Exception e) {
             log.error("문제 목록 조회 실패", e);
-            return ResponseEntity.internalServerError()
-                    .body(ApiResponse.error("9999", "문제 목록 조회 중 오류가 발생했습니다."));
+            throw new CustomBusinessException(AlgoErrorCode.INVALID_INPUT);
         }
     }
 
@@ -170,7 +168,7 @@ public class AlgorithmProblemController {
             // 문제 존재 여부 확인
             if (!algorithmProblemService.existsProblem(problemId)) {
                 log.warn("존재하지 않는 문제 조회 시도 - problemId: {}", problemId);
-                return ResponseEntity.notFound().build();
+                throw new CustomBusinessException(AlgoErrorCode.PROBLEM_NOT_FOUND);
             }
 
             // 문제 상세 정보 조회
@@ -180,10 +178,11 @@ public class AlgorithmProblemController {
 
             return ResponseEntity.ok(ApiResponse.success(problem));
 
+        } catch (CustomBusinessException e) {
+            throw e;
         } catch (Exception e) {
             log.error("문제 상세 조회 실패 - problemId: {}", problemId, e);
-            return ResponseEntity.internalServerError()
-                    .body(ApiResponse.error("9999", "문제 상세 조회 중 오류가 발생했습니다."));
+            throw new CustomBusinessException(AlgoErrorCode.PROBLEM_NOT_FOUND);
         }
     }
 
@@ -209,7 +208,7 @@ public class AlgorithmProblemController {
 
         } catch (Exception e) {
             log.error("문제 존재 여부 확인 실패 - problemId: {}", problemId, e);
-            return ResponseEntity.internalServerError().build();
+            throw new CustomBusinessException(AlgoErrorCode.PROBLEM_NOT_FOUND);
         }
     }
 
@@ -228,8 +227,7 @@ public class AlgorithmProblemController {
 
         } catch (Exception e) {
             log.error("헬스 체크 실패", e);
-            return ResponseEntity.internalServerError()
-                    .body(ApiResponse.error("9999", "서비스 상태 확인 중 오류가 발생했습니다."));
+            throw new CustomBusinessException(AlgoErrorCode.INVALID_INPUT);
         }
     }
 }
