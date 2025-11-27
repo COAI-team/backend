@@ -65,7 +65,7 @@
         WHERE USER_ID = #{id}
     </update>
 
-    <update id="updateGithubToken" parameterType="kr.or.kosa.backend.user.domain.User">
+    <update id="updateGithubToken">
         UPDATE USERS
         SET USER_GITHUBTOKEN = #{githubToken}
         WHERE USER_ID = #{id}
@@ -77,15 +77,31 @@
         WHERE USER_ID = #{id}
     </update>
 
-    <update id="updateRefreshToken">
-        UPDATE USERS
-        SET USER_REFRESHTOKEN = #{token}
-        WHERE USER_ID = #{id}
-    </update>
-
     <update id="updatePassword">
         UPDATE USERS
         SET USER_PW = #{password}
+        WHERE USER_ID = #{id}
+    </update>
+
+    <update id="updateUserInfo">
+        UPDATE USERS
+        SET
+            USER_NAME = #{name},
+            USER_NICKNAME = #{nickname},
+            USER_UPDATEDAT = NOW()
+        WHERE USER_ID = #{id}
+    </update>
+
+    <update id="updateUserEmail">
+        UPDATE USERS
+        SET USER_EMAIL = #{email}
+        WHERE USER_ID = #{id}
+    </update>
+
+    <!-- refresh token DB 보관하는 경우 -->
+    <update id="updateRefreshToken">
+        UPDATE USERS
+        SET USER_REFRESHTOKEN = #{token}
         WHERE USER_ID = #{id}
     </update>
 
