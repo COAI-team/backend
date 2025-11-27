@@ -56,7 +56,7 @@ public class PaymentsController {
             System.out.println("### [Ready] DB 저장 성공.");
             return ResponseEntity.status(HttpStatus.CREATED).body(readyPayment);
 
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException | IllegalStateException e) {
             // 포인트 부족, 잘못된 사용량 등 비즈니스 검증 실패
             System.err.println("### [Ready] 요청 검증 실패: " + e.getMessage());
 

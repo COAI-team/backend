@@ -6,22 +6,42 @@
 <mapper namespace="kr.or.kosa.backend.pay.repository.PaymentsMapper">
 
     <!-- ================== ResultMap ================== -->
-    <resultMap id="PaymentsResultMap" type="kr.or.kosa.backend.pay.entity.Payments">
-        <id     column="order_id"        property="orderId"/>
-        <result column="user_id"         property="userId"/>
-        <result column="plan_code"       property="planCode"/>
-        <result column="payment_key"     property="paymentKey"/>
-        <result column="order_name"      property="orderName"/>
-        <result column="customer_name"   property="customerName"/>
-        <result column="original_amount" property="originalAmount"/>
-        <result column="used_point"      property="usedPoint"/>
-        <result column="amount"          property="amount"/>
-        <result column="status"          property="status"/>
-        <result column="requested_at"    property="requestedAt"/>
-        <result column="canceled_at"     property="canceledAt"/>
+    <resultMap id="PaymentsResultMap"
+               type="kr.or.kosa.backend.pay.entity.Payments">
+        <id     column="order_id"         property="orderId"/>
+        <result column="user_id"          property="userId"/>
+        <result column="plan_code"        property="planCode"/>
+        <result column="payment_key"      property="paymentKey"/>
+        <result column="order_name"       property="orderName"/>
+        <result column="customer_name"    property="customerName"/>
+
+        <!-- BigDecimal 금액들 -->
+        <result column="original_amount"  property="originalAmount"/>
+        <result column="used_point"       property="usedPoint"/>
+        <result column="amount"           property="amount"/>
+
+        <result column="status"           property="status"/>
+
+        <!-- LocalDateTime 매핑 -->
+        <result column="requested_at"
+                property="requestedAt"
+                javaType="java.time.LocalDateTime"/>
+        <result column="canceled_at"
+                property="canceledAt"
+                javaType="java.time.LocalDateTime"/>
+
+        <result column="pay_method"       property="payMethod"/>
+        <result column="pg_raw_response"  property="pgRawResponse"/>
+
+        <!-- 카드 정보 & 승인 시각 -->
+        <result column="card_company"     property="cardCompany"/>
+        <result column="card_approval_no" property="cardApprovalNo"/>
+        <result column="approved_at"
+                property="approvedAt"
+                javaType="java.time.LocalDateTime"/>
     </resultMap>
 
-    <!-- ================== INSERT ================== -->
+    <!-- ================== INSERT (READY 단계 최초 저장) ================== -->
     <insert id="insertPayment"
             parameterType="kr.or.kosa.backend.pay.entity.Payments">
         INSERT INTO payments (
@@ -65,7 +85,12 @@
         amount,
         status,
         requested_at,
-        canceled_at
+        canceled_at,
+        pay_method,
+        pg_raw_response,
+        card_company,
+        card_approval_no,
+        approved_at
         FROM payments
         WHERE order_id = #{orderId}
     </select>
@@ -85,7 +110,12 @@
         amount,
         status,
         requested_at,
-        canceled_at
+        canceled_at,
+        pay_method,
+        pg_raw_response,
+        card_company,
+        card_approval_no,
+        approved_at
         FROM payments
         WHERE payment_key = #{paymentKey}
         AND status = 'DONE'
@@ -96,8 +126,13 @@
             parameterType="kr.or.kosa.backend.pay.entity.Payments">
         UPDATE payments
         SET
-        payment_key = #{paymentKey},
-        status      = #{status}
+        payment_key      = #{paymentKey},
+        status           = #{status},
+        pay_method       = #{payMethod},
+        pg_raw_response  = #{pgRawResponse},
+        card_company     = #{cardCompany},
+        card_approval_no = #{cardApprovalNo},
+        approved_at      = #{approvedAt}
         WHERE order_id = #{orderId}
     </update>
 
@@ -107,6 +142,23 @@
         SET
         status      = #{status},
         canceled_at = NOW()
+        WHERE order_id = #{orderId}
+    </update>
+
+    <!-- ================== READY 단계: 기존 orderId 덮어쓰기 ================== -->
+    <update id="updatePaymentForReady"
+            parameterType="kr.or.kosa.backend.pay.entity.Payments">
+        UPDATE payments
+        SET
+        user_id         = #{userId},
+        plan_code       = #{planCode},
+        order_name      = #{orderName},
+        customer_name   = #{customerName},
+        original_amount = #{originalAmount},
+        used_point      = #{usedPoint},
+        amount          = #{amount},
+        status          = #{status},
+        requested_at    = #{requestedAt}
         WHERE order_id = #{orderId}
     </update>
 
@@ -125,7 +177,12 @@
         amount,
         status,
         requested_at,
-        canceled_at
+        canceled_at,
+        pay_method,
+        pg_raw_response,
+        card_company,
+        card_approval_no,
+        approved_at
         FROM payments
         WHERE user_id = #{userId}
         ORDER BY requested_at DESC

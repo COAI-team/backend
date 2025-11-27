@@ -2,6 +2,8 @@ package kr.or.kosa.backend.pay.dto;
 
 import lombok.*;
 
+import java.math.BigDecimal;
+
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
@@ -9,8 +11,11 @@ import lombok.*;
 @Setter
 @ToString
 public class PaymentsDTO {
-    String orderId;
-    String orderName;
-    String customerName;
-    int amount;
+
+    private String orderId;
+    private String orderName;
+    private String customerName;
+
+    // 결제 금액 (BigDecimal로 통일)
+    private BigDecimal amount;
 }

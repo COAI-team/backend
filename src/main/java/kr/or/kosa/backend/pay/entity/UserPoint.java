@@ -1,6 +1,8 @@
 package kr.or.kosa.backend.pay.entity;
 
 import lombok.*;
+
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @AllArgsConstructor
@@ -12,6 +14,6 @@ import java.time.LocalDateTime;
 public class UserPoint {
 
     private String userId;       // PK
-    private int balance;         // 현재 잔액
+    private BigDecimal balance;         // 현재 잔액
     private LocalDateTime updatedAt; // 마지막 변경 시각
 }

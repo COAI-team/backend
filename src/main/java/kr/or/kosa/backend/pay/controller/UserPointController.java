@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -32,7 +33,7 @@ public class UserPointController {
         UserPoint userPoint = pointMapper.findUserPointByUserId(finalUserId)
                 .orElse(UserPoint.builder()
                         .userId(finalUserId)
-                        .balance(0)
+                        .balance(BigDecimal.ZERO)
                         .build());
 
         Map<String, Object> body = new HashMap<>();

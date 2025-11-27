@@ -1,6 +1,7 @@
 package kr.or.kosa.backend.pay.dto;
 
 import lombok.*;
+import java.math.BigDecimal;
 
 @Getter
 @Setter
@@ -21,7 +22,7 @@ public class UpgradeQuoteResponse {
     private long remainingDays;
 
     // 이번에 결제해야 할 추가 금액 (원)
-    private int extraAmount;
+    private BigDecimal extraAmount;   // ✅ int → BigDecimal
 
     // 기존 BASIC 구독 종료일 (표시용)
     private String basicEndDate;

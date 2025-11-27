@@ -38,7 +38,7 @@
         )
     </insert>
 
-    <!-- 사용자의 ACTIVE 구독 전체 -->
+    <!-- 사용자의 ACTIVE 구독 전체 (현재 시각 기준 아직 안 끝난 것만) -->
     <select id="findActiveSubscriptionsByUserId"
             resultMap="SubscriptionResultMap">
         SELECT
@@ -52,6 +52,7 @@
         FROM subscriptions
         WHERE user_id = #{userId}
         AND status = 'ACTIVE'
+        AND end_date > NOW()
         ORDER BY end_date DESC
     </select>
 
@@ -70,7 +71,7 @@
         WHERE order_id = #{orderId}
     </select>
 
-    <!-- 🔥 추가: BASIC ACTIVE 중 가장 최신 한 건 -->
+    <!-- 🔥 BASIC ACTIVE 중 가장 최신 한 건 (역시 end_date > NOW() 조건 추가) -->
     <select id="findLatestActiveSubscriptionByUserIdAndType"
             resultMap="SubscriptionResultMap">
         SELECT
@@ -85,6 +86,7 @@
         WHERE user_id = #{userId}
         AND subscription_type = #{subscriptionType}
         AND status = 'ACTIVE'
+        AND end_date > NOW()
         ORDER BY end_date DESC
         LIMIT 1
     </select>
@@ -94,6 +96,15 @@
         UPDATE subscriptions
         SET status = #{status}
         WHERE order_id = #{orderId}
+    </update>
+
+    <!-- 🔥 추가: 이미 끝난 ACTIVE 구독을 EXPIRED 로 전환 -->
+    <update id="expireSubscriptionsByUserId">
+        UPDATE subscriptions
+        SET status = 'EXPIRED'
+        WHERE user_id = #{userId}
+        AND status = 'ACTIVE'
+        AND end_date <= NOW()
     </update>
 
 </mapper>

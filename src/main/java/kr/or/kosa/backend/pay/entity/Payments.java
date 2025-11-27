@@ -2,6 +2,9 @@ package kr.or.kosa.backend.pay.entity;
 
 import lombok.*;
 
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
@@ -29,20 +32,31 @@ public class Payments {
     private String customerName;
 
     // 원래 플랜 가격 (포인트 적용 전 금액)
-    private int originalAmount;
+    private BigDecimal originalAmount;
 
-    // 사용한 포인트
-    private int usedPoint;
+    // 사용한 포인트 (돈처럼 취급)
+    private BigDecimal usedPoint;
 
-    // 결제 금액 (원)
-    private int amount;
+    // 최종 결제 금액 (원)
+    private BigDecimal amount;
 
     // 결제 상태: READY, DONE, CANCELED 등
     private String status;
 
-    // 결제 요청/생성 일시 (ISO 문자열 등)
-    private String requestedAt;
-  
-    private String canceledAt;
-}
+    // 결제 요청/생성 일시
+    private LocalDateTime requestedAt;
 
+    // 결제 취소 일시
+    private LocalDateTime canceledAt;
+
+    // 결제수단: CARD / EASY_KAKAOPAY / ACCOUNT_TRANSFER / ...
+    private String payMethod;
+
+    // 토스 응답 전체 JSON
+    private String pgRawResponse;
+
+    // 카드사, 승인번호, 승인시각
+    private String cardCompany;        // 예: "KB", "HYUNDAI" 등 (issuerCode 기준)
+    private String cardApprovalNo;     // approveNo
+    private LocalDateTime approvedAt;  // 승인 시각
+}

@@ -10,36 +10,26 @@ import java.util.Optional;
 @Mapper
 public interface PaymentsMapper {
 
-    /**
-     * 1. 결제 정보 초기 저장 (결제 요청 직후)
-     */
-    int insertPayment(Payments payments);
+    // INSERT (READY 단계 최초 저장)
+    void insertPayment(Payments payments);
 
-    /**
-     * 2. 주문 ID로 결제 정보 조회 (승인 전/후 상태 확인용)
-     */
+    // orderId로 단건 조회
     Optional<Payments> findPaymentByOrderId(@Param("orderId") String orderId);
 
-    /**
-     * 3. 결제 승인 후 상태 및 paymentKey 업데이트
-     */
-    int updatePaymentStatus(Payments payments);
-
-    /**
-     * paymentKey로 결제 정보 조회 (환불 시 필요)
-     */
+    // paymentKey로 단건 조회 (주로 환불용, DONE 상태만)
     Optional<Payments> findPaymentByPaymentKey(@Param("paymentKey") String paymentKey);
 
-    /**
-     * 환불/취소 상태로 업데이트
-     */
+    // 승인 시 상태/키/카드 정보 업데이트
+    int updatePaymentStatus(Payments payments);
+
+    // 취소 시 상태/canceled_at 갱신
     int updatePaymentStatusToCanceled(@Param("orderId") String orderId,
                                       @Param("status") String status);
 
-    /**
-     * 특정 유저의 최근 결제 내역 N개를 조회 (환불 남용 체크용)
-     *  - requested_at DESC 기준
-     */
+    // READY 단계에서 기존 orderId 결제정보 덮어쓰기
+    int updatePaymentForReady(Payments payments);
+
+    // 최근 결제 N건 (환불 남용 체크)
     List<Payments> findRecentPaymentsByUser(@Param("userId") String userId,
                                             @Param("limit") int limit);
 }
