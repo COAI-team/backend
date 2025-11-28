@@ -59,6 +59,43 @@
         WHERE ALGO_PROBLEM_STATUS = 1
     </select>
 
+    <!-- 문제 목록 조회 (필터 포함) -->
+    <select id="selectProblemsWithFilter" resultMap="AlgoProblemResultMap">
+        SELECT
+        <include refid="problemColumns"/>
+        FROM ALGO_PROBLEMS
+        WHERE ALGO_PROBLEM_STATUS = 1
+        <if test="difficulty != null and difficulty != ''">
+            AND ALGO_PROBLEM_DIFFICULTY = #{difficulty}
+        </if>
+        <if test="source != null and source != ''">
+            AND ALGO_PROBLEM_SOURCE = #{source}
+        </if>
+        <if test="keyword != null and keyword != ''">
+            AND (ALGO_PROBLEM_TITLE LIKE CONCAT('%', #{keyword}, '%')
+            OR ALGO_PROBLEM_DESCRIPTION LIKE CONCAT('%', #{keyword}, '%'))
+        </if>
+        ORDER BY ALGO_CREATED_AT DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <!-- 전체 문제 수 조회 (필터 포함) -->
+    <select id="countProblemsWithFilter" resultType="int">
+        SELECT COUNT(*)
+        FROM ALGO_PROBLEMS
+        WHERE ALGO_PROBLEM_STATUS = 1
+        <if test="difficulty != null and difficulty != ''">
+            AND ALGO_PROBLEM_DIFFICULTY = #{difficulty}
+        </if>
+        <if test="source != null and source != ''">
+            AND ALGO_PROBLEM_SOURCE = #{source}
+        </if>
+        <if test="keyword != null and keyword != ''">
+            AND (ALGO_PROBLEM_TITLE LIKE CONCAT('%', #{keyword}, '%')
+            OR ALGO_PROBLEM_DESCRIPTION LIKE CONCAT('%', #{keyword}, '%'))
+        </if>
+    </select>
+
     <!-- 문제 상세 조회 -->
     <select id="selectProblemById" resultMap="AlgoProblemResultMap">
         SELECT
@@ -106,4 +143,28 @@
             #{algoProblemId}, #{inputData}, #{expectedOutput}, #{isSample}
         )
     </insert>
+
+    <!-- 샘플 테스트케이스 조회 -->
+    <select id="selectSampleTestCasesByProblemId" resultMap="algoTestcaseResultMap">
+        SELECT * FROM ALGO_TESTCASES
+        WHERE ALGO_PROBLEM_ID = #{problemId}
+        AND IS_SAMPLE = 1
+        ORDER BY TESTCASE_ID ASC
+    </select>
+
+    <!-- 모든 테스트케이스 조회 -->
+    <select id="selectTestCasesByProblemId" resultMap="algoTestcaseResultMap">
+        SELECT * FROM ALGO_TESTCASES
+        WHERE ALGO_PROBLEM_ID = #{problemId}
+        ORDER BY TESTCASE_ID ASC
+    </select>
+
+    <!-- algoTestcaseResultMap이 기존 파일에 없다면 추가 -->
+    <resultMap id="algoTestcaseResultMap" type="kr.or.kosa.backend.algorithm.domain.AlgoTestcase">
+        <id property="testcaseId" column="TESTCASE_ID"/>
+        <result property="algoProblemId" column="ALGO_PROBLEM_ID"/>
+        <result property="inputData" column="INPUT_DATA"/>
+        <result property="expectedOutput" column="EXPECTED_OUTPUT"/>
+        <result property="isSample" column="IS_SAMPLE"/>
+    </resultMap>
 </mapper>

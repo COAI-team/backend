@@ -34,23 +34,19 @@ public class SecurityConfig {
         http
                 .cors(Customizer.withDefaults())
                 .csrf(AbstractHttpConfigurer::disable)
-                .sessionManagement(session ->
-                        session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-                )
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
                 .authorizeHttpRequests(auth -> auth
+                        // .requestMatchers(
+                        // "/**"
+                        // )
+                        // .permitAll()
+                        .anyRequest().permitAll());
 
-//                        .requestMatchers(
-//                                "/**"
-//                        )
-//                        .permitAll()
-                                .anyRequest().permitAll()
-                );
-
-//                .addFilterBefore(
-//                        new JwtAuthenticationFilter(jwtProvider),
-//                        UsernamePasswordAuthenticationFilter.class
-//                );
+        // .addFilterBefore(
+        // new JwtAuthenticationFilter(jwtProvider),
+        // UsernamePasswordAuthenticationFilter.class
+        // );
 
         return http.build();
     }
