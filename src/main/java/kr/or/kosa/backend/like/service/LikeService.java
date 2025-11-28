@@ -26,7 +26,7 @@ public class LikeService {
     private final CommentMapper commentMapper;
 
     @Transactional
-    public boolean toggleLike(Integer userId, ReferenceType referenceType, Long referenceId) {
+    public boolean toggleLike(Long userId, ReferenceType referenceType, Long referenceId) {
         LikeRecord existingLike = likeMapper.selectLike(userId, referenceType, referenceId);
 
         if (existingLike != null) {
@@ -47,7 +47,7 @@ public class LikeService {
         }
     }
 
-    public List<Long> getLikedIds(Integer userId, ReferenceType referenceType, List<Long> referenceIds) {
+    public List<Long> getLikedIds(Long userId, ReferenceType referenceType, List<Long> referenceIds) {
         if (referenceIds == null || referenceIds.isEmpty()) {
             return Collections.emptyList();
         }

@@ -18,7 +18,7 @@ public class CommentResponse {
     private Long boardId;
     private String boardType;
     private Long parentCommentId;
-    private Integer userId;
+    private Long userId;
     private String userNickname;
     private String content;
     private Integer likeCount;

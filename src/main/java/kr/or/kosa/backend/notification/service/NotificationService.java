@@ -21,8 +21,8 @@ public class NotificationService {
 
     @Transactional
     public void sendNotification(
-            Integer recipientId,
-            Integer senderId,
+            Long recipientId,
+            Long senderId,
             NotificationType notificationType,
             ReferenceType referenceType,
             Long referenceId

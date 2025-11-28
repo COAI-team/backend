@@ -17,7 +17,7 @@ public class Comment {
     private Long boardId;
     private String boardType;
     private Long parentCommentId;
-    private Integer userId;
+    private Long userId;
     private String content;
     private Integer likeCount;
     private Boolean isDeleted;

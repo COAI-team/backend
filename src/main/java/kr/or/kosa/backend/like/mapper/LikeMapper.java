@@ -14,17 +14,17 @@ public interface LikeMapper {
     void insertLike(LikeRecord likeRecord);
 
     // 좋아요 삭제
-    void deleteLike(@Param("userId") Integer userId,
+    void deleteLike(@Param("userId") Long userId,
                     @Param("referenceType") ReferenceType referenceType,
                     @Param("referenceId") Long referenceId);
 
     // 좋아요 존재 여부 확인
-    LikeRecord selectLike(@Param("userId") Integer userId,
+    LikeRecord selectLike(@Param("userId") Long userId,
                           @Param("referenceType") ReferenceType referenceType,
                           @Param("referenceId") Long referenceId);
 
     // 사용자가 좋아요 누른 ID 목록 조회
-    List<Long> selectLikedReferenceIds(@Param("userId") Integer userId,
+    List<Long> selectLikedReferenceIds(@Param("userId") Long userId,
                                        @Param("referenceType") ReferenceType referenceType,
                                        @Param("referenceIds") List<Long> referenceIds);
 

@@ -10,7 +10,7 @@ import java.util.List;
 public interface CommentMapper {
 
     // 댓글 생성
-    void insertComment(Comment comment);
+    Long insertComment(Comment comment);
 
     // 댓글 조회
     Comment selectCommentById(Long commentId);
@@ -23,10 +23,10 @@ public interface CommentMapper {
     List<Comment> selectRepliesByParentIds(@Param("parentCommentIds") List<Long> parentCommentIds);
 
     // 댓글 수정
-    void updateComment(Comment comment);
+    Long updateComment(Comment comment);
 
     // 댓글 소프트 삭제
-    void deleteComment(@Param("commentId") Long commentId);
+    Long deleteComment(@Param("commentId") Long commentId);
 
     // 좋아요 개수 증가
     void incrementLikeCount(@Param("commentId") Long commentId);

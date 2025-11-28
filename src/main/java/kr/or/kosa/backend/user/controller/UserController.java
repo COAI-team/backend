@@ -32,7 +32,7 @@ public class UserController {
             @Valid @ModelAttribute UserRegisterRequestDto dto,
             @RequestPart(value = "image", required = false) MultipartFile image
     ) {
-        int userId = userService.register(dto, image);
+        Long userId = userService.register(dto, image);
 
         return ResponseEntity.ok(Map.of(
                 KEY_SUCCESS, true,
@@ -200,7 +200,7 @@ public class UserController {
     public ResponseEntity<Map<String, Object>> requestDelete(
             @AuthenticationPrincipal JwtUserDetails user
     ) {
-        boolean result = userService.requestDelete(user.id());
+        boolean result = userService.requestDelete(Long.valueOf(user.id()));
 
         return ResponseEntity.ok(Map.of(
                 KEY_SUCCESS, result,
@@ -217,7 +217,7 @@ public class UserController {
     public ResponseEntity<Map<String, Object>> restoreUser(
             @AuthenticationPrincipal JwtUserDetails user
     ) {
-        boolean result = userService.restoreUser(user.id());
+        boolean result = userService.restoreUser(Long.valueOf(user.id()));
 
         return ResponseEntity.ok(Map.of(
                 KEY_SUCCESS, result,

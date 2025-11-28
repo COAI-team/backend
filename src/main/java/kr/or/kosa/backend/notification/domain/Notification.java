@@ -15,8 +15,8 @@ import java.time.LocalDateTime;
 public class Notification {
 
     private Long notificationId;
-    private Integer recipientId;
-    private Integer senderId;
+    private Long recipientId;
+    private Long senderId;
     private NotificationType notificationType;
     private ReferenceType referenceType;
     private Long referenceId;

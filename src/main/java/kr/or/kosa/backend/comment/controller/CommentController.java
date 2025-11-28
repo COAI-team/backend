@@ -29,7 +29,7 @@ public class CommentController {
             @Valid @RequestBody CommentCreateRequest request,
             @RequestAttribute(value = "userId", required = false) Integer userId
     ) {
-        Integer actualUserId = (userId != null) ? userId : 1;
+        Long actualUserId = (userId != null) ? userId : 1L;
         CommentResponse response = commentService.createComment(request, actualUserId);
 
         Map<String, Object> result = new HashMap<>();
@@ -43,7 +43,7 @@ public class CommentController {
     public ResponseEntity<List<CommentWithRepliesResponse>> list(
             @RequestParam Long boardId,
             @RequestParam String boardType,
-            @RequestAttribute(value = "userId", required = false) Integer userId
+            @RequestAttribute(value = "userId", required = false) Long userId
     ) {
         List<CommentWithRepliesResponse> response = commentService.getCommentsByBoard(
                 boardId,
@@ -57,13 +57,13 @@ public class CommentController {
     public ResponseEntity<Void> update(
             @PathVariable Long commentId,
             @Valid @RequestBody CommentUpdateRequest request,
-            @RequestAttribute(value = "userId", required = false) Integer userId
+            @RequestAttribute(value = "userId", required = false) Long userId
     ) {
         log.info("=== update 컨트롤러 시작 ===");
         log.info("commentId: {}", commentId);
         log.info("request: {}", request);
 
-        Integer actualUserId = (userId != null) ? userId : 1;
+        Long actualUserId = (userId != null) ? userId : 1;
         commentService.updateComment(commentId, request, actualUserId);
 
         log.info("=== update 컨트롤러 완료 ===");
@@ -73,9 +73,9 @@ public class CommentController {
     @DeleteMapping("/{commentId}")
     public ResponseEntity<Void> delete(
             @PathVariable Long commentId,
-            @RequestAttribute(value = "userId", required = false) Integer userId
+            @RequestAttribute(value = "userId", required = false) Long userId
     ) {
-        Integer actualUserId = (userId != null) ? userId : 1;
+        Long actualUserId = (userId != null) ? userId : 1;
         commentService.deleteComment(commentId, actualUserId);
         return ResponseEntity.ok().build();
     }

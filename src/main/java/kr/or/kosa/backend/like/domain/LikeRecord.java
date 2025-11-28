@@ -14,7 +14,7 @@ import java.time.LocalDateTime;
 public class LikeRecord {
 
     private Long likeId;
-    private Integer userId;
+    private Long userId;
     private ReferenceType referenceType;
     private Long referenceId;
     private LocalDateTime createdAt;

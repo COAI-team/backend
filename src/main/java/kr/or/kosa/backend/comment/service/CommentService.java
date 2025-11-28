@@ -40,7 +40,7 @@ public class CommentService {
     private final LikeService likeService;
 
     @Transactional
-    public CommentResponse createComment(CommentCreateRequest request, Integer userId) {
+    public CommentResponse createComment(CommentCreateRequest request, Long userId) {
         // 대댓글인 경우 부모 댓글 검증
         if (request.parentCommentId() != null) {
             Comment parentComment = commentMapper.selectCommentById(request.parentCommentId());
@@ -66,7 +66,7 @@ public class CommentService {
         }
         // 댓글인 경우 게시글 작성자에게 알림
         else {
-            Integer boardAuthorId = getBoardAuthorId(request.boardType(), request.boardId());
+            Long boardAuthorId = getBoardAuthorId(request.boardType(), request.boardId());
 
             if (!boardAuthorId.equals(userId)) {
                 ReferenceType referenceType = switch (request.boardType()) {
@@ -94,7 +94,7 @@ public class CommentService {
                 .content(request.content())
                 .build();
 
-        int inserted = commentMapper.insertComment(comment);
+        Long inserted = commentMapper.insertComment(comment);
         if (inserted == 0) {
             throw new CustomBusinessException(CommentErrorCode.INSERT_ERROR);
         }
@@ -102,7 +102,7 @@ public class CommentService {
         return CommentResponse.from(comment);
     }
 
-    public List<CommentWithRepliesResponse> getCommentsByBoard(Long boardId, String boardType, Integer currentUserId) {
+    public List<CommentWithRepliesResponse> getCommentsByBoard(Long boardId, String boardType, Long currentUserId) {
         // 1. 댓글만 조회
         List<Comment> comments = commentMapper.selectCommentsByBoard(boardId, boardType);
 
@@ -123,12 +123,12 @@ public class CommentService {
                 .collect(Collectors.groupingBy(Comment::getParentCommentId));
 
         // 5. 모든 사용자 ID 수집
-        Set<Integer> allUserIds = new HashSet<>();
+        Set<Long> allUserIds = new HashSet<>();
         comments.forEach(c -> allUserIds.add(c.getUserId()));
         replies.forEach(r -> allUserIds.add(r.getUserId()));
 
         // 6. 사용자 정보 한 번에 조회
-        Map<Integer, String> userNicknameMap = getUserNicknameMap(new ArrayList<>(allUserIds));
+        Map<Long, String> userNicknameMap = getUserNicknameMap(new ArrayList<>(allUserIds));
 
         // 7. 현재 사용자가 좋아요 누른 댓글 ID 목록 조회
         List<Long> allCommentIds = new ArrayList<>(commentIds);
@@ -139,7 +139,7 @@ public class CommentService {
                 : Collections.emptySet();
 
         // 8. 게시글 작성자 ID 조회
-        Integer boardAuthorId = getBoardAuthorId(boardType, boardId);
+        Long boardAuthorId = getBoardAuthorId(boardType, boardId);
 
         // 9. 응답 조립
         return comments.stream()
@@ -184,7 +184,7 @@ public class CommentService {
     }
 
     @Transactional
-    public CommentResponse updateComment(Long commentId, CommentUpdateRequest request, Integer userId) {
+    public CommentResponse updateComment(Long commentId, CommentUpdateRequest request, Long userId) {
         Comment comment = commentMapper.selectCommentById(commentId);
         if (comment == null) {
             throw new CustomBusinessException(CommentErrorCode.NOT_FOUND);
@@ -200,7 +200,7 @@ public class CommentService {
 
         comment.update(request.content());
 
-        int updated = commentMapper.updateComment(comment);
+        Long updated = commentMapper.updateComment(comment);
         if (updated == 0) {
             throw new CustomBusinessException(CommentErrorCode.UPDATE_ERROR);
         }
@@ -209,7 +209,7 @@ public class CommentService {
     }
 
     @Transactional
-    public void deleteComment(Long commentId, Integer userId) {
+    public void deleteComment(Long commentId, Long userId) {
         Comment comment = commentMapper.selectCommentById(commentId);
         if (comment == null) {
             throw new CustomBusinessException(CommentErrorCode.NOT_FOUND);
@@ -220,7 +220,7 @@ public class CommentService {
         }
 
         // 소프트 딜리트
-        int deleted = commentMapper.deleteComment(commentId);
+        Long deleted = commentMapper.deleteComment(commentId);
         if (deleted == 0) {
             throw new CustomBusinessException(CommentErrorCode.DELETE_ERROR);
         }
@@ -232,7 +232,7 @@ public class CommentService {
         notificationService.deleteByReference(ReferenceType.COMMENT, commentId);
     }
 
-    private Integer getBoardAuthorId(String boardType, Long boardId) {
+    private Long getBoardAuthorId(String boardType, Long boardId) {
         return switch (boardType) {
             case "CODEBOARD" -> {
                 Codeboard codeBoard = codeBoardMapper.selectById(boardId);
@@ -252,7 +252,7 @@ public class CommentService {
         };
     }
 
-    private Map<Integer, String> getUserNicknameMap(List<Integer> userIds) {
+    private Map<Long, String> getUserNicknameMap(List<Long> userIds) {
         if (userIds.isEmpty()) {
             return Collections.emptyMap();
         }
