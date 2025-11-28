@@ -22,7 +22,7 @@ public class PasswordResetTokenService {
     /**
      * 비밀번호 재설정 토큰 생성 & 저장
      */
-    public String createResetToken(Integer userId) {
+    public String createResetToken(Long userId) {
         String token = UUID.randomUUID().toString();
 
         redisTemplate.opsForValue().set(
@@ -38,10 +38,10 @@ public class PasswordResetTokenService {
     /**
      * 토큰 검증 후 유저 ID 반환
      */
-    public Integer validateToken(String token) {
+    public Long validateToken(String token) {
         String value = redisTemplate.opsForValue().get(RESET_TOKEN_PREFIX + token);
         if (value == null) return null;
-        return Integer.parseInt(value);
+        return Long.parseLong(value);
     }
 
     /**

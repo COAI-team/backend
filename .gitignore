@@ -1,19 +1,39 @@
-HELP.md
-.gradle
+# 빌드 출력물 무시
 build/
+target/
+bin/
+out/
+.gradle/
+
+# Gradle wrapper는 무시하지 않음
 !gradle/wrapper/gradle-wrapper.jar
 !**/src/main/**/build/
 !**/src/test/**/build/
 
-### Spring Boot 설정 파일 ###
+# 캐시 파일 무시
+.cache/
+cache/
+*.cache
+
+# 로그 파일 무시
+*.log
+logs/
+log/
+logging/
+
+# 기타 기본 무시 파일
+HELP.md
+
+# Spring Boot 설정 파일 무시 (Evelyn 요구: yml은 그대로 둠)
 application.yml
 application.yaml
 application.properties
 application-*.yml
 application-*.yaml
 application-*.properties
+**.yml
 
-### STS ###
+# STS 관련 파일 무시
 .apt_generated
 .classpath
 .factorypath
@@ -25,7 +45,7 @@ bin/
 !**/src/main/**/bin/
 !**/src/test/**/bin/
 
-### IntelliJ IDEA ###
+# IntelliJ IDEA 관련 파일 무시
 .idea
 *.iws
 *.iml
@@ -34,16 +54,26 @@ out/
 !**/src/main/**/out/
 !**/src/test/**/out/
 
-### NetBeans ###
+# NetBeans 관련 파일 무시
 /nbproject/private/
 /nbbuild/
 /dist/
 /nbdist/
 /.nb-gradle/
 
-### VS Code ###
+# VS Code 관련 파일 무시
 .vscode/
-# 환경변수 파일이 있다면
+
+# 환경 변수 파일 무시
 src/main/java/kr/or/kosa/backend/config/.env
 .env.*
-application.yml
+
+# 보안 / 인증키 파일 무시
+secret.key
+jwt-secret*
+*.pem
+*.crt
+*.key
+*.pfx
+*.pkcs12
+*.der

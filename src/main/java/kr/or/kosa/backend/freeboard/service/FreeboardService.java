@@ -1,10 +1,10 @@
 package kr.or.kosa.backend.freeboard.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import kr.or.kosa.backend.commons.exception.custom.CustomBusinessException;
 import kr.or.kosa.backend.freeboard.domain.Freeboard;
 import kr.or.kosa.backend.freeboard.dto.FreeboardDto;
 import kr.or.kosa.backend.freeboard.exception.FreeboardErrorCode;
-import kr.or.kosa.backend.freeboard.exception.FreeboardException;
 import kr.or.kosa.backend.freeboard.mapper.FreeboardMapper;
 import kr.or.kosa.backend.tag.service.TagService;
 import lombok.RequiredArgsConstructor;
@@ -48,7 +48,7 @@ public class FreeboardService {
 
         Freeboard freeboard = mapper.selectById(id);
         if (freeboard == null) {
-            throw new FreeboardException(FreeboardErrorCode.NOT_FOUND);
+            throw new CustomBusinessException(FreeboardErrorCode.NOT_FOUND);
         }
 
         List<String> tags = tagService.getFreeboardTags(id);
@@ -62,13 +62,12 @@ public class FreeboardService {
 
         String jsonContent;
         String plainText;
-
         try {
             jsonContent = dto.toJsonContent(objectMapper);
             plainText = dto.toPlainText(objectMapper);
         } catch (Exception e) {
             log.error("JSON 변환 실패", e);
-            throw new FreeboardException(FreeboardErrorCode.JSON_PARSE_ERROR);
+            throw new CustomBusinessException(FreeboardErrorCode.JSON_PARSE_ERROR);
         }
 
         Freeboard freeboard = Freeboard.builder()
@@ -82,7 +81,7 @@ public class FreeboardService {
 
         int inserted = mapper.insert(freeboard);
         if (inserted == 0) {
-            throw new FreeboardException(FreeboardErrorCode.INSERT_ERROR);
+            throw new CustomBusinessException(FreeboardErrorCode.INSERT_ERROR);
         }
 
         Long freeboardId = freeboard.getFreeboardId();
@@ -99,10 +98,10 @@ public class FreeboardService {
 
         Freeboard existing = mapper.selectById(id);
         if (existing == null) {
-            throw new FreeboardException(FreeboardErrorCode.NOT_FOUND);
+            throw new CustomBusinessException(FreeboardErrorCode.NOT_FOUND);
         }
         if (!existing.getUserId().equals(userId)) {
-            throw new FreeboardException(FreeboardErrorCode.NO_EDIT_PERMISSION);
+            throw new CustomBusinessException(FreeboardErrorCode.NO_EDIT_PERMISSION);
         }
 
         String jsonContent;
@@ -113,7 +112,7 @@ public class FreeboardService {
             plainText = dto.toPlainText(objectMapper);
         } catch (Exception e) {
             log.error("JSON 변환 실패: freeboardId={}", id, e);
-            throw new FreeboardException(FreeboardErrorCode.JSON_PARSE_ERROR);
+            throw new CustomBusinessException(FreeboardErrorCode.JSON_PARSE_ERROR);
         }
 
         Freeboard freeboard = Freeboard.builder()
@@ -125,7 +124,7 @@ public class FreeboardService {
                 .build();
 
         if (mapper.update(freeboard) == 0) {
-            throw new FreeboardException(FreeboardErrorCode.UPDATE_ERROR);
+            throw new CustomBusinessException(FreeboardErrorCode.UPDATE_ERROR);
         }
 
         if (dto.getTags() != null) {
@@ -137,15 +136,15 @@ public class FreeboardService {
     public void delete(Long id, Long userId) {
         Freeboard existing = mapper.selectById(id);
         if (existing == null) {
-            throw new FreeboardException(FreeboardErrorCode.NOT_FOUND);
+            throw new CustomBusinessException(FreeboardErrorCode.NOT_FOUND);
         }
         if (!existing.getUserId().equals(userId)) {
-            throw new FreeboardException(FreeboardErrorCode.NO_DELETE_PERMISSION);
+            throw new CustomBusinessException(FreeboardErrorCode.NO_DELETE_PERMISSION);
         }
 
         int result = mapper.delete(id);
         if (result == 0) {
-            throw new FreeboardException(FreeboardErrorCode.DELETE_ERROR);
+            throw new CustomBusinessException(FreeboardErrorCode.DELETE_ERROR);
         }
     }
 }

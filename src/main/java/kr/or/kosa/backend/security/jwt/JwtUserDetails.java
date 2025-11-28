@@ -6,7 +6,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import java.util.Collection;
 import java.util.Collections;
 
-public record JwtUserDetails(Integer id, String email) implements UserDetails {
+public record JwtUserDetails(Long id, String email) implements UserDetails {
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
