@@ -25,8 +25,9 @@ public class AlgorithmProblemService {
 
     /**
      * 문제 목록 조회 (페이징)
+     * 
      * @param offset 시작 위치
-     * @param limit 조회 개수
+     * @param limit  조회 개수
      * @return 문제 목록
      */
     public List<AlgoProblem> getProblems(int offset, int limit) {
@@ -46,6 +47,7 @@ public class AlgorithmProblemService {
 
     /**
      * 전체 문제 수 조회
+     * 
      * @return 전체 문제 개수
      */
     public int getTotalProblemsCount() {
@@ -64,7 +66,60 @@ public class AlgorithmProblemService {
     }
 
     /**
+     * 문제 목록 조회 (필터 포함)
+     * 
+     * @param offset     시작 위치
+     * @param limit      조회 개수
+     * @param difficulty 난이도 필터 (nullable)
+     * @param source     출처 필터 (nullable)
+     * @param keyword    검색어 (nullable)
+     * @return 문제 목록
+     */
+    public List<AlgoProblem> getProblemsWithFilter(int offset, int limit, String difficulty, String source,
+            String keyword) {
+        log.debug("문제 목록 조회 (필터) - offset: {}, limit: {}, difficulty: {}, source: {}, keyword: {}",
+                offset, limit, difficulty, source, keyword);
+
+        try {
+            List<AlgoProblem> problems = algorithmProblemMapper.selectProblemsWithFilter(offset, limit, difficulty,
+                    source, keyword);
+            log.debug("문제 목록 조회 완료 - 조회된 문제 수: {}", problems.size());
+
+            return problems;
+
+        } catch (Exception e) {
+            log.error("문제 목록 조회 실패 - offset: {}, limit: {}, difficulty: {}, source: {}, keyword: {}",
+                    offset, limit, difficulty, source, keyword, e);
+            throw new RuntimeException("문제 목록 조회 중 오류가 발생했습니다.", e);
+        }
+    }
+
+    /**
+     * 전체 문제 수 조회 (필터 포함)
+     * 
+     * @param difficulty 난이도 필터 (nullable)
+     * @param source     출처 필터 (nullable)
+     * @param keyword    검색어 (nullable)
+     * @return 필터링된 문제 개수
+     */
+    public int getTotalProblemsCountWithFilter(String difficulty, String source, String keyword) {
+        log.debug("전체 문제 수 조회 (필터) - difficulty: {}, source: {}, keyword: {}", difficulty, source, keyword);
+
+        try {
+            int count = algorithmProblemMapper.countProblemsWithFilter(difficulty, source, keyword);
+            log.debug("전체 문제 수 조회 완료 - count: {}", count);
+
+            return count;
+
+        } catch (Exception e) {
+            log.error("전체 문제 수 조회 실패 (필터) - difficulty: {}, source: {}, keyword: {}", difficulty, source, keyword, e);
+            throw new RuntimeException("전체 문제 수 조회 중 오류가 발생했습니다.", e);
+        }
+    }
+
+    /**
      * 문제 상세 조회
+     * 
      * @param problemId 문제 ID
      * @return 문제 정보
      */
@@ -94,6 +149,7 @@ public class AlgorithmProblemService {
 
     /**
      * 문제 존재 여부 확인
+     * 
      * @param problemId 문제 ID
      * @return 존재 여부
      */
@@ -118,6 +174,7 @@ public class AlgorithmProblemService {
 
     /**
      * 페이지 번호 검증
+     * 
      * @param page 페이지 번호 (1부터 시작)
      * @param size 페이지 크기
      * @return 검증된 페이지 번호
@@ -142,6 +199,7 @@ public class AlgorithmProblemService {
 
     /**
      * 페이지 크기 검증
+     * 
      * @param size 페이지 크기
      * @return 검증된 페이지 크기
      */
@@ -161,9 +219,10 @@ public class AlgorithmProblemService {
 
     // ===== AI 생성 문제 저장 메서드 =====
     /**
-            * AI 생성 문제를 DB에 저장
+     * AI 생성 문제를 DB에 저장
+     * 
      * @param responseDto AI 생성 결과
-     * @param userId 생성자 ID (null 가능)
+     * @param userId      생성자 ID (null 가능)
      * @return 저장된 문제 ID
      */
     @Transactional

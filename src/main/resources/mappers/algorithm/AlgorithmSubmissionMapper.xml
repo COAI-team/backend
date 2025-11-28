@@ -1,0 +1,173 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="kr.or.kosa.backend.algorithm.mapper.AlgorithmSubmissionMapper">
+
+    <!-- Result Map 정의 -->
+    <resultMap id="algoSubmissionResultMap" type="kr.or.kosa.backend.algorithm.domain.AlgoSubmission">
+        <id property="algosubmissionId" column="ALGOSUBMISSION_ID"/>
+        <result property="algoProblemId" column="ALGO_PROBLEM_ID"/>
+        <result property="userId" column="USER_ID"/>
+        <result property="sourceCode" column="SOURCE_CODE"/>
+        <result property="language" column="LANGUAGE"/>
+        <result property="judgeResult" column="JUDGE_RESULT"/>
+        <result property="executionTime" column="EXECUTION_TIME"/>
+        <result property="memoryUsage" column="MEMORY_USAGE"/>
+        <result property="passedTestCount" column="PASSED_TEST_COUNT"/>
+        <result property="totalTestCount" column="TOTAL_TEST_COUNT"/>
+        <result property="aiFeedback" column="AI_FEEDBACK"/>
+        <result property="aiFeedbackStatus" column="AI_FEEDBACK_STATUS"/>
+        <result property="aiFeedbackType" column="AI_FEEDBACK_TYPE"/>
+        <result property="focusScore" column="FOCUS_SCORE"/>
+        <result property="aiScore" column="AI_SCORE"/>
+        <result property="timeEfficiencyScore" column="TIME_EFFICIENCY_SCORE"/>
+        <result property="finalScore" column="FINAL_SCORE"/>
+        <result property="scoreWeights" column="SCORE_WEIGHTS"/>
+        <result property="startSolving" column="STARTSOLVING"/>
+        <result property="endSolving" column="ENDSOLVING"/>
+        <result property="solvingDurationSeconds" column="SOLVING_DURATION_SECONDS"/>
+        <result property="focusSessionId" column="FOCUS_SESSION_ID"/>
+        <result property="eyetracked" column="EYETRACKED"/>
+        <result property="githubCommitRequested" column="GITHUB_COMMIT_REQUESTED"/>
+        <result property="githubCommitStatus" column="GITHUB_COMMIT_STATUS"/>
+        <result property="isShared" column="IS_SHARED"/>
+        <result property="submittedAt" column="SUBMITTED_AT"/>
+    </resultMap>
+
+    <!-- 제출 저장 -->
+    <insert id="insertSubmission" parameterType="kr.or.kosa.backend.algorithm.domain.AlgoSubmission"
+            useGeneratedKeys="true" keyProperty="algosubmissionId">
+        INSERT INTO ALGO_SUBMISSIONS (
+        ALGO_PROBLEM_ID, USER_ID, SOURCE_CODE, EXECUTION_TIME, MEMORY_USAGE,
+        PASSED_TEST_COUNT, TOTAL_TEST_COUNT, AI_FEEDBACK, AI_FEEDBACK_STATUS, AI_FEEDBACK_TYPE,
+        JUDGE_RESULT, FOCUS_SCORE, AI_SCORE, TIME_EFFICIENCY_SCORE, FINAL_SCORE,
+        SCORE_WEIGHTS, FOCUS_SESSION_ID, EYETRACKED, STARTSOLVING, ENDSOLVING,
+        SOLVING_DURATION_SECONDS, GITHUB_COMMIT_REQUESTED, GITHUB_COMMIT_STATUS,
+        IS_SHARED, SUBMITTED_AT
+        ) VALUES (
+        #{algoProblemId}, #{userId}, #{sourceCode}, #{executionTime}, #{memoryUsage},
+        #{passedTestCount}, #{totalTestCount}, #{aiFeedback}, #{aiFeedbackStatus}, #{aiFeedbackType},
+        #{judgeResult}, #{focusScore}, #{aiScore}, #{timeEfficiencyScore}, #{finalScore},
+        #{scoreWeights}, #{focusSessionId}, #{eyetracked}, #{startSolving}, #{endSolving},
+        #{solvingDurationSeconds}, #{githubCommitRequested}, #{githubCommitStatus},
+        #{isShared}, NOW()
+        )
+    </insert>
+
+    <!-- 제출 ID로 조회 -->
+    <select id="selectSubmissionById" resultMap="algoSubmissionResultMap">
+        SELECT
+        s.ALGOSUBMISSION_ID,
+        s.ALGO_PROBLEM_ID,
+        s.USER_ID,
+        s.SOURCE_CODE,
+        s.EXECUTION_TIME,
+        s.MEMORY_USAGE,
+        s.PASSED_TEST_COUNT,
+        s.TOTAL_TEST_COUNT,
+        s.AI_FEEDBACK,
+        s.AI_FEEDBACK_STATUS,
+        s.AI_FEEDBACK_TYPE,
+        s.JUDGE_RESULT,
+        s.FOCUS_SCORE,
+        s.AI_SCORE,
+        s.TIME_EFFICIENCY_SCORE,
+        s.FINAL_SCORE,
+        s.SCORE_WEIGHTS,
+        s.FOCUS_SESSION_ID,
+        s.EYETRACKED,
+        s.STARTSOLVING,
+        s.ENDSOLVING,
+        s.SOLVING_DURATION_SECONDS,
+        s.GITHUB_COMMIT_REQUESTED,
+        s.GITHUB_COMMIT_STATUS,
+        s.SUBMITTED_AT,
+        s.IS_SHARED,
+        p.LANGUAGE as LANGUAGE  -- ✅ PROBLEMS 테이블에서 LANGUAGE 가져오기
+        FROM ALGO_SUBMISSIONS s
+        LEFT JOIN ALGO_PROBLEMS p ON s.ALGO_PROBLEM_ID = p.ALGO_PROBLEM_ID
+        WHERE s.ALGOSUBMISSION_ID = #{submissionId}
+    </select>
+
+    <!-- 제출 정보 업데이트 -->
+    <update id="updateSubmission" parameterType="kr.or.kosa.backend.algorithm.domain.AlgoSubmission">
+        UPDATE ALGO_SUBMISSIONS SET
+        JUDGE_RESULT = #{judgeResult},
+        EXECUTION_TIME = #{executionTime},
+        MEMORY_USAGE = #{memoryUsage},
+        PASSED_TEST_COUNT = #{passedTestCount},
+        TOTAL_TEST_COUNT = #{totalTestCount},
+        AI_FEEDBACK = #{aiFeedback},
+        AI_FEEDBACK_STATUS = #{aiFeedbackStatus},
+        AI_SCORE = #{aiScore},
+        FOCUS_SCORE = #{focusScore},
+        TIME_EFFICIENCY_SCORE = #{timeEfficiencyScore},
+        FINAL_SCORE = #{finalScore},
+        SCORE_WEIGHTS = #{scoreWeights},
+        ENDSOLVING = #{endSolving},
+        SOLVING_DURATION_SECONDS = #{solvingDurationSeconds}
+        WHERE ALGOSUBMISSION_ID = #{algosubmissionId}
+    </update>
+
+    <!-- 사용자별 제출 목록 조회 -->
+    <select id="selectSubmissionsByUserId" resultMap="algoSubmissionResultMap">
+        SELECT
+        s.*,
+        p.ALGO_PROBLEM_TITLE,
+        p.LANGUAGE as LANGUAGE
+        FROM ALGO_SUBMISSIONS s
+        LEFT JOIN ALGO_PROBLEMS p ON s.ALGO_PROBLEM_ID = p.ALGO_PROBLEM_ID
+        WHERE s.USER_ID = #{userId}
+        ORDER BY s.SUBMITTED_AT DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <!-- 사용자별 제출 총 개수 -->
+    <select id="countSubmissionsByUserId" resultType="int">
+        SELECT COUNT(*) FROM ALGO_SUBMISSIONS WHERE USER_ID = #{userId}
+    </select>
+
+    <!-- 문제별 제출 목록 조회 (공개된 것만) -->
+    <select id="selectPublicSubmissionsByProblemId" resultMap="algoSubmissionResultMap">
+        SELECT
+        s.*,
+        u.USER_NAME,
+        p.LANGUAGE as LANGUAGE
+        FROM ALGO_SUBMISSIONS s
+        LEFT JOIN USER u ON s.USER_ID = u.USER_ID
+        LEFT JOIN ALGO_PROBLEMS p ON s.ALGO_PROBLEM_ID = p.ALGO_PROBLEM_ID
+        WHERE s.ALGO_PROBLEM_ID = #{problemId} AND s.IS_SHARED = 1
+        ORDER BY s.FINAL_SCORE DESC, s.SUBMITTED_AT ASC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <!-- 특정 사용자의 특정 문제 최고 점수 제출 조회 -->
+    <select id="selectBestSubmissionByUserAndProblem" resultMap="algoSubmissionResultMap">
+        SELECT
+        s.*,
+        p.LANGUAGE as LANGUAGE
+        FROM ALGO_SUBMISSIONS s
+        LEFT JOIN ALGO_PROBLEMS p ON s.ALGO_PROBLEM_ID = p.ALGO_PROBLEM_ID
+        WHERE s.USER_ID = #{userId} AND s.ALGO_PROBLEM_ID = #{problemId}
+        ORDER BY s.FINAL_SCORE DESC, s.SUBMITTED_AT ASC
+        LIMIT 1
+    </select>
+
+    <!-- AI 피드백 업데이트 -->
+    <update id="updateAiFeedback">
+        UPDATE ALGO_SUBMISSIONS SET
+        AI_FEEDBACK = #{aiFeedback},
+        AI_FEEDBACK_STATUS = 'COMPLETED',
+        AI_SCORE = #{aiScore},
+        FINAL_SCORE = #{finalScore}
+        WHERE ALGOSUBMISSION_ID = #{submissionId}
+    </update>
+
+    <!-- 공유 상태 업데이트 -->
+    <update id="updateSharingStatus">
+        UPDATE ALGO_SUBMISSIONS SET
+        IS_SHARED = #{isShared}
+        WHERE ALGOSUBMISSION_ID = #{submissionId}
+    </update>
+
+</mapper>
