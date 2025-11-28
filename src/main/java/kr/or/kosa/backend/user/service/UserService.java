@@ -5,7 +5,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 public interface UserService {
 
-    int register(UserRegisterRequestDto dto, MultipartFile imageFile);
+    Long register(UserRegisterRequestDto dto, MultipartFile imageFile);
 
     UserLoginResponseDto login(UserLoginRequestDto dto);
 
@@ -19,15 +19,15 @@ public interface UserService {
 
     boolean resetPassword(String token, String newPassword);
 
-    boolean updatePassword(Integer userId, PasswordUpdateRequestDto dto);
+    boolean updatePassword(Long userId, PasswordUpdateRequestDto dto);
 
-    UserResponseDto updateUserInfo(Integer userId, UserUpdateRequestDto dto, MultipartFile image);
+    UserResponseDto updateUserInfo(Long userId, UserUpdateRequestDto dto, MultipartFile image);
 
-    String updateEmail(Integer userId, String newEmail);
+    String updateEmail(Long userId, String newEmail);
 
-    UserResponseDto getUserInfo(Integer userId);
+    UserResponseDto getUserInfo(Long userId);
 
-    boolean requestDelete(Integer userId);
+    boolean requestDelete(Long userId);
 
-    boolean restoreUser(Integer userId);
+    boolean restoreUser(Long userId);
 }

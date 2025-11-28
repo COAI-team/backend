@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="kr.or.kosa.backend.codeboard.mapper.CodeboardMapper">
+
+    <!-- 게시글 목록 (페이징) -->
+    <select id="selectPage" resultType="kr.or.kosa.backend.codeboard.domain.Codeboard">
+        SELECT
+        codeboard_id,
+        user_id,
+        codeboard_title,
+        codeboard_content,
+        codeboard_click,
+        codeboard_image,
+        codeboard_represent_image,
+        codeboard_created_at,
+        codeboard_deleted_yn,
+        like_count
+        FROM codeboard
+        WHERE codeboard_deleted_yn = 'N'
+        ORDER BY codeboard_id DESC
+        LIMIT #{size} OFFSET #{offset}
+    </select>
+
+    <!-- 상세 조회 -->
+    <select id="selectById" parameterType="long" resultType="kr.or.kosa.backend.codeboard.domain.Codeboard">
+        SELECT
+        codeboard_id,
+        user_id,
+        codeboard_title,
+        codeboard_content,
+        codeboard_click,
+        codeboard_image,
+        codeboard_represent_image,
+        codeboard_created_at,
+        codeboard_deleted_yn,
+        like_count
+        FROM codeboard
+        WHERE codeboard_id = #{id}
+        AND codeboard_deleted_yn = 'N'
+    </select>
+
+    <!-- 등록 -->
+    <insert id="insert" parameterType="kr.or.kosa.backend.codeboard.domain.Codeboard"
+            useGeneratedKeys="true" keyProperty="codeboardId">
+        INSERT INTO codeboard (
+        user_id,
+        codeboard_title,
+        codeboard_content,
+        codeboard_click,
+        codeboard_image,
+        codeboard_represent_image,
+        codeboard_created_at,
+        codeboard_deleted_yn,
+        like_count
+        ) VALUES (
+        #{userId},
+        #{codeboardTitle},
+        #{codeboardContent},
+        0,
+        #{codeboardImage},
+        #{codeboardRepresentImage},
+        NOW(),
+        'N',
+        0
+        )
+    </insert>
+
+    <!-- 수정 -->
+    <update id="update" parameterType="kr.or.kosa.backend.codeboard.domain.Codeboard">
+        UPDATE codeboard
+        SET
+        codeboard_title = #{codeboardTitle},
+        codeboard_content = #{codeboardContent},
+        codeboard_image = #{codeboardImage},
+        codeboard_represent_image = #{codeboardRepresentImage}
+        WHERE codeboard_id = #{codeboardId}
+        AND codeboard_deleted_yn = 'N'
+    </update>
+
+    <!-- 삭제 -->
+    <update id="delete" parameterType="long">
+        UPDATE codeboard
+        SET codeboard_deleted_yn = 'Y'
+        WHERE codeboard_id = #{id}
+    </update>
+
+    <!-- 조회수 증가 -->
+    <update id="increaseClick" parameterType="long">
+        UPDATE codeboard
+        SET codeboard_click = codeboard_click + 1
+        WHERE codeboard_id = #{id}
+    </update>
+
+    <!-- 전체 게시글 수 -->
+    <select id="countAll" resultType="int">
+        SELECT COUNT(*)
+        FROM codeboard
+        WHERE codeboard_deleted_yn = 'N'
+    </select>
+
+    <!-- 좋아요 개수 증가 -->
+    <update id="incrementLikeCount">
+        UPDATE codeboard
+        SET like_count = like_count + 1
+        WHERE codeboard_id = #{codeboardId}
+    </update>
+
+    <!-- 좋아요 개수 감소 -->
+    <update id="decrementLikeCount">
+        UPDATE codeboard
+        SET like_count = like_count - 1
+        WHERE codeboard_id = #{codeboardId}
+        AND like_count > 0
+    </update>
+
+</mapper>

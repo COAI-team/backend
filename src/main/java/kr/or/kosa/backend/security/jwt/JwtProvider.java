@@ -25,15 +25,15 @@ public class JwtProvider {
     // =======================
     // 토큰 생성
     // =======================
-    public String createAccessToken(Integer id, String email) {
+    public String createAccessToken(Long id, String email) {
         return createToken(id, email, ACCESS_TOKEN_EXP);
     }
 
-    public String createRefreshToken(Integer id, String email) {
+    public String createRefreshToken(Long id, String email) {
         return createToken(id, email, REFRESH_TOKEN_EXP);
     }
 
-    private String createToken(Integer id, String email, long exp) {
+    private String createToken(Long id, String email, long exp) {
         return Jwts.builder()
                 .setSubject(email)
                 .claim("id", id)
@@ -62,9 +62,9 @@ public class JwtProvider {
     // =======================
     // claim 추출
     // =======================
-    public Integer getUserId(String token) {
+    public Long getUserId(String token) {
         Claims claims = getClaims(token);
-        return claims.get("id", Integer.class);
+        return claims.get("id", Long.class);
     }
 
     public String getEmail(String token) {
