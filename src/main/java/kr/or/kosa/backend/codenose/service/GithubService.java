@@ -56,8 +56,11 @@ public class GithubService {
                 }
             }
             return repositories;
+        } catch (org.springframework.web.client.HttpClientErrorException e) {
+            log.error("GitHub API Error: {} - {}", e.getStatusCode(), e.getResponseBodyAsString());
+            throw new RuntimeException("GitHub API Error: " + e.getStatusCode() + " " + e.getResponseBodyAsString());
         } catch (Exception e) {
-            log.error("GitHub 레포지토리 목록 조회 실패: {}", e.getMessage());
+            log.error("GitHub 레포지토리 목록 조회 실패", e);
             throw new RuntimeException("레포지토리 목록을 가져오는데 실패했습니다: " + e.getMessage());
         }
     }

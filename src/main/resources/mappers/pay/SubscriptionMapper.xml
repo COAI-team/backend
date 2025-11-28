@@ -21,89 +21,85 @@
             useGeneratedKeys="true"
             keyProperty="subscriptionId">
         INSERT INTO subscriptions (
-        user_id,
-        order_id,
-        subscription_type,
-        start_date,
-        end_date,
-        status
+            user_id,
+            order_id,
+            subscription_type,
+            start_date,
+            end_date,
+            status
         )
         VALUES (
-        #{userId},
-        #{orderId},
-        #{subscriptionType},
-        #{startDate},
-        #{endDate},
-        #{status}
+            #{userId},
+            #{orderId},
+            #{subscriptionType},
+            #{startDate},
+            #{endDate},
+            #{status}
         )
     </insert>
 
-    <!-- 사용자의 ACTIVE 구독 전체 (현재 시각 기준 아직 안 끝난 것만) -->
     <select id="findActiveSubscriptionsByUserId"
             resultMap="SubscriptionResultMap">
         SELECT
-        subscription_id,
-        user_id,
-        order_id,
-        subscription_type,
-        start_date,
-        end_date,
-        status
+            subscription_id,
+            user_id,
+            order_id,
+            subscription_type,
+            start_date,
+            end_date,
+            status
         FROM subscriptions
         WHERE user_id = #{userId}
-        AND status = 'ACTIVE'
-        AND end_date > NOW()
+          AND status = 'ACTIVE'
+          AND end_date &gt; NOW()
         ORDER BY end_date DESC
     </select>
 
-    <!-- orderId로 단건 조회 -->
     <select id="findSubscriptionByOrderId"
             resultMap="SubscriptionResultMap">
         SELECT
-        subscription_id,
-        user_id,
-        order_id,
-        subscription_type,
-        start_date,
-        end_date,
-        status
+            subscription_id,
+            user_id,
+            order_id,
+            subscription_type,
+            start_date,
+            end_date,
+            status
         FROM subscriptions
         WHERE order_id = #{orderId}
     </select>
 
-    <!-- 🔥 BASIC ACTIVE 중 가장 최신 한 건 (역시 end_date > NOW() 조건 추가) -->
     <select id="findLatestActiveSubscriptionByUserIdAndType"
             resultMap="SubscriptionResultMap">
         SELECT
-        subscription_id,
-        user_id,
-        order_id,
-        subscription_type,
-        start_date,
-        end_date,
-        status
+            subscription_id,
+            user_id,
+            order_id,
+            subscription_type,
+            start_date,
+            end_date,
+            status
         FROM subscriptions
         WHERE user_id = #{userId}
-        AND subscription_type = #{subscriptionType}
-        AND status = 'ACTIVE'
-        AND end_date > NOW()
+          AND subscription_type = #{subscriptionType}
+          AND status = 'ACTIVE'
+          AND end_date &gt; NOW()
         ORDER BY end_date DESC
         LIMIT 1
     </select>
 
-    <!-- 구독 상태 CANCELED 등으로 변경 -->
     <update id="updateSubscriptionStatusToCanceled">
         UPDATE subscriptions
         SET status = #{status}
         WHERE order_id = #{orderId}
     </update>
 
-    <!-- 🔥 추가: 이미 끝난 ACTIVE 구독을 EXPIRED 로 전환 -->
     <update id="expireSubscriptionsByUserId">
         UPDATE subscriptions
         SET status = 'EXPIRED'
         WHERE user_id = #{userId}
-        AND status = 'ACTIVE'
-        AND end_date &lt;= NOW()
+          AND status = 'ACTIVE'
+          AND end_date &lt;= NOW()
+
     </update>
 </mapper>

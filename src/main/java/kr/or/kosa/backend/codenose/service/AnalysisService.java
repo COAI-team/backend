@@ -314,6 +314,95 @@ public class AnalysisService {
     }
 
     /**
+     * 저장된 GitHub 파일을 조회하여 AI 분석 수행 (스트리밍 버전)
+     *
+     * @param requestDto 분석 요청 DTO
+     * @return AI 분석 결과 스트림 (Flux<String>)
+     */
+    public reactor.core.publisher.Flux<String> analyzeStoredFileStream(AnalysisRequestDTO requestDto) {
+        try {
+            // 1. DB에서 저장된 GitHub 파일 내용 조회
+            GithubFileDTO storedFile = analysisMapper.findFileById(requestDto.getAnalysisId());
+
+            if (storedFile == null) {
+                throw new RuntimeException("저장된 파일을 찾을 수 없습니다. repositoryUrl: "
+                        + ", filePath: " + requestDto.getFilePath() + ", analysisId: " + requestDto.getAnalysisId());
+            }
+
+            log.info("파일 조회 완료 (스트림) - fileId: {}, fileName: {}, contentLength: {}",
+                    storedFile.getFileId(),
+                    storedFile.getFileName(),
+                    storedFile.getFileContent().length());
+
+            // 2. 사용자 컨텍스트 조회 (RAG)
+            String userContext = ragService.retrieveUserContext(String.valueOf(requestDto.getUserId()));
+
+            // 3. 프롬프트 생성
+            String systemPromptWithTone = PromptGenerator.createSystemPrompt(
+                    requestDto.getAnalysisTypes(),
+                    requestDto.getToneLevel(),
+                    requestDto.getCustomRequirements(),
+                    userContext);
+
+            // 4. AI 메시지 구성
+            List<Message> messages = new ArrayList<>();
+            messages.add(new SystemMessage(systemPromptWithTone));
+            messages.add(new UserMessage("다음 코드를 분석해주세요:\n\n" + storedFile.getFileContent()));
+
+            // 5. AI 호출 및 스트리밍
+            Prompt prompt = new Prompt(messages);
+            StringBuilder accumulatedContent = new StringBuilder();
+
+            return chatClient.prompt(prompt)
+                    .stream()
+                    .chatResponse()
+                    .map(response -> {
+                        String content = response.getResult().getOutput().getText();
+                        if (content != null) {
+                            accumulatedContent.append(content);
+                            return content;
+                        }
+                        return "";
+                    })
+                    .doOnComplete(() -> {
+                        // 스트림 완료 후 DB 저장 및 후처리
+                        String fullContent = accumulatedContent.toString();
+                        String cleanedResponse = cleanMarkdownCodeBlock(fullContent);
+                        log.info("스트림 분석 완료. 결과 저장 시작.");
+
+                        try {
+                            // 5. 분석 결과를 CODE_ANALYSIS_HISTORY 테이블에 저장
+                            String analysisId = saveAnalysisResult(storedFile, requestDto, cleanedResponse);
+
+                            // 6. 사용자 코드 패턴 업데이트
+                            updateUserPatterns(requestDto.getUserId(), objectMapper.readTree(cleanedResponse).path("codeSmells"));
+
+                            // 7. RAG VectorDB에 저장
+                            RagDto.IngestRequest ingestRequest = new RagDto.IngestRequest(
+                                    String.valueOf(requestDto.getUserId()),
+                                    storedFile.getFileContent(),
+                                    cleanedResponse,
+                                    storedFile.getFileName().substring(storedFile.getFileName().lastIndexOf(".") + 1),
+                                    storedFile.getFilePath(),
+                                    "Stored File Analysis (Stream)",
+                                    requestDto.getCustomRequirements());
+                            ragService.ingestCode(ingestRequest);
+
+                            log.info("스트림 분석 결과 저장 완료 - analysisId: {}", analysisId);
+
+                        } catch (Exception e) {
+                            log.error("스트림 분석 결과 저장 실패", e);
+                        }
+                    })
+                    .doOnError(e -> log.error("스트림 분석 중 오류 발생", e));
+
+        } catch (Exception e) {
+            log.error("파일 분석 스트림 시작 실패: {}", e.getMessage(), e);
+            throw new RuntimeException("파일 분석 스트림 시작에 실패했습니다: " + e.getMessage());
+        }
+    }
+
+    /**
      * AI 응답에서 JSON 부분만 추출
      * 
      * @param response AI 원본 응답

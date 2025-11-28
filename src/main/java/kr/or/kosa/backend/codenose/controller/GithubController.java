@@ -32,11 +32,11 @@ public class GithubController {
         return ResponseEntity.ok(branches);
     }
 
-    @GetMapping("/repos/{owner}/{repo}/tree/{branch}")
+    @GetMapping("/repos/{owner}/{repo}/tree")
     public ResponseEntity<List<GithubTreeEntryDTO>> getTree(
             @PathVariable String owner,
             @PathVariable String repo,
-            @PathVariable String branch) {
+            @RequestParam String branch) {
         List<GithubTreeEntryDTO> tree = githubService.getTree(owner, repo, branch);
         return ResponseEntity.ok(tree);
     }
