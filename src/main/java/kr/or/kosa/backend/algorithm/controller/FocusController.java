@@ -47,8 +47,10 @@ public class FocusController {
     public ResponseEntity<ApiResponse<FocusSession>> startSession(
             @RequestBody Map<String, Long> request,
             @AuthenticationPrincipal JwtAuthentication authentication) {
+        log.info("👁️ [Focus Start] 세션 시작 요청 수신 - request: {}", request);
         Long userId = extractUserId(authentication);
         Long problemId = request.get("problemId");
+        log.info("👁️ [Focus Start] userId: {}, problemId: {}", userId, problemId);
 
         FocusSession session = focusTrackingService.startSession(userId, problemId);
         return ResponseEntity.ok(ApiResponse.success(session));
@@ -61,9 +63,11 @@ public class FocusController {
     @PostMapping("/events")
     public ResponseEntity<ApiResponse<Void>> receiveEvent(
             @RequestBody Map<String, Object> eventData) {
+        log.info("👁️ [Focus Event] 이벤트 수신 - eventData: {}", eventData);
         // eventData: { sessionId, type, details, duration, ... }
         String sessionId = (String) eventData.get("sessionId");
         String type = (String) eventData.get("type");
+        log.info("👁️ [Focus Event] sessionId: {}, type: {}", sessionId, type);
 
         focusTrackingService.logEvent(sessionId, type, eventData);
         return ResponseEntity.ok(ApiResponse.success(null));
@@ -76,7 +80,9 @@ public class FocusController {
     @PostMapping("/end")
     public ResponseEntity<ApiResponse<FocusSession>> endSession(
             @RequestBody Map<String, String> request) {
+        log.info("👁️ [Focus End] 세션 종료 요청 수신 - request: {}", request);
         String sessionId = request.get("sessionId");
+        log.info("👁️ [Focus End] sessionId: {}", sessionId);
 
         FocusSession result = focusTrackingService.endSession(sessionId);
         return ResponseEntity.ok(ApiResponse.success(result));

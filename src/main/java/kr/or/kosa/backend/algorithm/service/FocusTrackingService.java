@@ -85,8 +85,14 @@ public class FocusTrackingService {
     public FocusSession endSession(String sessionId) {
         // 1. DB에서 세션 조회
         FocusSession session = focusTrackingMapper.findSessionById(sessionId);
-        if (session == null || !"ACTIVE".equals(session.getStatus())) {
-            throw new IllegalArgumentException("Invalid or already completed session");
+        if (session == null) {
+            throw new IllegalArgumentException("Session not found");
+        }
+
+        // 이미 완료된 세션은 조용히 리턴 (중복 호출 허용)
+        if (!"ACTIVE".equals(session.getStatus())) {
+            log.info("Session already completed, returning existing session: {}", sessionId);
+            return session;
         }
 
         // 2. Redis에서 위반 로그 조회
@@ -151,7 +157,12 @@ public class FocusTrackingService {
                 .focusGrade(calculateGrade(focusRate))
                 .build();
 
-        focusTrackingMapper.insertFocusSummary(summary);
+        try {
+            focusTrackingMapper.insertFocusSummary(summary);
+        } catch (Exception e) {
+            log.warn("Failed to insert focus summary (likely duplicate): {}", e.getMessage());
+            // 이미 저장된 경우 무시하고 진행
+        }
 
         // 6. Redis 데이터 정리
         redisTemplate.delete(SESSION_KEY_PREFIX + sessionId);
@@ -179,8 +190,10 @@ public class FocusTrackingService {
     }
 
     private String mapToDbViolationType(String type) {
-        if ("GAZE_AWAY".equals(type)) return "SCREEN_EXIT";
-        if ("NO_FACE".equals(type)) return "FACE_MISSING";
+        if ("GAZE_AWAY".equals(type))
+            return "SCREEN_EXIT";
+        if ("NO_FACE".equals(type))
+            return "FACE_MISSING";
         return type; // TAB_SWITCH 등은 그대로 사용
     }
 }
