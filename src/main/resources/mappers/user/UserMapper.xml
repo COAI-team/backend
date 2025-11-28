@@ -141,14 +141,13 @@
 
     <!-- 3) 90일 지난 계정 조회 -->
     <select id="findUsersToDelete" resultMap="UserMap">
-        <![CDATA[
+    <![CDATA[
         SELECT *
         FROM USERS
         WHERE USER_ISDELETED = 1
           AND USER_DELETEDAT IS NOT NULL
-          AND USER_DELETEDAT <
-    ]]>
-    #{now}
+          AND USER_DELETEDAT < #{now}
+        ]]>
     </select>
 
     <!-- 4) Soft Delete 처리 -->

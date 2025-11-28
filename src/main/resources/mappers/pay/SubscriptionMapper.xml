@@ -103,8 +103,7 @@
         UPDATE subscriptions
         SET status = 'EXPIRED'
         WHERE user_id = #{userId}
-        AND status = 'ACTIVE'
-        AND end_date <= NOW()
+          AND status = 'ACTIVE'
+          AND end_date &lt;= NOW()
     </update>
-
 </mapper>
