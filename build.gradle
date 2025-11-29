@@ -54,8 +54,8 @@ dependencies {
     implementation 'org.springframework.ai:spring-ai-starter-vector-store-qdrant'
 
     /* DB (MariaDB) */
-    // implementation 'org.mariadb.jdbc:mariadb-java-client:3.3.3'
-    runtimeOnly 'com.mysql:mysql-connector-j'
+    implementation 'org.mariadb.jdbc:mariadb-java-client:3.3.3'
+    // runtimeOnly 'com.mysql:mysql-connector-j'
 
     /* JWT */
     implementation 'io.jsonwebtoken:jjwt-api:0.11.5'

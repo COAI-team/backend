@@ -3,17 +3,21 @@ package kr.or.kosa.backend.algorithm.service;
 import kr.or.kosa.backend.algorithm.domain.AlgoProblem;
 import kr.or.kosa.backend.algorithm.domain.AlgoTestcase;
 import kr.or.kosa.backend.algorithm.dto.ProblemGenerationResponseDto;
+import kr.or.kosa.backend.algorithm.dto.ProblemListRequestDto;
+import kr.or.kosa.backend.algorithm.dto.ProblemListResponseDto;
+import kr.or.kosa.backend.algorithm.dto.ProblemStatisticsDto;
 import kr.or.kosa.backend.algorithm.mapper.AlgorithmProblemMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
- * 알고리즘 문제 서비스 - Phase 1
- * 기본 조회 기능만 구현
+ * 알고리즘 문제 서비스
  */
 @Service
 @RequiredArgsConstructor
@@ -23,9 +27,11 @@ public class AlgorithmProblemService {
 
     private final AlgorithmProblemMapper algorithmProblemMapper;
 
+    // ===== 기존 메서드들 =====
+
     /**
      * 문제 목록 조회 (페이징)
-     * 
+     *
      * @param offset 시작 위치
      * @param limit  조회 개수
      * @return 문제 목록
@@ -47,7 +53,7 @@ public class AlgorithmProblemService {
 
     /**
      * 전체 문제 수 조회
-     * 
+     *
      * @return 전체 문제 개수
      */
     public int getTotalProblemsCount() {
@@ -67,7 +73,7 @@ public class AlgorithmProblemService {
 
     /**
      * 문제 목록 조회 (필터 포함)
-     * 
+     *
      * @param offset     시작 위치
      * @param limit      조회 개수
      * @param difficulty 난이도 필터 (nullable)
@@ -76,7 +82,7 @@ public class AlgorithmProblemService {
      * @return 문제 목록
      */
     public List<AlgoProblem> getProblemsWithFilter(int offset, int limit, String difficulty, String source,
-            String keyword) {
+                                                   String keyword) {
         log.debug("문제 목록 조회 (필터) - offset: {}, limit: {}, difficulty: {}, source: {}, keyword: {}",
                 offset, limit, difficulty, source, keyword);
 
@@ -96,7 +102,7 @@ public class AlgorithmProblemService {
 
     /**
      * 전체 문제 수 조회 (필터 포함)
-     * 
+     *
      * @param difficulty 난이도 필터 (nullable)
      * @param source     출처 필터 (nullable)
      * @param keyword    검색어 (nullable)
@@ -119,7 +125,7 @@ public class AlgorithmProblemService {
 
     /**
      * 문제 상세 조회
-     * 
+     *
      * @param problemId 문제 ID
      * @return 문제 정보
      */
@@ -149,7 +155,7 @@ public class AlgorithmProblemService {
 
     /**
      * 문제 존재 여부 확인
-     * 
+     *
      * @param problemId 문제 ID
      * @return 존재 여부
      */
@@ -174,7 +180,7 @@ public class AlgorithmProblemService {
 
     /**
      * 페이지 번호 검증
-     * 
+     *
      * @param page 페이지 번호 (1부터 시작)
      * @param size 페이지 크기
      * @return 검증된 페이지 번호
@@ -185,7 +191,6 @@ public class AlgorithmProblemService {
             return 1;
         }
 
-        // 최대 페이지 수 확인
         int totalCount = getTotalProblemsCount();
         int maxPage = (int) Math.ceil((double) totalCount / size);
 
@@ -199,7 +204,7 @@ public class AlgorithmProblemService {
 
     /**
      * 페이지 크기 검증
-     * 
+     *
      * @param size 페이지 크기
      * @return 검증된 페이지 크기
      */
@@ -217,10 +222,9 @@ public class AlgorithmProblemService {
         return size;
     }
 
-    // ===== AI 생성 문제 저장 메서드 =====
     /**
      * AI 생성 문제를 DB에 저장
-     * 
+     *
      * @param responseDto AI 생성 결과
      * @param userId      생성자 ID (null 가능)
      * @return 저장된 문제 ID
@@ -230,11 +234,9 @@ public class AlgorithmProblemService {
         try {
             log.info("AI 생성 문제 저장 시작 - 제목: {}", responseDto.getProblem().getAlgoProblemTitle());
 
-            // 1. 문제 엔티티 준비
             AlgoProblem problem = responseDto.getProblem();
-            problem.setAlgoCreater(userId); // 생성자 ID 설정
+            problem.setAlgoCreater(userId);
 
-            // 2. 문제 저장 (AUTO_INCREMENT로 ID 자동 생성)
             int insertResult = algorithmProblemMapper.insertProblem(problem);
 
             if (insertResult == 0) {
@@ -244,12 +246,10 @@ public class AlgorithmProblemService {
             log.info("문제 저장 완료 - ID: {}, 제목: {}",
                     problem.getAlgoProblemId(), problem.getAlgoProblemTitle());
 
-            // 3. 테스트케이스 저장
             if (responseDto.getTestCases() != null && !responseDto.getTestCases().isEmpty()) {
                 saveTestcases(problem.getAlgoProblemId(), responseDto.getTestCases());
             }
 
-            // 4. ResponseDto에 생성된 ID 설정
             responseDto.setProblemId(problem.getAlgoProblemId());
 
             return problem.getAlgoProblemId();
@@ -285,6 +285,70 @@ public class AlgorithmProblemService {
         } catch (Exception e) {
             log.error("테스트케이스 저장 중 오류 발생", e);
             throw new RuntimeException("테스트케이스 저장 실패: " + e.getMessage(), e);
+        }
+    }
+
+    // ===== 새로 추가되는 메서드들 =====
+
+    /**
+     * 문제 목록 조회 (고급 필터링 + 통계)
+     *
+     * @param request 문제 목록 조회 요청 Dto
+     * @return 문제 목록과 페이징 정보
+     */
+    public Map<String, Object> getProblemListWithStats(ProblemListRequestDto request) {
+        log.info("문제 목록 조회 시작 - 필터: {}", request);
+
+        try {
+            // 전체 개수 조회
+            int totalCount = algorithmProblemMapper.countProblemList(request);
+
+            // 문제 목록 조회
+            List<ProblemListResponseDto> problems = algorithmProblemMapper.selectProblemList(request);
+
+            // 페이지 정보 계산
+            int page = request.getPage() != null ? request.getPage() : 1;
+            int size = request.getSize() != null ? request.getSize() : 10;
+            int totalPages = (int) Math.ceil((double) totalCount / size);
+            boolean hasNext = page < totalPages;
+            boolean hasPrevious = page > 1;
+
+            log.info("문제 목록 조회 완료 - 총 {}개, 페이지 {}/{}", totalCount, page, totalPages);
+
+            // 응답 데이터 구성
+            Map<String, Object> responseData = new HashMap<>();
+            responseData.put("problems", problems);
+            responseData.put("totalCount", totalCount);
+            responseData.put("totalPages", totalPages);
+            responseData.put("currentPage", page);
+            responseData.put("hasNext", hasNext);
+            responseData.put("hasPrevious", hasPrevious);
+
+            return responseData;
+        } catch (Exception e) {
+            log.error("문제 목록 조회 실패", e);
+            throw new RuntimeException("문제 목록 조회 중 오류가 발생했습니다.", e);
+        }
+    }
+
+    /**
+     * 통계 정보 조회
+     *
+     * @param userId 사용자 ID (null 가능)
+     * @return 통계 정보
+     */
+    public ProblemStatisticsDto getProblemStatistics(Long userId) {
+        log.info("통계 정보 조회 - userId: {}", userId);
+
+        try {
+            ProblemStatisticsDto statistics = algorithmProblemMapper.selectProblemStatistics(userId);
+
+            log.info("통계 정보 조회 완료 - {}", statistics);
+
+            return statistics;
+        } catch (Exception e) {
+            log.error("통계 정보 조회 실패", e);
+            throw new RuntimeException("통계 정보 조회 중 오류가 발생했습니다.", e);
         }
     }
 }

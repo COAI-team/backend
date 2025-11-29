@@ -13,7 +13,8 @@ public enum ProblemSource {
 
     AI_GENERATED("AI_GENERATED", "AI 생성", "🤖", "AI가 자동으로 생성한 문제"),
     BOJ("BOJ", "백준", "🏆", "백준 온라인 저지에서 가져온 문제"),
-    CUSTOM("CUSTOM", "사용자 정의", "✏️", "사용자가 직접 작성한 문제");
+    PROGRAMMERS("PROGRAMMERS", "프로그래머스", "💻", "프로그래머스에서 가져온 문제"),
+    CUSTOM("CUSTOM", "커스텀", "✏️", "사용자가 직접 작성한 문제");
 
     /**
      * 데이터베이스 저장값
@@ -63,7 +64,7 @@ public enum ProblemSource {
      * 외부 플랫폼 문제인지 확인
      */
     public boolean isExternalSource() {
-        return this == BOJ;
+        return this == BOJ || this == PROGRAMMERS;
     }
 
     /**
@@ -87,6 +88,7 @@ public enum ProblemSource {
         return switch (this) {
             case AI_GENERATED -> "source-ai";
             case BOJ -> "source-boj";
+            case PROGRAMMERS -> "source-programmers";
             case CUSTOM -> "source-custom";
         };
     }
@@ -98,7 +100,8 @@ public enum ProblemSource {
         return switch (this) {
             case AI_GENERATED -> "#e3f2fd";  // 연한 파란색
             case BOJ -> "#fff3e0";           // 연한 주황색
-            case CUSTOM -> "#f3e5f5";        // 연한 보라색
+            case PROGRAMMERS -> "#f3e5f5";   // 연한 보라색
+            case CUSTOM -> "#e8f5e9";        // 연한 초록색
         };
     }
 
@@ -109,7 +112,8 @@ public enum ProblemSource {
         return switch (this) {
             case AI_GENERATED -> "#1976d2";  // 진한 파란색
             case BOJ -> "#f57c00";           // 진한 주황색
-            case CUSTOM -> "#7b1fa2";        // 진한 보라색
+            case PROGRAMMERS -> "#7b1fa2";   // 진한 보라색
+            case CUSTOM -> "#2e7d32";        // 진한 초록색
         };
     }
 }

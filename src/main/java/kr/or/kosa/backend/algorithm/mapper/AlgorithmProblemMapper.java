@@ -2,6 +2,9 @@ package kr.or.kosa.backend.algorithm.mapper;
 
 import kr.or.kosa.backend.algorithm.domain.AlgoProblem;
 import kr.or.kosa.backend.algorithm.domain.AlgoTestcase;
+import kr.or.kosa.backend.algorithm.dto.ProblemListRequestDto;
+import kr.or.kosa.backend.algorithm.dto.ProblemListResponseDto;
+import kr.or.kosa.backend.algorithm.dto.ProblemStatisticsDto;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -110,4 +113,20 @@ public interface AlgorithmProblemMapper {
      * 모든 테스트케이스 조회
      */
     List<AlgoTestcase> selectTestCasesByProblemId(@Param("problemId") Long problemId);
+
+    /**
+     * 문제 목록 조회 (고급 필터링 + 통계)
+     */
+    List<ProblemListResponseDto> selectProblemList(ProblemListRequestDto request);
+
+    /**
+     * 문제 목록 전체 개수 조회
+     */
+    int countProblemList(ProblemListRequestDto request);
+
+    /**
+     * 통계 정보 조회
+     */
+    ProblemStatisticsDto selectProblemStatistics(@Param("userId") Long userId);
+
 }
