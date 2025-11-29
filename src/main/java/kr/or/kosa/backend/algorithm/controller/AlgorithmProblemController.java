@@ -96,7 +96,7 @@ public class AlgorithmProblemController {
 
     /**
      * 문제 목록 조회 (기존 - 하위 호환성 유지)
-     * GET /api/algo/problems?page=1&size=10&difficulty=BRONZE&source=AI_GENERATED&keyword=검색어
+     * GET /api/algo/problems?page=1&size=10&difficulty=BRONZE&source=AI_GENERATED&keyword=검색어&topic=배열
      */
     @GetMapping
     public ResponseEntity<ApiResponse<Map<String, Object>>> getProblems(
@@ -104,7 +104,8 @@ public class AlgorithmProblemController {
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(required = false) String difficulty,
             @RequestParam(required = false) String source,
-            @RequestParam(required = false) String keyword) {
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String topic) {  // topic 파라미터 추가
 
         log.info("========================================");
         log.info("문제 목록 조회 요청");
@@ -112,6 +113,7 @@ public class AlgorithmProblemController {
         log.info("difficulty: '{}' (null: {})", difficulty, difficulty == null);
         log.info("source: '{}' (null: {})", source, source == null);
         log.info("keyword: '{}' (null: {})", keyword, keyword == null);
+        log.info("topic: '{}' (null: {})", topic, topic == null);  // topic 로그 추가
         log.info("========================================");
 
         try {
@@ -135,19 +137,26 @@ public class AlgorithmProblemController {
                 keyword = null;
                 log.info("keyword를 null로 변환");
             }
+            // topic 빈 문자열 처리 추가
+            if (topic != null && topic.trim().isEmpty()) {
+                topic = null;
+                log.info("topic을 null로 변환");
+            }
 
             int offset = (page - 1) * size;
 
-            log.info("Service 호출 전 - offset: {}, limit: {}, difficulty: {}, source: {}, keyword: {}",
-                    offset, size, difficulty, source, keyword);
+            log.info("Service 호출 전 - offset: {}, limit: {}, difficulty: {}, source: {}, keyword: {}, topic: {}",
+                    offset, size, difficulty, source, keyword, topic);
 
+            // Service 호출에 topic 추가
             List<AlgoProblem> problems = algorithmProblemService.getProblemsWithFilter(
-                    offset, size, difficulty, source, keyword);
+                    offset, size, difficulty, source, keyword, topic);
 
             log.info("Service 호출 후 - 조회된 문제 수: {}", problems.size());
 
+            // getTotalProblemsCountWithFilter에도 topic 추가
             int totalCount = algorithmProblemService.getTotalProblemsCountWithFilter(
-                    difficulty, source, keyword);
+                    difficulty, source, keyword, topic);
 
             int totalPages = (int) Math.ceil((double) totalCount / size);
             boolean hasNext = page < totalPages;
@@ -176,7 +185,7 @@ public class AlgorithmProblemController {
 
     /**
      * 문제 목록 조회 V2 (고급 필터링 + 통계)
-     * GET /api/algo/problems/v2?page=1&size=10&difficulty=BRONZE&source=AI_GENERATED&language=Java&status=solved&sortBy=latest
+     * GET /api/algo/problems/v2?page=1&size=10&difficulty=BRONZE&source=AI_GENERATED&language=Java&status=solved&sortBy=latest&topic=배열
      */
     @GetMapping("/v2")
     public ResponseEntity<ApiResponse<Map<String, Object>>> getProblemsV2(
@@ -187,11 +196,12 @@ public class AlgorithmProblemController {
             @RequestParam(required = false) String language,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String topic,  // topic 파라미터 추가
             @RequestParam(defaultValue = "latest") String sortBy,
             @AuthenticationPrincipal JwtAuthentication authentication) {
 
-        log.info("문제 목록 조회 V2 - page: {}, size: {}, difficulty: {}, source: {}, language: {}, status: {}, sortBy: {}",
-                page, size, difficulty, source, language, status, sortBy);
+        log.info("문제 목록 조회 V2 - page: {}, size: {}, difficulty: {}, source: {}, language: {}, status: {}, keyword: {}, topic: {}, sortBy: {}",
+                page, size, difficulty, source, language, status, keyword, topic, sortBy);
 
         try {
             // 사용자 ID 추출
@@ -210,6 +220,7 @@ public class AlgorithmProblemController {
                     .language(language)
                     .status(status)
                     .keyword(keyword)
+                    .topic(topic)
                     .sortBy(sortBy)
                     .userId(userId)
                     .build();

@@ -21,6 +21,7 @@ public class ProblemListRequestDto {
     private String status;          // 상태 (solved, unsolved)
     private String keyword;         // 검색 키워드
     private String sortBy;          // 정렬 기준 (latest, accuracy, popular)
+    private String topic;           // 유형 (배열, DP, 그리디 등)
 
     // 페이징
     private Integer page;           // 페이지 번호 (1부터 시작)
