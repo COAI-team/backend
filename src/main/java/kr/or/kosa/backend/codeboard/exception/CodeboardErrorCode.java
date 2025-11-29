@@ -4,7 +4,7 @@ import kr.or.kosa.backend.commons.exception.custom.ErrorCode;
 
 public enum CodeboardErrorCode implements ErrorCode {
     INSERT_ERROR("CB001", "게시글 등록 중 오류가 발생했습니다."),
-    UPDATE_ERROR("CB002", "게시글 수정 중 오류가 발생했습니다."),
+    UPDATE_ERROR("CB0010", "게시글 수정 중 오류가 발생했습니다."),
     DELETE_ERROR("CB003", "게시글 삭제 중 오류가 발생했습니다."),
     NOT_FOUND("CB004", "해당 게시글을 찾을 수 없습니다."),
     INVALID_INPUT("CB005", "요청 데이터가 유효하지 않습니다."),
