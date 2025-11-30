@@ -104,7 +104,7 @@ public class CommentService {
         Comment savedComment = commentMapper.selectCommentById(comment.getCommentId());
 
         // 사용자 닉네임 조회
-        User user = userMapper.findById(userId);
+        Users user = userMapper.findById(userId);
         String userNickname = user != null ? user.getNickname() : null;
 
         return CommentResponse.builder()
