@@ -175,24 +175,6 @@ public class UserController {
     }
 
     // ============================================================================
-    // 이메일 변경
-    // ============================================================================
-    @PutMapping("/me/email")
-    public ResponseEntity<Map<String, Object>> updateEmail(
-            @AuthenticationPrincipal JwtUserDetails user,
-            @RequestBody EmailUpdateRequestDto dto
-    ) {
-
-        String updatedEmail = userService.updateEmail(user.id(), dto.getNewEmail());
-
-        return ResponseEntity.ok(Map.of(
-                KEY_SUCCESS, true,
-                KEY_MESSAGE, "이메일이 성공적으로 변경되었습니다.",
-                "email", updatedEmail
-        ));
-    }
-
-    // ============================================================================
     // 탈퇴 신청 (90일 뒤 삭제)
     // ============================================================================
 
