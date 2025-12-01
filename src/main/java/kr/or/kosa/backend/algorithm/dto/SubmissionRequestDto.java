@@ -1,0 +1,53 @@
+package kr.or.kosa.backend.algorithm.dto;
+
+import kr.or.kosa.backend.algorithm.domain.AlgoSubmission;
+import kr.or.kosa.backend.algorithm.domain.ProgrammingLanguage;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.time.LocalDateTime;
+
+/**
+ * 코드 제출 요청 DTO (ALG-07)
+ * Validation은 서비스 계층에서 처리
+ */
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class SubmissionRequestDto {
+
+    private Long problemId;
+    private ProgrammingLanguage language;
+    private String sourceCode;
+
+    // 시간 추적 정보
+    private LocalDateTime startTime;
+    private LocalDateTime endTime;
+
+    // Eye Tracking 세션 ID (선택사항)
+    private String focusSessionId;
+
+    // AI 피드백 요청 타입
+    private AlgoSubmission.AiFeedbackType feedbackType;
+
+    // GitHub 커밋 요청 여부
+    private Boolean requestGithubCommit;
+
+    /**
+     * 요청 데이터 검증 메서드
+     */
+    public void validate() {
+        if (problemId == null) {
+            throw new IllegalArgumentException("문제 ID는 필수입니다");
+        }
+        if (language == null) {
+            throw new IllegalArgumentException("프로그래밍 언어는 필수입니다");
+        }
+        if (sourceCode == null || sourceCode.trim().isEmpty()) {
+            throw new IllegalArgumentException("소스코드는 필수입니다");
+        }
+    }
+}

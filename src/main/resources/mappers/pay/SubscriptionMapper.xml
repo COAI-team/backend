@@ -30,20 +30,20 @@
             useGeneratedKeys="true"
             keyProperty="subscriptionId">
         INSERT INTO subscriptions (
-        user_id,
-        order_id,
-        subscription_type,
-        start_date,
-        end_date,
-        status
+            user_id,
+            order_id,
+            subscription_type,
+            start_date,
+            end_date,
+            status
         )
         VALUES (
-        #{userId},
-        #{orderId},
-        #{subscriptionType},
-        #{startDate},
-        #{endDate},
-        #{status}
+            #{userId},
+            #{orderId},
+            #{subscriptionType},
+            #{startDate},
+            #{endDate},
+            #{status}
         )
     </insert>
 
@@ -51,17 +51,17 @@
     <select id="findActiveSubscriptionsByUserId"
             resultMap="SubscriptionResultMap">
         SELECT
-        subscription_id,
-        user_id,
-        order_id,
-        subscription_type,
-        start_date,
-        end_date,
-        status
+            subscription_id,
+            user_id,
+            order_id,
+            subscription_type,
+            start_date,
+            end_date,
+            status
         FROM subscriptions
         WHERE user_id = #{userId}
-        AND status = 'ACTIVE'
-        AND end_date > NOW()
+          AND status = 'ACTIVE'
+          AND end_date &gt; NOW()
         ORDER BY end_date DESC
     </select>
 
@@ -69,13 +69,13 @@
     <select id="findSubscriptionByOrderId"
             resultMap="SubscriptionResultMap">
         SELECT
-        subscription_id,
-        user_id,
-        order_id,
-        subscription_type,
-        start_date,
-        end_date,
-        status
+            subscription_id,
+            user_id,
+            order_id,
+            subscription_type,
+            start_date,
+            end_date,
+            status
         FROM subscriptions
         WHERE order_id = #{orderId}
     </select>
@@ -84,18 +84,18 @@
     <select id="findLatestActiveSubscriptionByUserIdAndType"
             resultMap="SubscriptionResultMap">
         SELECT
-        subscription_id,
-        user_id,
-        order_id,
-        subscription_type,
-        start_date,
-        end_date,
-        status
+            subscription_id,
+            user_id,
+            order_id,
+            subscription_type,
+            start_date,
+            end_date,
+            status
         FROM subscriptions
         WHERE user_id = #{userId}
-        AND subscription_type = #{subscriptionType}
-        AND status = 'ACTIVE'
-        AND end_date > NOW()
+          AND subscription_type = #{subscriptionType}
+          AND status = 'ACTIVE'
+          AND end_date &gt; NOW()
         ORDER BY end_date DESC
         LIMIT 1
     </select>

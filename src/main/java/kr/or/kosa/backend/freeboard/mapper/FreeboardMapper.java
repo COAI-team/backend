@@ -28,4 +28,10 @@ public interface FreeboardMapper {
 
     // 총 게시글 수 (페이징용)
     int countAll();
+
+    // 좋아요 개수 증가
+    void incrementLikeCount(@Param("freeboardId") Long freeboardId);
+
+    // 좋아요 개수 감소
+    void decrementLikeCount(@Param("freeboardId") Long freeboardId);
 }

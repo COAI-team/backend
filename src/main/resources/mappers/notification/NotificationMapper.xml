@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="kr.or.kosa.backend.notification.mapper.NotificationMapper">
+
+    <resultMap id="notificationResultMap" type="kr.or.kosa.backend.notification.domain.Notification">
+        <id property="notificationId" column="notification_id"/>
+        <result property="recipientId" column="recipient_id"/>
+        <result property="senderId" column="sender_id"/>
+        <result property="notificationType" column="notification_type"
+                typeHandler="org.apache.ibatis.type.EnumTypeHandler"/>
+        <result property="referenceType" column="reference_type"
+                typeHandler="org.apache.ibatis.type.EnumTypeHandler"/>
+        <result property="referenceId" column="reference_id"/>
+        <result property="message" column="message"/>
+        <result property="isRead" column="is_read"/>
+        <result property="createdAt" column="created_at"/>
+    </resultMap>
+
+    <!-- 알림 생성 -->
+    <insert id="insertNotification" parameterType="kr.or.kosa.backend.notification.domain.Notification"
+            useGeneratedKeys="true" keyProperty="notificationId">
+        INSERT INTO notification (
+        recipient_id,
+        sender_id,
+        notification_type,
+        reference_type,
+        reference_id,
+        message,
+        is_read,
+        created_at
+        ) VALUES (
+        #{recipientId},
+        #{senderId},
+        #{notificationType},
+        #{referenceType},
+        #{referenceId},
+        #{message},
+        FALSE,
+        NOW()
+        )
+    </insert>
+
+    <!-- 사용자의 읽지 않은 알림 조회 -->
+    <select id="selectUnreadNotifications" resultMap="notificationResultMap">
+        SELECT *
+        FROM notification
+        WHERE recipient_id = #{recipientId}
+        AND is_read = FALSE
+        ORDER BY created_at DESC
+    </select>
+
+    <!-- 알림 읽음 처리 -->
+    <update id="markAsRead">
+        UPDATE notification
+        SET is_read = TRUE
+        WHERE notification_id = #{notificationId}
+    </update>
+
+    <!-- 참조 대상의 모든 알림 삭제 -->
+    <delete id="deleteByReference">
+        DELETE FROM notification
+        WHERE reference_type = #{referenceType}
+        AND reference_id = #{referenceId}
+    </delete>
+
+</mapper>

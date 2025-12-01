@@ -76,4 +76,25 @@ public class AnalysisController {
         String result = analysisService.analyzeStoredFile(requestDto);
         return ResponseEntity.ok(ApiResponse.success(result));
     }
+
+    /**
+     * 저장된 파일을 분석하는 스트리밍 엔드포인트
+     * POST /api/analysis/analyze-stored/stream
+     */
+    @PostMapping(value = "/analyze-stored/stream", produces = org.springframework.http.MediaType.TEXT_EVENT_STREAM_VALUE)
+    public reactor.core.publisher.Flux<String> analyzeStoredFileStream(@RequestBody AnalysisRequestDTO requestDto) {
+        return analysisService.analyzeStoredFileStream(requestDto);
+    }
+
+    @org.springframework.web.bind.annotation.GetMapping("/history/{userId}")
+    public ResponseEntity<ApiResponse<java.util.List<kr.or.kosa.backend.codenose.dto.dtoReal.CodeResultDTO>>> getUserAnalysisHistory(@org.springframework.web.bind.annotation.PathVariable Long userId) {
+        java.util.List<kr.or.kosa.backend.codenose.dto.dtoReal.CodeResultDTO> history = analysisService.getUserAnalysisHistory(userId);
+        return ResponseEntity.ok(ApiResponse.success(history));
+    }
+
+    @org.springframework.web.bind.annotation.GetMapping("/result/{analysisId}")
+    public ResponseEntity<ApiResponse<kr.or.kosa.backend.codenose.dto.dtoReal.CodeResultDTO>> getAnalysisResult(@org.springframework.web.bind.annotation.PathVariable String analysisId) {
+        kr.or.kosa.backend.codenose.dto.dtoReal.CodeResultDTO result = analysisService.getAnalysisResult(analysisId);
+        return ResponseEntity.ok(ApiResponse.success(result));
+    }
 }

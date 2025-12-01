@@ -4,7 +4,7 @@ import jakarta.validation.Valid;
 import kr.or.kosa.backend.commons.response.ApiResponse;
 import kr.or.kosa.backend.freeboard.domain.Freeboard;
 import kr.or.kosa.backend.freeboard.dto.FreeboardCreateRequest;
-import kr.or.kosa.backend.freeboard.dto.FreeboardDto; // 이 import 추가!
+import kr.or.kosa.backend.freeboard.dto.FreeboardDto;
 import kr.or.kosa.backend.freeboard.dto.FreeboardUpdateRequest;
 import kr.or.kosa.backend.freeboard.service.FreeboardService;
 import lombok.RequiredArgsConstructor;

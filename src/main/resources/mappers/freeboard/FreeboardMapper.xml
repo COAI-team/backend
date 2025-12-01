@@ -97,4 +97,19 @@
         WHERE freeboard_deleted_yn = 'N'
     </select>
 
+    <!-- 좋아요 개수 증가 -->
+    <update id="incrementLikeCount">
+        UPDATE freeboard
+        SET like_count = like_count + 1
+        WHERE freeboard_id = #{freeboardId}
+    </update>
+
+    <!-- 좋아요 개수 감소 -->
+    <update id="decrementLikeCount">
+        UPDATE freeboard
+        SET like_count = like_count - 1
+        WHERE freeboard_id = #{freeboardId}
+        AND like_count > 0
+    </update>
+
 </mapper>

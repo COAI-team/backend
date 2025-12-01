@@ -3,10 +3,7 @@ package kr.or.kosa.backend.algorithm.service;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import kr.or.kosa.backend.algorithm.domain.AlgoProblem;
-import kr.or.kosa.backend.algorithm.domain.AlgoTestcase;
-import kr.or.kosa.backend.algorithm.domain.ProblemDifficulty;
-import kr.or.kosa.backend.algorithm.domain.ProblemSource;
+import kr.or.kosa.backend.algorithm.domain.*;
 import kr.or.kosa.backend.algorithm.dto.ProblemGenerationRequestDto;
 import kr.or.kosa.backend.algorithm.dto.ProblemGenerationResponseDto;
 import lombok.RequiredArgsConstructor;
@@ -196,31 +193,22 @@ public class AIProblemGeneratorService {
 
     /**
      * 태그를 JSON 배열 형식으로 변환
+     * topic을 String으로 받도록 수정
      */
-    private String buildTagsJson(String topic) {
-        if (topic == null || topic.trim().isEmpty()) {
-            return "[]"; // 빈 JSON 배열
+    private String buildTagsJson(String topicStr) {
+        if (topicStr == null || topicStr.trim().isEmpty()) {
+            return "[]"; // 빈 배열
         }
 
         try {
-            // 쉼표로 구분된 태그를 JSON 배열로 변환
-            String[] tags = topic.split(",");
-            List<String> tagList = new ArrayList<>();
-
-            for (String tag : tags) {
-                String trimmed = tag.trim();
-                if (!trimmed.isEmpty()) {
-                    tagList.add(trimmed);
-                }
-            }
-
-            // ObjectMapper로 JSON 배열 생성
-            return objectMapper.writeValueAsString(tagList);
+            // topic이 문자열이므로 그대로 JSON 배열로 변환
+            List<String> tags = List.of(topicStr);
+            return objectMapper.writeValueAsString(tags);
 
         } catch (Exception e) {
-            log.error("태그 JSON 변환 실패, 기본값 사용: {}", topic, e);
+            log.error("태그 JSON 변환 실패, 기본값 사용: {}", topicStr, e);
             // 실패 시 단일 태그로 JSON 배열 생성
-            return "[\"" + topic.replace("\"", "\\\"") + "\"]";
+            return "[\"" + topicStr.replace("\"", "\\\"") + "\"]";
         }
     }
 

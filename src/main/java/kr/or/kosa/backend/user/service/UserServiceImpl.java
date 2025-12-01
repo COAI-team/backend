@@ -41,7 +41,7 @@ public class UserServiceImpl implements UserService {
     // 회원가입
     // ---------------------------------------------------------
     @Override
-    public int register(UserRegisterRequestDto dto, MultipartFile imageFile) {
+    public Long register(UserRegisterRequestDto dto, MultipartFile imageFile) {
 
         if (!emailVerificationService.isVerified(dto.getEmail())) {
             throw new CustomBusinessException(UserErrorCode.EMAIL_NOT_VERIFIED);
@@ -68,9 +68,9 @@ public class UserServiceImpl implements UserService {
             throw new CustomBusinessException(UserErrorCode.USER_CREATE_FAIL);
         }
 
-        int userId = user.getId();
+        Long userId = user.getId();
 
-        // 프로필 이미지 처리
+        // 프로필 이미지 업로드
         String imageUrl;
         if (imageFile != null && !imageFile.isEmpty()) {
             String folderPath = "profile-images/" + dto.getNickname() + "/profile";
@@ -141,7 +141,7 @@ public class UserServiceImpl implements UserService {
             throw new CustomBusinessException(UserErrorCode.INVALID_TOKEN);
         }
 
-        Integer userId = jwtProvider.getUserId(refreshToken);
+        Long userId = jwtProvider.getUserId(refreshToken);
 
         String savedToken = redisTemplate.opsForValue().get(REFRESH_KEY_PREFIX + userId);
         if (savedToken == null || !savedToken.equals(refreshToken)) {
@@ -164,9 +164,8 @@ public class UserServiceImpl implements UserService {
                 return false;
             }
 
-            Integer userId = jwtProvider.getUserId(token);
+            Long userId = jwtProvider.getUserId(token);
 
-            // refresh 삭제
             redisTemplate.delete(REFRESH_KEY_PREFIX + userId);
 
             long expireAt = jwtProvider.getTokenRemainingTime(token);
@@ -223,7 +222,7 @@ public class UserServiceImpl implements UserService {
     @Override
     public boolean resetPassword(String token, String newPassword) {
 
-        Integer userId = passwordResetTokenService.validateToken(token);
+        Long userId = passwordResetTokenService.validateToken(token);
         if (userId == null) return false;
 
         String encryptedPassword = passwordEncoder.encode(newPassword);
@@ -246,7 +245,7 @@ public class UserServiceImpl implements UserService {
     // 로그인 상태에서 비밀번호 변경
     // ---------------------------------------------------------
     @Override
-    public boolean updatePassword(Integer userId, PasswordUpdateRequestDto dto) {
+    public boolean updatePassword(Long userId, PasswordUpdateRequestDto dto) {
 
         User user = userMapper.findById(userId);
         if (user == null) {
@@ -265,7 +264,7 @@ public class UserServiceImpl implements UserService {
     // 사용자 정보 수정
     // ---------------------------------------------------------
     @Override
-    public UserResponseDto updateUserInfo(Integer userId, UserUpdateRequestDto dto, MultipartFile image) {
+    public UserResponseDto updateUserInfo(Long userId, UserUpdateRequestDto dto, MultipartFile image) {
 
         User user = userMapper.findById(userId);
         if (user == null) {
@@ -313,7 +312,7 @@ public class UserServiceImpl implements UserService {
     // 이메일 수정
     // ---------------------------------------------------------
     @Override
-    public String updateEmail(Integer userId, String newEmail) {
+    public String updateEmail(Long userId, String newEmail) {
 
         User user = userMapper.findById(userId);
         if (user == null) {
@@ -354,7 +353,7 @@ public class UserServiceImpl implements UserService {
     // 내 정보 조회
     // ---------------------------------------------------------
     @Override
-    public UserResponseDto getUserInfo(Integer userId) {
+    public UserResponseDto getUserInfo(Long userId) {
 
         User user = userMapper.findById(userId);
 
@@ -378,23 +377,21 @@ public class UserServiceImpl implements UserService {
     // 90일 뒤 탈퇴 예약
     // ============================================================
     @Override
-    public boolean requestDelete(Integer userId) {
+    public boolean requestDelete(Long userId) {
 
         User user = userMapper.findById(userId);
         if (user == null) {
             throw new CustomBusinessException(UserErrorCode.USER_NOT_FOUND);
         }
 
-        // 이미 탈퇴 예약 중인지 확인
         boolean isAlreadyScheduled =
                 user.getDeletedAt() != null &&
-                        !Boolean.TRUE.equals(user.getIsDeleted()); // 🔥 핵심 수정
+                        !Boolean.TRUE.equals(user.getIsDeleted());
 
         if (isAlreadyScheduled) {
             throw new CustomBusinessException(UserErrorCode.ALREADY_SCHEDULED_DELETE);
         }
 
-        // 90일 뒤 탈퇴될 예정
         LocalDateTime deletedAt = LocalDateTime.now().plusDays(90);
 
         int result = userMapper.scheduleDelete(userId, deletedAt);
@@ -406,19 +403,17 @@ public class UserServiceImpl implements UserService {
     // 탈퇴 신청 복구
     // ============================================================
     @Override
-    public boolean restoreUser(Integer userId) {
+    public boolean restoreUser(Long userId) {
 
         User user = userMapper.findById(userId);
         if (user == null) {
             throw new CustomBusinessException(UserErrorCode.USER_NOT_FOUND);
         }
 
-        // 탈퇴 예약조차 되어있지 않으면 복구 불가
         if (user.getDeletedAt() == null) {
             return false;
         }
 
-        // 이미 90일이 지나 실제 삭제가 예정된 계정
         if (user.getDeletedAt().isBefore(LocalDateTime.now())) {
             return false;
         }

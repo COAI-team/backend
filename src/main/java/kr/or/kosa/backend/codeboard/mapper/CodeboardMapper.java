@@ -22,4 +22,10 @@ public interface CodeboardMapper {
     int countAll();
 
     void increaseClick(@Param("id") Long id);
+
+    // 좋아요 개수 증가
+    void incrementLikeCount(@Param("codeboardId") Long codeboardId);
+
+    // 좋아요 개수 감소
+    void decrementLikeCount(@Param("codeboardId") Long codeboardId);
 }

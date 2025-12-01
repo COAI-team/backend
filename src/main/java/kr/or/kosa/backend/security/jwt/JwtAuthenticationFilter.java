@@ -34,7 +34,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             // 토큰이 있고 유효한 경우만 인증 처리
             if (token != null && jwtProvider.validateToken(token)) {
 
-                Integer userId = jwtProvider.getUserId(token);
+                Long userId = jwtProvider.getUserId(token);
 
                 JwtUserDetails userDetails =
                         new JwtUserDetails(userId, jwtProvider.getEmail(token));
