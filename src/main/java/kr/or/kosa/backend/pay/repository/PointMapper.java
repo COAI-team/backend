@@ -19,13 +19,13 @@ public interface PointMapper {
      * 포인트 사용 (잔액 차감). 잔액 부족 시 0 row 업데이트되도록 구현.
      */
     int usePoint(@Param("userId") String userId,
-                 @Param("amount") BigDecimal amount);
+                 @Param("usePoint") BigDecimal usePoint);
 
     /**
      * 포인트 환불(복구).
      */
     int refundPoint(@Param("userId") String userId,
-                    @Param("amount") BigDecimal amount);
+                    @Param("refundPoint") BigDecimal refundPoint);
 
     int insertPointHistory(PointHistory history);
 }
