@@ -36,7 +36,7 @@ public class JwtProvider {
     private String createToken(Long id, String email, long exp) {
         return Jwts.builder()
                 .setSubject(email)
-                .claim("id", id)
+                .claim("id", id) // ✔ userId가 아니라 id 로 저장됨
                 .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis() + exp))
                 .signWith(key, SignatureAlgorithm.HS256)
@@ -64,7 +64,7 @@ public class JwtProvider {
     // =======================
     public Long getUserId(String token) {
         Claims claims = getClaims(token);
-        return claims.get("id", Long.class);
+        return claims.get("id", Long.class); // ✔ 기존 로직 그대로
     }
 
     public String getEmail(String token) {
@@ -80,22 +80,40 @@ public class JwtProvider {
     }
 
     // =======================
-    // (1) 만료일 가져오기
+    // 만료일 가져오기
     // =======================
     public Date getExpiration(String token) {
         return getClaims(token).getExpiration();
     }
 
     // =======================
-    // (2) 남은 유효시간(ms) 계산
+    // 남은 유효시간(ms)
     // =======================
     public long getTokenRemainingTime(String token) {
         try {
             Date expiration = getExpiration(token);
-            long now = System.currentTimeMillis();
-            return expiration.getTime() - now;  // 남은 시간(ms)
+            return expiration.getTime() - System.currentTimeMillis();
         } catch (Exception e) {
             return 0;
         }
+    }
+
+    // =======================
+    // GitHub Disconnect 용 메서드
+    // =======================
+    public Long getUserIdFromToken(String token) {
+        Claims claims = parseToken(token);
+        return claims.get("id", Long.class); // ✔ userId → id 로 수정
+    }
+
+    // =======================
+    // 공통 Claims 파싱 메서드 추가 (새로 추가됨)
+    // =======================
+    private Claims parseToken(String token) {
+        return Jwts.parserBuilder()
+                .setSigningKey(key)
+                .build()
+                .parseClaimsJws(token)
+                .getBody();
     }
 }

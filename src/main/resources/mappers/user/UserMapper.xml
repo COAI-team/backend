@@ -134,6 +134,12 @@
                  )
     </insert>
 
+    <delete id="deleteSocialAccount">
+        DELETE FROM SOCIALLOGIN
+        WHERE USER_ID = #{userId}
+          AND SOCIALLOGIN_PROVIDER = #{provider}
+    </delete>
+
     <!-- ========= 90일 뒤 자동 탈퇴 ========= -->
 
     <update id="scheduleDelete">

@@ -32,4 +32,6 @@ public interface UserService {
     boolean restoreUser(Long userId);
 
     Users githubLogin(GitHubUserResponse gitHubUser);
+
+    boolean disconnectGithub(Long userId);
 }

@@ -465,4 +465,21 @@ public class UserServiceImpl implements UserService {
 
         return newUser;
     }
+
+    // ---------------------------------------------------------
+// GitHub 연동 해제
+// ---------------------------------------------------------
+    @Override
+    public boolean disconnectGithub(Long userId) {
+
+        Users user = userMapper.findById(userId);
+        if (user == null) {
+            throw new CustomBusinessException(UserErrorCode.USER_NOT_FOUND);
+        }
+
+        // GitHub provider 정보 삭제
+        int result = userMapper.deleteSocialAccount(userId, "github");
+
+        return result > 0;
+    }
 }

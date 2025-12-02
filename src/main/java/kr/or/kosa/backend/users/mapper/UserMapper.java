@@ -64,4 +64,6 @@ public interface UserMapper {
             @Param("userEmail") String userEmail,
             @Param("userName") String userName
     );
+
+    int deleteSocialAccount(Long userId, String provider);
 }
