@@ -2,175 +2,176 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
-<mapper namespace="kr.or.kosa.backend.user.mapper.UserMapper">
+<mapper namespace="kr.or.kosa.backend.users.mapper.UserMapper">
 
-    <!-- ========= Domain 매핑 ========= -->
-    <resultMap id="UserMap" type="kr.or.kosa.backend.user.domain.User">
-        <id property="id" column="id"/>
-        <result property="email" column="email"/>
-        <result property="password" column="password"/>
-        <result property="name" column="name"/>
-        <result property="nickname" column="nickname"/>
-        <result property="image" column="image"/>
-        <result property="grade" column="grade"/>
-        <result property="role" column="role"/>
-        <result property="githubToken" column="github_token"/>
-        <result property="refreshToken" column="refresh_token"/>
-        <result property="isDeleted" column="is_deleted"/>
-        <result property="deletedAt" column="deleted_at"/>
-        <result property="createdAt" column="created_at"/>
-        <result property="updatedAt" column="updated_at"/>
-        <result property="enabled" column="enabled"/>
+    <!-- ========= Users 매핑 ========= -->
+    <resultMap id="UserMap" type="kr.or.kosa.backend.users.domain.Users">
+        <id property="userId" column="USER_ID"/>
+        <result property="userEmail" column="USER_EMAIL"/>
+        <result property="userPw" column="USER_PW"/>
+        <result property="userName" column="USER_NAME"/>
+        <result property="userNickname" column="USER_NICKNAME"/>
+        <result property="userImage" column="USER_IMAGE"/>
+        <result property="userGrade" column="USER_GRADE"/>
+        <result property="userRole" column="USER_ROLE"/>
+        <result property="userIsdeleted" column="USER_ISDELETED"/>
+        <result property="userDeletedat" column="USER_DELETEDAT"/>
+        <result property="userCreatedat" column="USER_CREATEDAT"/>
+        <result property="userUpdatedat" column="USER_UPDATEDAT"/>
+        <result property="userEnabled" column="USER_ENABLED"/>
+        <result property="userIssubscribed" column="USER_ISSUBSCRIBED"/>
     </resultMap>
 
     <!-- ========= SELECT ========= -->
+
     <select id="findByEmail" resultMap="UserMap">
         SELECT *
-        FROM `user`
-        WHERE email = #{email}
+        FROM USERS
+        WHERE USER_EMAIL = #{userEmail}
     </select>
 
     <select id="findByNickname" resultMap="UserMap">
         SELECT *
-        FROM `user`
-        WHERE nickname = #{nickname}
+        FROM USERS
+        WHERE USER_NICKNAME = #{userNickname}
     </select>
 
     <select id="findById" resultMap="UserMap">
         SELECT *
-        FROM `user`
-        WHERE id = #{id}
+        FROM USERS
+        WHERE USER_ID = #{userId}
     </select>
 
     <select id="selectUsersByIds" resultMap="UserMap">
-        SELECT id, nickname, email
-        FROM `user`
-        WHERE id IN
+        SELECT USER_ID, USER_NICKNAME, USER_EMAIL
+        FROM USERS
+        WHERE USER_ID IN
         <foreach collection="userIds" item="userId" open="(" separator="," close=")">
             #{userId}
         </foreach>
     </select>
 
+
     <!-- ========= INSERT ========= -->
+
     <insert id="insertUser"
-            parameterType="kr.or.kosa.backend.user.domain.User"
+            parameterType="kr.or.kosa.backend.users.domain.Users"
             useGeneratedKeys="true"
-            keyProperty="id">
-        INSERT INTO `user` (
-        email, password, name, nickname, image
+            keyProperty="userId">
+        INSERT INTO USERS (
+            USER_EMAIL,
+            USER_PW,
+            USER_NAME,
+            USER_NICKNAME,
+            USER_IMAGE
         ) VALUES (
-        #{email}, #{password}, #{name}, #{nickname}, #{image}
-        )
+                     #{userEmail},
+                     #{userPw},
+                     #{userName},
+                     #{userNickname},
+                     #{userImage}
+                 )
     </insert>
 
-    <insert id="insertGithubUser"
-            parameterType="kr.or.kosa.backend.user.domain.User">
-        INSERT INTO `user` (
-        email, name, nickname, image,
-        github_token, role, password
-        ) VALUES (
-        #{email}, #{name}, #{nickname}, #{image},
-        #{githubToken}, #{role}, 'GITHUB_USER'
-        )
-    </insert>
 
     <!-- ========= UPDATE ========= -->
-    <update id="updateUser" parameterType="kr.or.kosa.backend.user.domain.User">
-        UPDATE `user`
-        SET name = #{name},
-        nickname = #{nickname},
-        image = #{image}
-        WHERE id = #{id}
-    </update>
 
-    <update id="updateGithubToken">
-        UPDATE `user`
-        SET github_token = #{githubToken}
-        WHERE id = #{id}
+    <update id="updateUser" parameterType="kr.or.kosa.backend.users.domain.Users">
+        UPDATE USERS
+        SET USER_NAME = #{userName},
+            USER_NICKNAME = #{userNickname},
+            USER_IMAGE = #{userImage},
+            USER_UPDATEDAT = NOW()
+        WHERE USER_ID = #{userId}
     </update>
 
     <update id="updateUserImage">
-        UPDATE `user`
-        SET image = #{image}
-        WHERE id = #{id}
+        UPDATE USERS
+        SET USER_IMAGE = #{userImage},
+            USER_UPDATEDAT = NOW()
+        WHERE USER_ID = #{userId}
     </update>
 
     <update id="updatePassword">
-        UPDATE `user`
-        SET password = #{password}
-        WHERE id = #{id}
+        UPDATE USERS
+        SET USER_PW = #{userPw},
+            USER_UPDATEDAT = NOW()
+        WHERE USER_ID = #{userId}
     </update>
 
     <update id="updateUserInfo">
-        UPDATE `user`
-        SET name = #{name},
-        nickname = #{nickname},
-        updated_at = NOW()
-        WHERE id = #{id}
+        UPDATE USERS
+        SET USER_NAME = #{userName},
+            USER_NICKNAME = #{userNickname},
+            USER_UPDATEDAT = NOW()
+        WHERE USER_ID = #{userId}
     </update>
 
-    <update id="updateUserEmail">
-        UPDATE `user`
-        SET email = #{email}
-        WHERE id = #{id}
-    </update>
-
-    <!-- refresh token 보관 -->
-    <update id="updateRefreshToken">
-        UPDATE `user`
-        SET refresh_token = #{token}
-        WHERE id = #{id}
-    </update>
 
     <!-- ========= DELETE ========= -->
     <delete id="deleteUser">
-        DELETE FROM `user`
-        WHERE id = #{id}
+        DELETE FROM USERS
+        WHERE USER_ID = #{userId}
     </delete>
 
-    <!-- ==========================
-         90일 뒤 자동 탈퇴 처리
-    ========================== -->
 
-    <!-- 1) 탈퇴 예약 -->
+    <!-- ========= Social Login ========= -->
+
+    <select id="findBySocialProvider" resultMap="UserMap">
+        SELECT u.*
+        FROM USERS u
+                 JOIN SOCIALLOGIN s ON u.USER_ID = s.USER_ID
+        WHERE s.SOCIALLOGIN_PROVIDER = #{provider}
+          AND s.SOCIALLOGIN_PROVIDER_ID = #{providerId}
+    </select>
+
+    <insert id="insertSocialAccount">
+        INSERT INTO SOCIALLOGIN (
+            USER_ID, SOCIALLOGIN_PROVIDER,
+            SOCIALLOGIN_PROVIDER_ID, SOCIALLOGIN_SOCIAL_EMAIL
+        ) VALUES (
+                     #{userId}, #{provider}, #{providerId}, #{userEmail}
+                 )
+    </insert>
+
+    <!-- ========= 90일 뒤 자동 탈퇴 ========= -->
+
     <update id="scheduleDelete">
-        UPDATE `user`
-        SET deleted_at = #{deletedAt},
-        is_deleted = 0
-        WHERE id = #{id}
+        UPDATE USERS
+        SET USER_DELETEDAT = #{userDeletedat},
+            USER_ISDELETED = 1
+        WHERE USER_ID = #{userId}
     </update>
 
-    <!-- 2) 탈퇴 복구 -->
     <update id="restoreUser">
-        UPDATE `user`
-        SET deleted_at = NULL
-        WHERE id = #{id}
+        UPDATE USERS
+        SET USER_DELETEDAT = NULL,
+            USER_ISDELETED = 0
+        WHERE USER_ID = #{userId}
     </update>
 
-    <!-- 3) 90일 지난 계정 조회 -->
     <select id="findUsersToDelete" resultMap="UserMap">
         <![CDATA[
         SELECT *
-        FROM `user`
-        WHERE is_deleted = 0
-          AND deleted_at IS NOT NULL
-          AND deleted_at < #{now}
+        FROM USERS
+        WHERE USER_ISDELETED = 1
+          AND USER_DELETEDAT IS NOT NULL
+          AND USER_DELETEDAT < #{now}
         ]]>
     </select>
 
-    <!-- 4) Soft Delete 처리 -->
     <update id="softDeleteUser">
-        UPDATE `user`
-        SET is_deleted = 1
-        WHERE id = #{id}
+        UPDATE USERS
+        SET USER_ISDELETED = 1
+        WHERE USER_ID = #{userId}
     </update>
 
-    <!-- 5) 개인정보 익명화 -->
     <update id="anonymizeUser">
-        UPDATE `user`
-        SET email = #{email},
-        name = #{name}
-        WHERE id = #{id}
+        UPDATE USERS
+        SET USER_EMAIL = #{userEmail},
+            USER_NAME = #{userName},
+            USER_UPDATEDAT = NOW()
+        WHERE USER_ID = #{userId}
     </update>
 
 </mapper>

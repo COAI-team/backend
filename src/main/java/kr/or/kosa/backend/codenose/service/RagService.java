@@ -24,7 +24,7 @@ public class RagService {
         private final ChatClient.Builder chatClientBuilder;
 
         public void ingestCode(RagDto.IngestRequest request) {
-                log.info("Ingesting code for user: {}", request.getUserId());
+                log.info("Ingesting code for users: {}", request.getUserId());
 
                 String timestamp = LocalDateTime.now().format(DateTimeFormatter.ISO_DATE_TIME);
 
@@ -54,11 +54,11 @@ public class RagService {
         }
 
         public String getPersonalizedFeedback(RagDto.FeedbackRequest request) {
-                log.info("Generating feedback for user: {}", request.getUserId());
+                log.info("Generating feedback for users: {}", request.getUserId());
 
                 ChatClient chatClient = chatClientBuilder.build();
 
-                // Search for relevant documents for this user
+                // Search for relevant documents for this users
                 String filterExpression = String.format("userId == '%s'", request.getUserId());
 
                 // We fetch a bit more documents to allow for in-context prioritization of
@@ -72,7 +72,7 @@ public class RagService {
                 List<Document> similarDocuments = vectorStore.similaritySearch(searchRequest);
 
                 if (similarDocuments.isEmpty()) {
-                        return "No previous code history found for this user. Please submit some code first.";
+                        return "No previous code history found for this users. Please submit some code first.";
                 }
 
                 // Sort documents by timestamp if possible, or just rely on the LLM to read the
@@ -86,7 +86,7 @@ public class RagService {
                 String prompt = String.format(
                                 """
                                                 You are a helpful coding mentor.
-                                                Based on the user's previous code and analysis history below, answer the user's question.
+                                                Based on the users's previous code and analysis history below, answer the users's question.
 
                                                 IMPORTANT:
                                                 1. Pay special attention to the 'Timestamp' in each history entry.
@@ -107,7 +107,7 @@ public class RagService {
         }
 
         /**
-         * Retrieves user context (past mistakes, patterns) for RAG-enhanced analysis.
+         * Retrieves users context (past mistakes, patterns) for RAG-enhanced analysis.
          */
         public String retrieveUserContext(String userId) {
                 try {
@@ -130,7 +130,7 @@ public class RagService {
                                         .map(Document::getText)
                                         .collect(Collectors.joining("\n\n---\n\n"));
                 } catch (Exception e) {
-                        log.error("Failed to retrieve user context for userId: {}", userId, e);
+                        log.error("Failed to retrieve users context for userId: {}", userId, e);
                         return "Failed to retrieve history.";
                 }
         }

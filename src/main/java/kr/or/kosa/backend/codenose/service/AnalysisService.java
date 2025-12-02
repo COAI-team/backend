@@ -124,10 +124,10 @@ public class AnalysisService {
 
             // 2. 사용자 컨텍스트 조회 (RAG)
             String userContext = ragService.retrieveUserContext(String.valueOf(requestDto.getUserId()));
-            log.info("Retrieved user context for analysis: {}",
+            log.info("Retrieved users context for analysis: {}",
                     userContext.substring(0, Math.min(userContext.length(), 100)) + "...");
 
-            // 3. 프롬프트 생성 (toneLevel에 따른 시스템 프롬프트 + User Context)
+            // 3. 프롬프트 생성 (toneLevel에 따른 시스템 프롬프트 + Users Context)
             String systemPromptWithTone = PromptGenerator.createSystemPrompt(
                     requestDto.getAnalysisTypes(),
                     requestDto.getToneLevel(),
