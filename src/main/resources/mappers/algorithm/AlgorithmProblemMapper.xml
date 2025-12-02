@@ -125,11 +125,11 @@
             keyColumn="ALGO_PROBLEM_ID">
         INSERT INTO ALGO_PROBLEMS (
             ALGO_PROBLEM_TITLE, ALGO_PROBLEM_DESCRIPTION, ALGO_PROBLEM_DIFFICULTY, ALGO_PROBLEM_SOURCE,
-            PROBLEM_TYPE, INIT_SCRIPT, LANGUAGE, TIMELIMIT, MEMORYLIMIT, ALGO_CREATER,
+            PROBLEM_TYPE, INIT_SCRIPT, TIMELIMIT, MEMORYLIMIT, ALGO_CREATER,
             ALGO_CREATED_AT, ALGO_UPDATED_AT, ALGO_PROBLEM_TAGS, ALGO_PROBLEM_STATUS
         ) VALUES (
             #{algoProblemTitle}, #{algoProblemDescription}, #{algoProblemDifficulty}, #{algoProblemSource},
-            #{problemType,typeHandler=org.apache.ibatis.type.EnumTypeHandler}, #{initScript}, #{language}, #{timelimit}, #{memorylimit}, #{algoCreater},
+            #{problemType,typeHandler=org.apache.ibatis.type.EnumTypeHandler}, #{initScript}, #{timelimit}, #{memorylimit}, #{algoCreater},
             #{algoCreatedAt}, #{algoUpdatedAt}, #{algoProblemTags}, #{algoProblemStatus}
         )
     </insert>
@@ -149,15 +149,17 @@
 
     <!-- 샘플 테스트케이스 조회 -->
     <select id="selectSampleTestCasesByProblemId" resultMap="algoTestcaseResultMap">
-        SELECT * FROM ALGO_TESTCASES
+        SELECT TESTCASE_ID, ALGO_PROBLEM_ID, INPUT_DATA, EXPECTED_OUTPUT, IS_SAMPLE
+        FROM ALGO_TESTCASES
         WHERE ALGO_PROBLEM_ID = #{problemId}
         AND IS_SAMPLE = 1
         ORDER BY TESTCASE_ID ASC
     </select>
 
-    <!-- 모든 테스트케이스 조회 -->
+    <!-- 모든 테스트케이스 조회 (문제 상세용 - 기본 정보만) -->
     <select id="selectTestCasesByProblemId" resultMap="algoTestcaseResultMap">
-        SELECT * FROM ALGO_TESTCASES
+        SELECT TESTCASE_ID, ALGO_PROBLEM_ID, INPUT_DATA, EXPECTED_OUTPUT, IS_SAMPLE
+        FROM ALGO_TESTCASES
         WHERE ALGO_PROBLEM_ID = #{problemId}
         ORDER BY TESTCASE_ID ASC
     </select>

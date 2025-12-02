@@ -3,7 +3,6 @@ package kr.or.kosa.backend.algorithm.service;
 import kr.or.kosa.backend.algorithm.domain.AlgoProblem;
 import kr.or.kosa.backend.algorithm.domain.AlgoSubmission;
 import kr.or.kosa.backend.algorithm.domain.AlgoTestcase;
-import kr.or.kosa.backend.algorithm.domain.ProgrammingLanguage; // ✅ 추가
 import kr.or.kosa.backend.algorithm.dto.SubmissionRequestDto;
 import kr.or.kosa.backend.algorithm.mapper.AlgorithmProblemMapper;
 import kr.or.kosa.backend.algorithm.mapper.AlgorithmSubmissionMapper;
@@ -51,9 +50,8 @@ public class AlgorithmJudgingService {
                             .build())
                     .collect(Collectors.toList());
 
-            // 2. 언어별 제한 시간/메모리 계산 (NEW!)
-            // 매핑 로직이 필요함.
-            String dbLanguageName = mapEnumToDbName(request.getLanguage());
+            // 2. 언어별 제한 시간/메모리 계산
+            String dbLanguageName = request.getLanguage(); // DB 언어명 직접 사용 (예: "Python 3", "Java 17")
 
             int realTimeLimit = languageConstantService.calculateRealTimeLimit(
                     dbLanguageName, problem.getTimelimit());
@@ -65,7 +63,7 @@ public class AlgorithmJudgingService {
 
             // 3. Judge0 채점 실행 (제한 시간/메모리 전달)
             CompletableFuture<Judge0Service.JudgeResultDto> judgeFuture = judge0Service.judgeCode(
-                    request.getSourceCode(), request.getLanguage(), testCaseDtos, realTimeLimit, realMemoryLimit);
+                    request.getSourceCode(), dbLanguageName, testCaseDtos, realTimeLimit, realMemoryLimit);
 
             Judge0Service.JudgeResultDto judgeResult = judgeFuture.get();
 
@@ -154,33 +152,6 @@ public class AlgorithmJudgingService {
     /**
      * ProgrammingLanguage Enum을 DB의 LANGUAGE_CONSTANTS 테이블의 LANGUAGE_NAME으로 매핑
      */
-    private String mapEnumToDbName(ProgrammingLanguage language) {
-        if (language == null)
-            return "Java 17"; // 기본값
-
-        switch (language) {
-            case JAVA:
-                return "Java 17";
-            case PYTHON:
-                return "Python 3";
-            case CPP:
-                return "C++17";
-            case C:
-                return "C11";
-            case JAVASCRIPT:
-                return "node.js"; // 소문자 주의
-            case GOLANG:
-                return "Go";
-            case KOTLIN:
-                return "Kotlin (JVM)";
-            case RUST:
-                return "Rust";
-            case SWIFT:
-                return "Swift";
-            case CSHARP:
-                return "C#";
-            default:
-                return "Java 17"; // Fallback
-        }
-    }
+    // mapEnumToDbName 메서드 제거됨
+    // 이제 request.getLanguage()가 DB 언어명을 직접 반환하므로 Enum 변환 불필요
 }

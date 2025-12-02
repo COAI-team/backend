@@ -53,7 +53,7 @@ public class AlgorithmEvaluationService {
                     codeEvaluationService.evaluateCode(
                             submission.getSourceCode(),
                             problem.getAlgoProblemDescription(),
-                            submission.getLanguage().name(),
+                            submission.getLanguage(),
                             judgeResult.getOverallResult()
                     );
 
