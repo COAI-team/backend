@@ -15,7 +15,9 @@
                 typeHandler="org.apache.ibatis.type.EnumTypeHandler"/>
         <result property="algoProblemSource" column="ALGO_PROBLEM_SOURCE"
                 typeHandler="org.apache.ibatis.type.EnumTypeHandler"/>
-        <result property="language" column="LANGUAGE"/>
+        <result property="problemType" column="PROBLEM_TYPE"
+                typeHandler="org.apache.ibatis.type.EnumTypeHandler"/>
+        <result property="initScript" column="INIT_SCRIPT"/>
         <result property="timelimit" column="TIMELIMIT"/>
         <result property="memorylimit" column="MEMORYLIMIT"/>
         <result property="algoCreater" column="ALGO_CREATER"/>
@@ -32,7 +34,8 @@
         ALGO_PROBLEM_DESCRIPTION,
         ALGO_PROBLEM_DIFFICULTY,
         ALGO_PROBLEM_SOURCE,
-        LANGUAGE,
+        PROBLEM_TYPE,
+        INIT_SCRIPT,
         TIMELIMIT,
         MEMORYLIMIT,
         ALGO_CREATER,
@@ -122,11 +125,11 @@
             keyColumn="ALGO_PROBLEM_ID">
         INSERT INTO ALGO_PROBLEMS (
             ALGO_PROBLEM_TITLE, ALGO_PROBLEM_DESCRIPTION, ALGO_PROBLEM_DIFFICULTY, ALGO_PROBLEM_SOURCE,
-            LANGUAGE, TIMELIMIT, MEMORYLIMIT, ALGO_CREATER,
+            PROBLEM_TYPE, INIT_SCRIPT, LANGUAGE, TIMELIMIT, MEMORYLIMIT, ALGO_CREATER,
             ALGO_CREATED_AT, ALGO_UPDATED_AT, ALGO_PROBLEM_TAGS, ALGO_PROBLEM_STATUS
         ) VALUES (
             #{algoProblemTitle}, #{algoProblemDescription}, #{algoProblemDifficulty}, #{algoProblemSource},
-            #{language}, #{timelimit}, #{memorylimit}, #{algoCreater},
+            #{problemType,typeHandler=org.apache.ibatis.type.EnumTypeHandler}, #{initScript}, #{language}, #{timelimit}, #{memorylimit}, #{algoCreater},
             #{algoCreatedAt}, #{algoUpdatedAt}, #{algoProblemTags}, #{algoProblemStatus}
         )
     </insert>

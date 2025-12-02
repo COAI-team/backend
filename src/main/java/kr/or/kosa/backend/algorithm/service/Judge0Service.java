@@ -1,11 +1,13 @@
 package kr.or.kosa.backend.algorithm.service;
 
 import kr.or.kosa.backend.algorithm.domain.AlgoSubmission;
-import kr.or.kosa.backend.algorithm.domain.AlgoTestcase;
 import kr.or.kosa.backend.algorithm.domain.ProgrammingLanguage;
 import kr.or.kosa.backend.algorithm.dto.Judge0RequestDto;
 import kr.or.kosa.backend.algorithm.dto.Judge0ResponseDto;
-import kr.or.kosa.backend.algorithm.dto.SubmissionResponseDto;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -17,7 +19,6 @@ import org.springframework.web.reactive.function.client.WebClient;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.stream.Collectors;
 
 /**
  * Judge0 API 연동 서비스 (ALG-07 관련) - 수정 버전
@@ -68,10 +69,13 @@ public class Judge0Service {
     public CompletableFuture<JudgeResultDto> judgeCode(
             String sourceCode,
             ProgrammingLanguage language,
-            List<TestCaseDto> testCases) {
+            List<TestCaseDto> testCases,
+            Integer timeLimit,
+            Integer memoryLimit) {
 
         return CompletableFuture.supplyAsync(() -> {
-            log.info("Judge0 채점 시작 - language: {}, testCases: {}", language, testCases.size());
+            log.info("Judge0 채점 시작 - language: {}, testCases: {}, timeLimit: {}ms, memoryLimit: {}MB",
+                    language, testCases.size(), timeLimit, memoryLimit);
 
             List<TestCaseResultDto> results = new ArrayList<>();
             Integer languageId = getLanguageId(language);
@@ -86,7 +90,7 @@ public class Judge0Service {
                     log.debug("테스트케이스 {} 실행 중...", i + 1);
 
                     TestCaseResultDto result = executeSingleTestCase(
-                            sourceCode, languageId, testCase, i + 1);
+                            sourceCode, languageId, testCase, i + 1, timeLimit, memoryLimit);
 
                     results.add(result);
 
@@ -136,21 +140,28 @@ public class Judge0Service {
     /**
      * 단일 테스트케이스 실행
      */
-    @Retryable(value = {Exception.class}, maxAttempts = 3, backoff = @Backoff(delay = 1000))
+    @Retryable(retryFor = { Exception.class }, maxAttempts = 3, backoff = @Backoff(delay = 1000))
     private TestCaseResultDto executeSingleTestCase(
             String sourceCode,
             Integer languageId,
             TestCaseDto testCase,
-            Integer testCaseNumber) {
+            Integer testCaseNumber,
+            Integer timeLimit,
+            Integer memoryLimit) {
 
         // 1. Judge0 요청 DTO
+        // timeLimit (ms) -> cpu_time_limit (seconds) 변환 필요
+        // Judge0는 초 단위 (float) 지원
+        float cpuTimeLimitSec = timeLimit != null ? timeLimit / 1000.0f : this.cpuTimeLimit.floatValue();
+        int memoryLimitKb = memoryLimit != null ? memoryLimit * 1000 : this.memoryLimit; // MB -> KB
+
         Judge0RequestDto request = Judge0RequestDto.builder()
                 .source_code(sourceCode)
                 .language_id(languageId)
                 .stdin(testCase.getInput())
                 .expected_output(testCase.getExpectedOutput())
-                .cpu_time_limit(cpuTimeLimit.intValue())
-                .memory_limit(memoryLimit)
+                .cpu_time_limit(cpuTimeLimitSec)
+                .memory_limit(memoryLimitKb)
                 .enable_per_process_and_thread_time_limit(true)
                 .enable_per_process_and_thread_memory_limit(true)
                 .build();
@@ -189,7 +200,6 @@ public class Judge0Service {
         }
     }
 
-
     /**
      * Judge0 응답 결과 해석
      */
@@ -198,14 +208,13 @@ public class Judge0Service {
             TestCaseDto testCase,
             Integer testCaseNumber) {
 
-        TestCaseResultDto.TestCaseResultDtoBuilder builder =
-                TestCaseResultDto.builder()
-                        .testCaseNumber(testCaseNumber)
-                        .input(testCase.getInput())
-                        .expectedOutput(testCase.getExpectedOutput())
-                        .actualOutput(response.getStdout())
-                        .executionTime(response.getTime() != null ? (int) Math.round(response.getTime() * 1000) : null)
-                        .memoryUsage(response.getMemory() != null ? response.getMemory().intValue() : null);
+        TestCaseResultDto.TestCaseResultDtoBuilder builder = TestCaseResultDto.builder()
+                .testCaseNumber(testCaseNumber)
+                .input(testCase.getInput())
+                .expectedOutput(testCase.getExpectedOutput())
+                .actualOutput(response.getStdout())
+                .executionTime(response.getTime() != null ? (int) Math.round(response.getTime() * 1000) : null)
+                .memoryUsage(response.getMemory() != null ? response.getMemory().intValue() : null);
 
         // 컴파일 에러 확인
         if (response.getCompile_output() != null && !response.getCompile_output().trim().isEmpty()) {
@@ -247,7 +256,8 @@ public class Judge0Service {
             case RE:
                 return builder
                         .result("ERROR")
-                        .errorMessage("런타임 에러: " + (response.getMessage() != null ? response.getMessage() : "알 수 없는 오류"))
+                        .errorMessage(
+                                "런타임 에러: " + (response.getMessage() != null ? response.getMessage() : "알 수 없는 오류"))
                         .build();
             case CE:
                 return builder
@@ -299,10 +309,10 @@ public class Judge0Service {
 
     // DTO 클래스들
 
-    @lombok.Data
-    @lombok.Builder
-    @lombok.NoArgsConstructor
-    @lombok.AllArgsConstructor
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class TestCaseDto {
         private String input;
         private String expectedOutput;
@@ -322,10 +332,10 @@ public class Judge0Service {
         private List<TestCaseResultDto> testCaseResults;
     }
 
-    @lombok.Data
-    @lombok.Builder
-    @lombok.NoArgsConstructor
-    @lombok.AllArgsConstructor
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class TestCaseResultDto {
         private Integer testCaseNumber;
         private String input;

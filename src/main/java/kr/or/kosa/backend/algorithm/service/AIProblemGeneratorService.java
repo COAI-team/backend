@@ -19,9 +19,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -109,46 +107,45 @@ public class AIProblemGeneratorService {
         String difficultyDesc = getDifficultyDescription(request.getDifficulty());
 
         return String.format("""
-            당신은 알고리즘 문제 출제 전문가입니다.
-            다음 조건에 맞는 알고리즘 문제를 **반드시 JSON 형식으로만** 생성해주세요.
-            
-            ## 요구사항
-            - 난이도: %s
-            - 주제: %s
-            - 언어: %s
-            %s
-            
-            ## 중요 규칙
-            1. 문제는 실제 코딩 테스트 수준으로 작성
-            2. 테스트케이스는 최소 3개 이상 포함
-            3. 입출력 예제는 명확하게 작성
-            4. **JSON 형식 외 다른 텍스트 절대 포함 금지**
-            
-            ## 응답 형식 (반드시 이 JSON 구조로만 응답)
-            {
-              "title": "문제 제목",
-              "description": "문제 설명 (자세하게)",
-              "constraints": "제약 조건",
-              "inputFormat": "입력 형식 설명",
-              "outputFormat": "출력 형식 설명",
-              "sampleInput": "1 2",
-              "sampleOutput": "3",
-              "testCases": [
-                {"input": "3 4", "output": "7"},
-                {"input": "5 7", "output": "12"},
-                {"input": "10 20", "output": "30"}
-              ]
-            }
-            
-            **주의**: JSON만 출력하고 다른 설명은 절대 포함하지 마세요!
-            """,
+                당신은 알고리즘 문제 출제 전문가입니다.
+                다음 조건에 맞는 알고리즘 문제를 **반드시 JSON 형식으로만** 생성해주세요.
+
+                ## 요구사항
+                - 난이도: %s
+                - 주제: %s
+                - 언어: %s
+                %s
+
+                ## 중요 규칙
+                1. 문제는 실제 코딩 테스트 수준으로 작성
+                2. 테스트케이스는 최소 3개 이상 포함
+                3. 입출력 예제는 명확하게 작성
+                4. **JSON 형식 외 다른 텍스트 절대 포함 금지**
+
+                ## 응답 형식 (반드시 이 JSON 구조로만 응답)
+                {
+                  "title": "문제 제목",
+                  "description": "문제 설명 (자세하게)",
+                  "constraints": "제약 조건",
+                  "inputFormat": "입력 형식 설명",
+                  "outputFormat": "출력 형식 설명",
+                  "sampleInput": "1 2",
+                  "sampleOutput": "3",
+                  "testCases": [
+                    {"input": "3 4", "output": "7"},
+                    {"input": "5 7", "output": "12"},
+                    {"input": "10 20", "output": "30"}
+                  ]
+                }
+
+                **주의**: JSON만 출력하고 다른 설명은 절대 포함하지 마세요!
+                """,
                 difficultyDesc,
                 request.getTopic(),
                 request.getLanguage(),
                 request.getAdditionalRequirements() != null
                         ? "- 추가 요구사항: " + request.getAdditionalRequirements()
-                        : ""
-        );
+                        : "");
     }
 
     /**
@@ -182,7 +179,7 @@ public class AIProblemGeneratorService {
                 .algoProblemDescription(buildFullDescription(jsonNode))
                 .algoProblemDifficulty(request.getDifficulty())
                 .algoProblemSource(ProblemSource.AI_GENERATED)
-                .language(request.getLanguage())
+                .problemType(kr.or.kosa.backend.algorithm.domain.ProblemType.ALGORITHM) // 기본값: ALGORITHM
                 .timelimit(request.getTimeLimit() != null
                         ? request.getTimeLimit()
                         : getDefaultTimeLimit(request.getDifficulty()))
@@ -230,19 +227,19 @@ public class AIProblemGeneratorService {
     private String buildFullDescription(JsonNode jsonNode) {
         return String.format("""
                 %s
-                
+
                 **입력**
                 %s
-                
+
                 **출력**
                 %s
-                
+
                 **제한 사항**
                 %s
-                
+
                 **예제 입력**
                 %s
-                
+
                 **예제 출력**
                 %s
                 """,
@@ -251,8 +248,7 @@ public class AIProblemGeneratorService {
                 jsonNode.get("outputFormat").asText(),
                 jsonNode.get("constraints").asText(),
                 jsonNode.get("sampleInput").asText(),
-                jsonNode.get("sampleOutput").asText()
-        );
+                jsonNode.get("sampleOutput").asText());
     }
 
     /**
@@ -286,8 +282,7 @@ public class AIProblemGeneratorService {
                                 .inputData(testCase.get("input").asText())
                                 .expectedOutput(testCase.get("output").asText())
                                 .isSample(false)
-                                .build()
-                );
+                                .build());
             }
         }
 

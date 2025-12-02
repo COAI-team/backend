@@ -3,6 +3,7 @@ package kr.or.kosa.backend.algorithm.service;
 import kr.or.kosa.backend.algorithm.domain.AlgoProblem;
 import kr.or.kosa.backend.algorithm.domain.AlgoSubmission;
 import kr.or.kosa.backend.algorithm.domain.AlgoTestcase;
+import kr.or.kosa.backend.algorithm.domain.ProgrammingLanguage; // ✅ 추가
 import kr.or.kosa.backend.algorithm.dto.SubmissionRequestDto;
 import kr.or.kosa.backend.algorithm.mapper.AlgorithmProblemMapper;
 import kr.or.kosa.backend.algorithm.mapper.AlgorithmSubmissionMapper;
@@ -28,6 +29,7 @@ public class AlgorithmJudgingService {
     private final AlgorithmProblemMapper problemMapper;
     private final Judge0Service judge0Service;
     private final AlgorithmEvaluationService evaluationService;
+    private final LanguageConstantService languageConstantService; // ✅ 추가
 
     /**
      * 통합 채점 및 평가 프로세스 (비동기)
@@ -49,9 +51,21 @@ public class AlgorithmJudgingService {
                             .build())
                     .collect(Collectors.toList());
 
-            // 2. Judge0 채점 실행
-            CompletableFuture<Judge0Service.JudgeResultDto> judgeFuture =
-                    judge0Service.judgeCode(request.getSourceCode(), request.getLanguage(), testCaseDtos);
+            // 2. 언어별 제한 시간/메모리 계산 (NEW!)
+            // 매핑 로직이 필요함.
+            String dbLanguageName = mapEnumToDbName(request.getLanguage());
+
+            int realTimeLimit = languageConstantService.calculateRealTimeLimit(
+                    dbLanguageName, problem.getTimelimit());
+            int realMemoryLimit = languageConstantService.calculateRealMemoryLimit(
+                    dbLanguageName, problem.getMemorylimit());
+
+            log.info("언어별 제한 적용 - 언어: {}, 시간: {}ms, 메모리: {}MB",
+                    dbLanguageName, realTimeLimit, realMemoryLimit);
+
+            // 3. Judge0 채점 실행 (제한 시간/메모리 전달)
+            CompletableFuture<Judge0Service.JudgeResultDto> judgeFuture = judge0Service.judgeCode(
+                    request.getSourceCode(), request.getLanguage(), testCaseDtos, realTimeLimit, realMemoryLimit);
 
             Judge0Service.JudgeResultDto judgeResult = judgeFuture.get();
 
@@ -72,14 +86,14 @@ public class AlgorithmJudgingService {
         }
     }
 
-
     /**
      * Judge 결과로만 제출 업데이트 (기본 점수)
      */
     private void updateSubmissionWithJudgeResult(Long submissionId, Judge0Service.JudgeResultDto judgeResult,
-                                                 SubmissionRequestDto request) {
+            SubmissionRequestDto request) {
         AlgoSubmission submission = submissionMapper.selectSubmissionById(submissionId);
-        if (submission == null) return;
+        if (submission == null)
+            return;
 
         // Judge 결과 설정
         submission.setJudgeResult(AlgoSubmission.JudgeResult.valueOf(judgeResult.getOverallResult()));
@@ -135,5 +149,38 @@ public class AlgorithmJudgingService {
         }
 
         return BigDecimal.ZERO;
+    }
+
+    /**
+     * ProgrammingLanguage Enum을 DB의 LANGUAGE_CONSTANTS 테이블의 LANGUAGE_NAME으로 매핑
+     */
+    private String mapEnumToDbName(ProgrammingLanguage language) {
+        if (language == null)
+            return "Java 17"; // 기본값
+
+        switch (language) {
+            case JAVA:
+                return "Java 17";
+            case PYTHON:
+                return "Python 3";
+            case CPP:
+                return "C++17";
+            case C:
+                return "C11";
+            case JAVASCRIPT:
+                return "node.js"; // 소문자 주의
+            case GOLANG:
+                return "Go";
+            case KOTLIN:
+                return "Kotlin (JVM)";
+            case RUST:
+                return "Rust";
+            case SWIFT:
+                return "Swift";
+            case CSHARP:
+                return "C#";
+            default:
+                return "Java 17"; // Fallback
+        }
     }
 }

@@ -137,7 +137,12 @@ public class AlgorithmProblemService {
                 throw new RuntimeException("존재하지 않는 문제입니다. ID: " + problemId);
             }
 
-            log.debug("문제 상세 조회 완료 - problemId: {}, title: {}", problemId, problem.getAlgoProblemTitle());
+            // 테스트케이스 조회 및 설정
+            List<AlgoTestcase> testcases = algorithmProblemMapper.selectTestCasesByProblemId(problemId);
+            problem.setTestcases(testcases);
+
+            log.debug("문제 상세 조회 완료 - problemId: {}, title: {}, testcases: {}",
+                    problemId, problem.getAlgoProblemTitle(), testcases != null ? testcases.size() : 0);
 
             return problem;
 

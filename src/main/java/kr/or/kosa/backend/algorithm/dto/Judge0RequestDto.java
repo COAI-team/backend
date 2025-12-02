@@ -18,7 +18,7 @@ public class Judge0RequestDto {
     private Integer language_id;
     private String stdin;
     private String expected_output;
-    private Integer cpu_time_limit;
+    private Float cpu_time_limit;
     private Integer memory_limit;
     private Boolean enable_per_process_and_thread_time_limit;
     private Boolean enable_per_process_and_thread_memory_limit;

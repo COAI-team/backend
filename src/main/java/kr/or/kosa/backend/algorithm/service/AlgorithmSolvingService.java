@@ -3,6 +3,9 @@ package kr.or.kosa.backend.algorithm.service;
 import kr.or.kosa.backend.algorithm.domain.AlgoProblem;
 import kr.or.kosa.backend.algorithm.domain.AlgoSubmission;
 import kr.or.kosa.backend.algorithm.domain.AlgoTestcase;
+import kr.or.kosa.backend.algorithm.domain.LanguageConstant;
+import kr.or.kosa.backend.algorithm.domain.LanguageType;
+import kr.or.kosa.backend.algorithm.domain.ProblemType;
 import kr.or.kosa.backend.algorithm.domain.ProgrammingLanguage;
 import kr.or.kosa.backend.algorithm.dto.*;
 import kr.or.kosa.backend.algorithm.mapper.AlgorithmProblemMapper;
@@ -39,8 +42,8 @@ public class AlgorithmSolvingService {
     private final AlgorithmProblemMapper problemMapper;
     private final AlgorithmSubmissionMapper submissionMapper;
     private final Judge0Service judge0Service;
-    private final AlgorithmEvaluationService evaluationService; //
     private final AlgorithmJudgingService judgingService;
+    private final LanguageConstantService languageConstantService;
 
     /**
      * 문제 풀이 시작 (ALG-04)
@@ -64,6 +67,35 @@ public class AlgorithmSolvingService {
         // 4. Eye Tracking 세션 ID 생성
         String sessionId = UUID.randomUUID().toString();
 
+        // 5. 언어별 제한 정보 구성 (NEW!)
+        ProblemType problemType = problem.getProblemType();
+        LanguageType languageType = (problemType == ProblemType.SQL)
+                ? LanguageType.DB
+                : LanguageType.GENERAL;
+
+        List<LanguageConstant> constants = languageConstantService.getLanguagesByType(languageType);
+
+        List<ProblemSolveResponseDto.LanguageOption> availableLanguages = constants.stream()
+                .map(lc -> ProblemSolveResponseDto.LanguageOption.builder()
+                        .languageName(lc.getLanguageName())
+                        // 제출용 값 매핑 필요 (DB 이름 -> Enum 이름 or 그대로)
+                        // 여기서는 프론트엔드가 DB 이름을 그대로 사용하도록 하거나, 별도 매핑이 필요함.
+                        // 기존에는 ProgrammingLanguage Enum을 사용했음.
+                        // 프론트엔드가 "Java"를 보내면 백엔드가 "JAVA" Enum으로 변환함.
+                        // 따라서 여기서 value는 Enum name이어야 함.
+                        // 하지만 DB에는 "Java 17" 등으로 저장되어 있음.
+                        // 역매핑이 필요하거나, 프론트엔드가 "Java 17"을 보내고 백엔드가 이를 처리하도록 변경해야 함.
+                        // 일단은 value에 DB 이름을 그대로 넣고, 프론트엔드에서 이를 선택하게 하고,
+                        // 제출 시 백엔드에서 이를 적절히 처리하도록 하는게 좋음.
+                        // 하지만 기존 로직은 ProgrammingLanguage Enum을 사용함.
+                        // 임시로 value를 languageName과 동일하게 설정하고, 제출 시 처리를 고민해야 함.
+                        // 또는 ProgrammingLanguage Enum을 순회하며 매칭되는 것을 찾을 수도 있음.
+                        .value(mapDbNameToEnumValue(lc.getLanguageName()))
+                        .timeLimit(lc.calculateRealTimeLimit(problem.getTimelimit()))
+                        .memoryLimit(lc.calculateRealMemoryLimit(problem.getMemorylimit()))
+                        .build())
+                .collect(Collectors.toList());
+
         return ProblemSolveResponseDto.builder()
                 .problemId(problem.getAlgoProblemId())
                 .title(problem.getAlgoProblemTitle())
@@ -71,11 +103,45 @@ public class AlgorithmSolvingService {
                 .difficulty(problem.getAlgoProblemDifficulty().name())
                 .timeLimit(problem.getTimelimit())
                 .memoryLimit(problem.getMemorylimit())
+                .problemType(problemType != null ? problemType.name() : "ALGORITHM")
+                .initScript(problem.getInitScript())
+                .availableLanguages(availableLanguages)
                 .sampleTestCases(convertToTestCaseDtos(sampleTestCases))
                 .sessionStartTime(LocalDateTime.now())
                 .sessionId(sessionId)
                 .previousSubmission(convertToPreviousSubmission(previousSubmission))
                 .build();
+    }
+
+    // DB 언어명을 프론트엔드용 값(Enum name 등)으로 매핑하는 헬퍼
+    private String mapDbNameToEnumValue(String dbLanguageName) {
+        // 간단한 매핑 로직 (필요 시 확장)
+        if (dbLanguageName.startsWith("Java"))
+            return "JAVA";
+        if (dbLanguageName.startsWith("Python"))
+            return "PYTHON";
+        if (dbLanguageName.startsWith("C++"))
+            return "CPP";
+        if (dbLanguageName.startsWith("C"))
+            return "C"; // C++보다 뒤에 와야 함
+        if (dbLanguageName.toLowerCase().contains("node"))
+            return "JAVASCRIPT";
+        if (dbLanguageName.equals("Go"))
+            return "GOLANG";
+        if (dbLanguageName.startsWith("Kotlin"))
+            return "KOTLIN";
+        if (dbLanguageName.startsWith("Rust"))
+            return "RUST";
+        if (dbLanguageName.startsWith("Swift"))
+            return "SWIFT";
+        if (dbLanguageName.equals("C#"))
+            return "CSHARP";
+
+        // SQL 언어
+        if (dbLanguageName.equalsIgnoreCase("MySQL"))
+            return "MYSQL";
+
+        return dbLanguageName.toUpperCase(); // Fallback
     }
 
     /**
@@ -153,8 +219,21 @@ public class AlgorithmSolvingService {
 
         // 5. Judge0 실행
         try {
+            // 언어별 제한 시간/메모리 계산
+            String dbLanguageName = mapEnumToDbName(language);
+            LanguageConstant constant = languageConstantService
+                    .getByLanguageName(dbLanguageName);
+
+            Integer realTimeLimit = constant != null
+                    ? constant.calculateRealTimeLimit(problem.getTimelimit())
+                    : problem.getTimelimit();
+
+            Integer realMemoryLimit = constant != null
+                    ? constant.calculateRealMemoryLimit(problem.getMemorylimit())
+                    : problem.getMemorylimit();
+
             CompletableFuture<Judge0Service.JudgeResultDto> judgeFuture = judge0Service
-                    .judgeCode(request.getSourceCode(), language, testCaseDtos);
+                    .judgeCode(request.getSourceCode(), language, testCaseDtos, realTimeLimit, realMemoryLimit);
 
             Judge0Service.JudgeResultDto judgeResult = judgeFuture.get();
 
@@ -380,5 +459,39 @@ public class AlgorithmSolvingService {
         }
 
         return BigDecimal.ZERO;
+    }
+
+    /**
+     * ProgrammingLanguage Enum을 DB의 LANGUAGE_CONSTANTS 테이블의 LANGUAGE_NAME으로 매핑
+     * (AlgorithmJudgingService와 동일한 로직)
+     */
+    private String mapEnumToDbName(ProgrammingLanguage language) {
+        if (language == null)
+            return "Java 17"; // 기본값
+
+        switch (language) {
+            case JAVA:
+                return "Java 17";
+            case PYTHON:
+                return "Python 3";
+            case CPP:
+                return "C++17";
+            case C:
+                return "C11";
+            case JAVASCRIPT:
+                return "node.js";
+            case GOLANG:
+                return "Go";
+            case KOTLIN:
+                return "Kotlin (JVM)";
+            case RUST:
+                return "Rust";
+            case SWIFT:
+                return "Swift";
+            case CSHARP:
+                return "C#";
+            default:
+                return "Java 17"; // Fallback
+        }
     }
 }
