@@ -33,22 +33,22 @@ public class PaymentsServiceImpl implements PaymentsService {
     }
 
     /**
-     * READY ???+ (?ъ씤???꾩븸 寃곗젣?쇰㈃) 利됱떆 DONE 泥섎━
+     * READY 저장 + (포인트 전액 결제라면) 즉시 DONE 처리
      */
     @Override
     @Transactional
     public Payments savePayment(Payments payments) {
 
-        // 0) ?좎?/二쇰Ц 湲곕낯 寃利?+ orderId ?명똿
+        // 0) 유저/주문 기본 검증 + orderId 세팅
         String userId = validateUserAndInitOrderId(payments);
 
-        // 理쒓렐 ?섎텋 ?대젰???곕Ⅸ 李⑤떒
+        // 최근 환불 이력에 따른 차단
         if (isUserInRefundBan(userId)) {
             throw new IllegalArgumentException(
-                    "理쒓렐 2???곗냽 ?섎텋濡??명빐 1媛쒖썡 ?숈븞 寃곗젣媛 ?쒗븳??怨꾩젙?낅땲??");
+                    "최근 2회 연속 환불로 인해 1개월 동안 결제가 제한된 계정입니다.");
         }
 
-        // 1) 湲덉븸/?ъ씤???뺢퇋??+ ?좏슚??寃??+ ?ъ씤???붿븸 寃利?
+        // 1) 금액/포인트 정규화 + 유효성 검사 + 포인트 잔액 검증
         boolean pointOnly = normalizeAmountsAndValidate(payments, userId);
 
         // 2) DB ?? (idempotent)
@@ -79,28 +79,28 @@ public class PaymentsServiceImpl implements PaymentsService {
     public Payments confirmAndSavePayment(String paymentKey, String orderId, Long amount) {
 
         Payments existingPayment = paymentsMapper.findPaymentByOrderId(orderId)
-                .orElseThrow(() -> new IllegalArgumentException("二쇰Ц ?뺣낫瑜?李얠쓣 ???놁뒿?덈떎."));
+                .orElseThrow(() -> new IllegalArgumentException("주문 정보를 찾을 수 없습니다."));
 
-        // ?대? DONE?대㈃ 洹몃?濡?諛섑솚 (硫깅벑??
+        // 이미 DONE이면 그대로 반환 (멱등성)
         if ("DONE".equals(existingPayment.getStatus())) {
             return existingPayment;
         }
 
         if (!"READY".equals(existingPayment.getStatus())) {
             throw new IllegalStateException(
-                    "寃곗젣 ?곹깭媛 ?뱀씤 媛?ν븳 ?곹깭媛 ?꾨떃?덈떎. ?꾩옱 ?곹깭: " + existingPayment.getStatus());
+                    "결제 상태가 승인 가능한 상태가 아닙니다. 현재 상태: " + existingPayment.getStatus());
         }
 
-        // BigDecimal ??Long 鍮꾧탳
+        // BigDecimal ↔ Long 비교
         BigDecimal storedAmount = existingPayment.getAmount();
         if (storedAmount == null) {
-            throw new IllegalStateException("?쒕쾭????λ맂 寃곗젣 湲덉븸???놁뒿?덈떎.");
+            throw new IllegalStateException("서버에 저장된 결제 금액이 없습니다.");
         }
         if (storedAmount.compareTo(BigDecimal.valueOf(amount)) != 0) {
-            throw new IllegalStateException("?붿껌 湲덉븸???쒕쾭????λ맂 湲덉븸怨??쇱튂?섏? ?딆뒿?덈떎.");
+            throw new IllegalStateException("요청 금액이 서버에 저장된 금액과 일치하지 않습니다.");
         }
 
-        // ?좎뒪 ?뱀씤 API ?몄텧 (?몃? ?대씪?댁뼵?몄뿉 ?꾩엫)
+        // 토스 승인 API 호출 (외부 클라이언트에 위임)
         TossConfirmResult tossResult =
                 tossPaymentsClient.confirmPayment(paymentKey, orderId, amount);
 
@@ -117,7 +117,7 @@ public class PaymentsServiceImpl implements PaymentsService {
 
         paymentsMapper.updatePaymentStatus(confirmedPayment);
 
-        // ?ъ씤???ㅼ젣 李④컧
+        // 포인트 실제 차감
         String userId = existingPayment.getUserId();
         BigDecimal usedPoint = nvl(existingPayment.getUsedPoint());
         if (userId != null && !userId.isEmpty()
@@ -125,11 +125,11 @@ public class PaymentsServiceImpl implements PaymentsService {
             pointService.usePoint(userId, usedPoint, orderId);
         }
 
-        // 援щ룆沅??쒖꽦??
+        // 구독권 활성화
         subscriptionDomainService.grantSubscriptionToUser(orderId);
 
         return paymentsMapper.findPaymentByOrderId(orderId).orElseThrow(() ->
-                new IllegalStateException("?뱀씤?섏뿀?쇰굹 DB?먯꽌 理쒖쥌 議고쉶 ?ㅽ뙣"));
+                new IllegalStateException("승인되었으나 DB에서 최종 조회 실패"));
     }
 
     @Override
@@ -144,23 +144,23 @@ public class PaymentsServiceImpl implements PaymentsService {
 
         Payments paymentToCancel = paymentsMapper.findPaymentByPaymentKey(paymentKey)
                 .orElseThrow(() ->
-                        new IllegalArgumentException("痍⑥냼??寃곗젣 ?뺣낫瑜?李얠쓣 ???놁뒿?덈떎."));
+                        new IllegalArgumentException("취소할 결제 정보를 찾을 수 없습니다."));
 
         if ("CANCELED".equals(paymentToCancel.getStatus())) {
-            throw new IllegalStateException("?대? 痍⑥냼??寃곗젣?낅땲??");
+            throw new IllegalStateException("이미 취소된 결제입니다.");
         }
 
         if (!"DONE".equals(paymentToCancel.getStatus())) {
             throw new IllegalStateException(
-                    "寃곗젣 ?꾨즺 ?곹깭?먯꽌留??섎텋?????덉뒿?덈떎. (?꾩옱 ?곹깭: " + paymentToCancel.getStatus() + ")");
+                    "결제 완료 상태에서만 환불할 수 있습니다. (현재 상태: " + paymentToCancel.getStatus() + ")");
         }
 
         LocalDateTime requestedAt = paymentToCancel.getRequestedAt();
-        if (requestedAt != null && requestedAt.isBefore(LocalDateTime.now().minusDays(7))) {
-            throw new IllegalArgumentException("寃곗젣 ??7?쇱씠 吏??嫄댁? ?섎텋?????놁뒿?덈떎.");
+        if (requestedAt.isBefore(LocalDateTime.now().minusDays(7))) {
+            throw new IllegalArgumentException("결제 후 7일이 지난 건은 환불할 수 없습니다.");
         }
 
-        // ?좎뒪 ?섎텋 API ?몄텧
+        // 토스 환불 API 호출
         String newStatus = tossPaymentsClient.cancelPayment(paymentKey, cancelReason);
 
         paymentsMapper.updatePaymentStatusToCanceled(paymentToCancel.getOrderId(), newStatus);
@@ -177,15 +177,15 @@ public class PaymentsServiceImpl implements PaymentsService {
                 .orElse(paymentToCancel);
     }
 
-    // ================== ??븷蹂?private 硫붿냼??==================
+    // ================== 역할별 private 메소드 ==================
 
     private String validateUserAndInitOrderId(Payments payments) {
         String userId = payments.getUserId();
         if (userId == null || userId.isBlank()) {
-            throw new IllegalArgumentException("寃곗젣瑜?吏꾪뻾?섎젮硫?userId媛 ?꾩슂?⑸땲??");
+            throw new IllegalArgumentException("결제를 진행하려면 userId가 필요합니다.");
         }
 
-        // orderId ?놁쑝硫??쒕쾭?먯꽌 ?앹꽦
+        // orderId 없으면 서버에서 생성
         if (payments.getOrderId() == null || payments.getOrderId().isBlank()) {
             String newOrderId = "ORD-" + System.currentTimeMillis()
                     + "-" + UUID.randomUUID().toString().substring(0, 8);
@@ -195,7 +195,7 @@ public class PaymentsServiceImpl implements PaymentsService {
     }
 
     /**
-     * 湲덉븸/?ъ씤???뺢퇋??+ ?좏슚??寃??+ ?ъ씤???붿븸 寃利?
+     * 금액/포인트 정규화 + 유효성 검사 + 포인트 잔액 검증
      */
     
     private boolean normalizeAmountsAndValidate(Payments payments, String userId) {
@@ -212,17 +212,11 @@ public class PaymentsServiceImpl implements PaymentsService {
             serverPrice = upgradeExtra;
         }
 
-        // 비활성 플랜이거나 가격이 0 이하인데 FREE/업그레이드 예외도 아니라면 차단
-        if (serverPrice.compareTo(BigDecimal.ZERO) <= 0
-                && !"FREE".equalsIgnoreCase(payments.getPlanCode())) {
-            throw new IllegalArgumentException("유효하지 않은 결제 플랜 코드입니다: " + payments.getPlanCode());
-        }
-
         originalAmount = applyServerPriceIfNecessary(
                 payments, originalAmount, clientAmount, usedPoint, serverPrice
         );
 
-        // ?ъ슜 ?ъ씤?멸? ?먭툑蹂대떎 ?щ㈃ ?먭툑源뚯?留??ъ슜?섎룄濡??쒕쾭?먯꽌 蹂댁젙
+        // 사용 포인트가 원금보다 크면 원금까지만 사용하도록 서버에서 보정
         if (usedPoint.compareTo(originalAmount) > 0) {
             usedPoint = originalAmount;
         }
@@ -290,18 +284,18 @@ public class PaymentsServiceImpl implements PaymentsService {
                                                    BigDecimal serverPrice) {
 
         if (serverPrice.compareTo(BigDecimal.ZERO) > 0) {
-            // ?쒕쾭 ?뺢?媛 ?덈뒗 ?뚮옖
+            // 서버 정가가 있는 플랜
             payments.setOriginalAmount(serverPrice);
             return serverPrice;
         }
 
-        // ?쒕쾭 ?뺢?媛 ?녿뒗 ?뱀닔 耳?댁뒪 + ?ъ씤??誘몄궗?????대씪 amount 瑜??먭?濡??ъ슜
+        // 서버 정가가 없는 특수 케이스 + 포인트 미사용 → 클라 amount 를 원가로 사용
         if (serverPrice.compareTo(BigDecimal.ZERO) <= 0
                 && originalAmount.compareTo(BigDecimal.ZERO) <= 0
                 && usedPoint.compareTo(BigDecimal.ZERO) == 0) {
 
             if (clientAmount.compareTo(BigDecimal.ZERO) <= 0) {
-                throw new IllegalArgumentException("寃곗젣 湲덉븸???щ컮瑜댁? ?딆뒿?덈떎.");
+                throw new IllegalArgumentException("결제 금액이 올바르지 않습니다.");
             }
             payments.setOriginalAmount(clientAmount);
             return clientAmount;
@@ -312,18 +306,18 @@ public class PaymentsServiceImpl implements PaymentsService {
 
     private void validateAmountRanges(BigDecimal originalAmount, BigDecimal usedPoint) {
         if (originalAmount.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException("?먮옒 寃곗젣 湲덉븸???щ컮瑜댁? ?딆뒿?덈떎.");
+            throw new IllegalArgumentException("원래 결제 금액이 올바르지 않습니다.");
         }
         if (usedPoint.compareTo(BigDecimal.ZERO) < 0) {
-            throw new IllegalArgumentException("?ъ슜 ?ъ씤?몃뒗 0蹂대떎 ?묒쓣 ???놁뒿?덈떎.");
+            throw new IllegalArgumentException("사용 포인트는 0보다 작을 수 없습니다.");
         }
         if (usedPoint.compareTo(originalAmount) > 0) {
-            throw new IllegalArgumentException("?ъ슜 ?ъ씤?멸? 寃곗젣 湲덉븸蹂대떎 ?????놁뒿?덈떎.");
+            throw new IllegalArgumentException("사용 포인트가 결제 금액보다 클 수 없습니다.");
         }
     }
 
     /**
-     * 寃곗젣 row upsert (INSERT or UPDATE), DONE ?곹깭硫?湲곗〈 row ?ъ궗??
+     * 결제 row upsert (INSERT or UPDATE), DONE 상태면 기존 row 재사용
      */
     private Payments upsertPayment(Payments payments) {
         Optional<Payments> existingOpt =
@@ -336,7 +330,7 @@ public class PaymentsServiceImpl implements PaymentsService {
 
         Payments existing = existingOpt.get();
 
-        // ?대? DONE?대㈃ ?ㅼ떆 泥섎━ X (?ъ씤??援щ룆 以묐났 諛⑹?)
+        // 이미 DONE이면 다시 처리 X (포인트/구독 중복 방지)
         if ("DONE".equalsIgnoreCase(existing.getStatus())) {
             return existing;
         }
@@ -351,24 +345,24 @@ public class PaymentsServiceImpl implements PaymentsService {
         existing.setStatus(payments.getStatus());
         existing.setRequestedAt(payments.getRequestedAt());
 
-        // ?대쫫? READY吏留?status ?꾨뱶???곕씪 DONE ?????媛??
+        // 이름은 READY지만 status 필드에 따라 DONE 도 저장 가능
         paymentsMapper.updatePaymentForReady(existing);
         return existing;
     }
 
     /**
-     * ?ъ씤???꾩븸 寃곗젣 ?뚮줈??泥섎━
+     * 포인트 전액 결제 플로우 처리
      */
     private void handlePointOnlyFlow(String userId, Payments persisted) {
 
         BigDecimal usedPoint = nvl(persisted.getUsedPoint());
 
-        // ?ъ씤??李④컧
+        // 포인트 차감
         if (usedPoint.compareTo(BigDecimal.ZERO) > 0) {
             pointService.usePoint(userId, usedPoint, persisted.getOrderId());
         }
 
-        // 寃곗젣?섎떒/?뱀씤 ?뺣낫 媛꾨떒 湲곕줉
+        // 결제수단/승인 정보 간단 기록
         Payments doneUpdate = Payments.builder()
                 .orderId(persisted.getOrderId())
                 .paymentKey(null)
@@ -380,13 +374,13 @@ public class PaymentsServiceImpl implements PaymentsService {
 
         paymentsMapper.updatePaymentStatus(doneUpdate);
 
-        // 援щ룆沅?遺??
+        // 구독권 부여
         subscriptionDomainService.grantSubscriptionToUser(persisted.getOrderId());
 
         persisted.setStatus("DONE");
     }
 
-    // ================== 怨듯넻 ?좏떥 ==================
+    // ================== 공통 유틸 ==================
 
     private boolean isUserInRefundBan(String userId) {
         List<Payments> recent = paymentsMapper.findRecentPaymentsByUser(userId, 2);
@@ -414,5 +408,3 @@ public class PaymentsServiceImpl implements PaymentsService {
         return value != null ? value : BigDecimal.ZERO;
     }
 }
-
-

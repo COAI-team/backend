@@ -115,5 +115,4 @@
         AND status = 'ACTIVE'
         AND end_date &lt;= NOW()
     </update>
-
 </mapper>
