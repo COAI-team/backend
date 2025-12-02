@@ -1,13 +1,18 @@
 package kr.or.kosa.backend.pay.dto;
 
-import lombok.*;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
+import lombok.ToString;
+
 import java.math.BigDecimal;
 
 @Getter
-@Setter
+@Builder
+@ToString
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
 public class UpgradeQuoteResponse {
 
     // 업그레이드 상황인지 여부 (BASIC → PRO 인 상태인지)
@@ -22,7 +27,7 @@ public class UpgradeQuoteResponse {
     private long remainingDays;
 
     // 이번에 결제해야 할 추가 금액 (원)
-    private BigDecimal extraAmount;   // ✅ int → BigDecimal
+    private BigDecimal extraAmount;
 
     // 기존 BASIC 구독 종료일 (표시용)
     private String basicEndDate;

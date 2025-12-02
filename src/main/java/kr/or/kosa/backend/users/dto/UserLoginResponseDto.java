@@ -1,4 +1,4 @@
-package kr.or.kosa.backend.user.dto;
+package kr.or.kosa.backend.users.dto;
 
 import lombok.Builder;
 import lombok.Getter;

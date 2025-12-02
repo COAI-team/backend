@@ -1,4 +1,4 @@
-package kr.or.kosa.backend.user.service;
+package kr.or.kosa.backend.users.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -77,25 +77,10 @@ public class EmailVerificationServiceImpl implements EmailVerificationService {
     /** 이메일 전송 - void → boolean */
     @Override
     public boolean send(String to, String subject, String text) {
-        try {
-            emailSender.sendEmail(to, subject, text);
-            return true;
-        } catch (Exception e) {
-            log.error("Email sending failed: {}", e.getMessage());
-            return false;
+        boolean sent = emailSender.sendEmail(to, subject, text);
+        if (!sent) {
+            log.error("Email sending failed (returned false)");
         }
-    }
-
-    /** 인증 정보 삭제 - void → boolean */
-    @Override
-    public boolean clearVerification(String email) {
-        try {
-            redisTemplate.delete(VERIFY_CODE_PREFIX + email);
-            redisTemplate.delete(VERIFIED_PREFIX + email);
-            return true;
-        } catch (Exception e) {
-            log.error("Failed to clear verification: {}", e.getMessage());
-            return false;
-        }
+        return sent;
     }
 }

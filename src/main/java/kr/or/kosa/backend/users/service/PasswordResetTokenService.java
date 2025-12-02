@@ -1,4 +1,4 @@
-package kr.or.kosa.backend.user.service;
+package kr.or.kosa.backend.users.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

@@ -6,6 +6,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Getter
 @NoArgsConstructor
@@ -15,8 +16,9 @@ public class FreeboardListDto {
     private Long freeboardId;
     private Long userId;
     private String freeboardTitle;
-    private String freeboardSummary;  // 미리보기용 요약
+    private String freeboardSummary;          // 미리보기용 요약
     private String freeboardRepresentImage;
     private Long freeboardClick;
+    private List<String> tags;
     private LocalDateTime freeboardCreatedAt;
 }

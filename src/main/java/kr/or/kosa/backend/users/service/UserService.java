@@ -1,6 +1,8 @@
-package kr.or.kosa.backend.user.service;
+package kr.or.kosa.backend.users.service;
 
-import kr.or.kosa.backend.user.dto.*;
+import kr.or.kosa.backend.auth.github.dto.GitHubUserResponse;
+import kr.or.kosa.backend.users.domain.Users;
+import kr.or.kosa.backend.users.dto.*;
 import org.springframework.web.multipart.MultipartFile;
 
 public interface UserService {
@@ -23,11 +25,11 @@ public interface UserService {
 
     UserResponseDto updateUserInfo(Long userId, UserUpdateRequestDto dto, MultipartFile image);
 
-    String updateEmail(Long userId, String newEmail);
-
     UserResponseDto getUserInfo(Long userId);
 
     boolean requestDelete(Long userId);
 
     boolean restoreUser(Long userId);
+
+    Users githubLogin(GitHubUserResponse gitHubUser);
 }

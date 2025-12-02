@@ -102,5 +102,4 @@
           AND end_date &lt;= NOW()
 
     </update>
-
 </mapper>

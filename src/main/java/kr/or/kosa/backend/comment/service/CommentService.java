@@ -16,8 +16,8 @@ import kr.or.kosa.backend.like.service.LikeService;
 import kr.or.kosa.backend.like.domain.ReferenceType;
 import kr.or.kosa.backend.notification.service.NotificationService;
 import kr.or.kosa.backend.notification.domain.NotificationType;
-import kr.or.kosa.backend.user.domain.User;
-import kr.or.kosa.backend.user.mapper.UserMapper;
+import kr.or.kosa.backend.users.domain.Users;
+import kr.or.kosa.backend.users.mapper.UserMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -104,8 +104,8 @@ public class CommentService {
         Comment savedComment = commentMapper.selectCommentById(comment.getCommentId());
 
         // 사용자 닉네임 조회
-        User user = userMapper.findById(userId);
-        String userNickname = user != null ? user.getNickname() : null;
+        Users user = userMapper.findById(userId);
+        String userNickname = user != null ? user.getUserNickname() : null;
 
         return CommentResponse.builder()
                 .commentId(savedComment.getCommentId())
@@ -279,11 +279,11 @@ public class CommentService {
             return Collections.emptyMap();
         }
 
-        List<User> users = userMapper.selectUsersByIds(userIds);
+        List<Users> users = userMapper.selectUsersByIds(userIds);
         return users.stream()
                 .collect(Collectors.toMap(
-                        User::getId,
-                        User::getNickname
+                        Users::getUserId,
+                        Users::getUserNickname
                 ));
     }
 }

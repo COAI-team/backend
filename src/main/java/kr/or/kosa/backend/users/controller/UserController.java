@@ -1,9 +1,9 @@
-package kr.or.kosa.backend.user.controller;
+package kr.or.kosa.backend.users.controller;
 
 import jakarta.validation.Valid;
 import kr.or.kosa.backend.security.jwt.JwtUserDetails;
-import kr.or.kosa.backend.user.dto.*;
-import kr.or.kosa.backend.user.service.UserService;
+import kr.or.kosa.backend.users.dto.*;
+import kr.or.kosa.backend.users.service.UserService;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -117,7 +117,7 @@ public class UserController {
             @RequestBody PasswordResetConfirmRequest dto
     ) {
 
-        boolean result = userService.resetPassword(dto.getToken(), dto.getNewPassword());
+        boolean result = userService.resetPassword(dto.getToken(), dto.getNewUserPw());
 
         return ResponseEntity.ok(Map.of(
                 KEY_SUCCESS, result,
@@ -161,34 +161,20 @@ public class UserController {
     @PutMapping(value = "/me", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<Map<String, Object>> updateMyInfo(
             @AuthenticationPrincipal JwtUserDetails user,
-            @ModelAttribute UserUpdateRequestDto dto,
-            @RequestPart(value = "image", required = false) MultipartFile image
+            @ModelAttribute UserUpdateRequestDto dto,   // ⬅ name, nickname
+            @RequestPart(value = "image", required = false) MultipartFile image // ⬅ 파일
     ) {
 
-        UserResponseDto updated = userService.updateUserInfo(user.id(), dto, image);
+        UserResponseDto updated = userService.updateUserInfo(
+                user.id(),
+                dto,
+                image
+        );
 
         return ResponseEntity.ok(Map.of(
                 KEY_SUCCESS, true,
                 KEY_MESSAGE, "회원 정보가 수정되었습니다.",
                 "user", updated
-        ));
-    }
-
-    // ============================================================================
-    // 이메일 변경
-    // ============================================================================
-    @PutMapping("/me/email")
-    public ResponseEntity<Map<String, Object>> updateEmail(
-            @AuthenticationPrincipal JwtUserDetails user,
-            @RequestBody EmailUpdateRequestDto dto
-    ) {
-
-        String updatedEmail = userService.updateEmail(user.id(), dto.getNewEmail());
-
-        return ResponseEntity.ok(Map.of(
-                KEY_SUCCESS, true,
-                KEY_MESSAGE, "이메일이 성공적으로 변경되었습니다.",
-                "email", updatedEmail
         ));
     }
 

@@ -1,7 +1,7 @@
-package kr.or.kosa.backend.user.scheduler;
+package kr.or.kosa.backend.users.scheduler;
 
-import kr.or.kosa.backend.user.domain.User;
-import kr.or.kosa.backend.user.mapper.UserMapper;
+import kr.or.kosa.backend.users.domain.Users;
+import kr.or.kosa.backend.users.mapper.UserMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -23,22 +23,24 @@ public class UserDeletionScheduler {
 
         LocalDateTime now = LocalDateTime.now();
 
-        List<User> users = userMapper.findUsersToDelete(now);
+        List<Users> users = userMapper.findUsersToDelete(now);
 
-        for (User u : users) {
+        for (Users u : users) {
+
+            Long userId = u.getUserId(); // 필드명 변경
 
             // Soft delete 적용
-            if (userMapper.softDeleteUser(u.getId()) <= 0) {
-                log.warn("Soft Delete failed for userId={}", u.getId());
+            if (userMapper.softDeleteUser(userId) <= 0) {
+                log.warn("Soft Delete failed for userId={}", userId);
             }
 
             // 개인정보 익명화
             if (userMapper.anonymizeUser(
-                    u.getId(),
-                    "deleted_" + u.getId() + "@deleted.com",
+                    userId,
+                    "deleted_" + userId + "@deleted.com",
                     "탈퇴회원"
             ) <= 0) {
-                log.warn("Anonymize failed for userId={}", u.getId());
+                log.warn("Anonymize failed for userId={}", userId);
             }
         }
     }

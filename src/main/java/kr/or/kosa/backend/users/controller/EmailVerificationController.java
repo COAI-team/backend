@@ -1,6 +1,6 @@
-package kr.or.kosa.backend.user.controller;
+package kr.or.kosa.backend.users.controller;
 
-import kr.or.kosa.backend.user.service.EmailVerificationService;
+import kr.or.kosa.backend.users.service.EmailVerificationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -22,18 +22,19 @@ public class EmailVerificationController {
      */
     @PostMapping("/send")
     public ResponseEntity<Map<String, Object>> sendEmail(@RequestParam String email) {
-
-        long expireAt = emailVerificationService.sendVerificationEmail(email);
-
-        boolean success = expireAt > 0;
-
-        return ResponseEntity.ok(Map.of(
-                KEY_SUCCESS, success,
-                KEY_MESSAGE, success ?
-                        "인증 이메일을 보냈습니다." :
-                        "이메일 전송에 실패했습니다.",
-                "expireAt", expireAt
-        ));
+        try {
+            long expireAt = emailVerificationService.sendVerificationEmail(email);
+            return ResponseEntity.ok(Map.of(
+                    KEY_SUCCESS, true,
+                    KEY_MESSAGE, "인증 이메일을 보냈습니다.",
+                    "expireAt", expireAt
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of(
+                    KEY_SUCCESS, false,
+                    KEY_MESSAGE, "이메일 전송에 실패했습니다. 사유: " + e.getMessage()
+            ));
+        }
     }
 
     /**
