@@ -111,7 +111,9 @@ public class RagService {
          */
         public String retrieveUserContext(String userId) {
                 try {
+                        System.out.println("*****Attempting to retrieve context for userId: {}*****" + userId);
                         String filterExpression = String.format("userId == '%s'", userId);
+                        System.out.println("*****Using filter expression: {}*****" + filterExpression);
 
                         // Search for general "mistakes" or "patterns" or just get recent ones
                         SearchRequest searchRequest = SearchRequest.builder()
@@ -121,8 +123,10 @@ public class RagService {
                                         .build();
 
                         List<Document> documents = vectorStore.similaritySearch(searchRequest);
+                        System.out.println("*****Found {} documents for user context*****" + documents.size());
 
                         if (documents.isEmpty()) {
+                                System.out.println("*****No documents found, returning default message.*****");
                                 return "No prior analysis history found.";
                         }
 
@@ -130,7 +134,7 @@ public class RagService {
                                         .map(Document::getText)
                                         .collect(Collectors.joining("\n\n---\n\n"));
                 } catch (Exception e) {
-                        log.error("Failed to retrieve users context for userId: {}", userId, e);
+                        System.out.println("*****Failed to retrieve user context for userId: {}*****" + userId);
                         return "Failed to retrieve history.";
                 }
         }

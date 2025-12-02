@@ -51,10 +51,10 @@ public class PaymentsServiceImpl implements PaymentsService {
         // 1) 금액/포인트 정규화 + 유효성 검사 + 포인트 잔액 검증
         boolean pointOnly = normalizeAmountsAndValidate(payments, userId);
 
-        // 2) DB 저장 (idempotent)
+        // 2) DB ?? (idempotent)
         Payments persisted = upsertPayment(payments);
 
-        // 3) 포인트 전액 결제인 경우 → 즉시 포인트 차감 + 구독권 부여
+        // ??? ?? ??? ???? ?? ??
         if (pointOnly) {
             handlePointOnlyFlow(userId, persisted);
         }
@@ -197,48 +197,52 @@ public class PaymentsServiceImpl implements PaymentsService {
     /**
      * 금액/포인트 정규화 + 유효성 검사 + 포인트 잔액 검증
      */
+    
     private boolean normalizeAmountsAndValidate(Payments payments, String userId) {
 
-        BigDecimal clientAmount   = nvl(payments.getAmount());          // 프론트에서 넘어온 최종 결제 금액
-        BigDecimal originalAmount = nvl(payments.getOriginalAmount());  // 원래 결제 금액
-        BigDecimal usedPoint      = nvl(payments.getUsedPoint());       // 사용할 포인트
+        BigDecimal clientAmount   = nvl(payments.getAmount());          // ????? ??? ?? ?? ??
+        BigDecimal originalAmount = nvl(payments.getOriginalAmount());  // ?? ?? ??
+        BigDecimal usedPoint      = nvl(payments.getUsedPoint());       // ??? ???
 
-        // 플랜 코드 기반 서버 정가
         BigDecimal serverPrice =
                 subscriptionDomainService.getMonthlyPrice(payments.getPlanCode());
 
-        // BASIC / PRO 등 서버 정가가 있으면 무조건 서버 가격으로 덮어씀
+        BigDecimal upgradeExtra = getUpgradeExtraAmountIfApplicable(userId, payments.getPlanCode());
+        if (upgradeExtra != null && upgradeExtra.compareTo(BigDecimal.ZERO) > 0) {
+            serverPrice = upgradeExtra;
+        }
+
         originalAmount = applyServerPriceIfNecessary(
                 payments, originalAmount, clientAmount, usedPoint, serverPrice
         );
 
-        // 금액 / 포인트 범위 검증
+        // 사용 포인트가 원금보다 크면 원금까지만 사용하도록 서버에서 보정
+        if (usedPoint.compareTo(originalAmount) > 0) {
+            usedPoint = originalAmount;
+        }
+
         validateAmountRanges(originalAmount, usedPoint);
 
-        // 최종 결제 금액 = 원가 - 포인트
         BigDecimal expectedAmount = originalAmount.subtract(usedPoint);
         if (expectedAmount.compareTo(BigDecimal.ZERO) < 0) {
-            throw new IllegalArgumentException("최종 결제 금액이 0 미만일 수 없습니다.");
+            throw new IllegalArgumentException("?? ?? ??? 0 ??? ? ????.");
         }
 
-        boolean pointOnly = (expectedAmount.compareTo(BigDecimal.ZERO) == 0);
+        boolean pointOnly = expectedAmount.compareTo(BigDecimal.ZERO) == 0;
 
-        // 토스 결제를 타는 경우(금액 > 0)에만 클라 amount 검증
         if (!pointOnly) {
             if (clientAmount.compareTo(BigDecimal.ZERO) <= 0) {
-                throw new IllegalArgumentException("결제 금액이 올바르지 않습니다.");
+                throw new IllegalArgumentException("?? ??? ???? ????.");
             }
             if (clientAmount.compareTo(expectedAmount) != 0) {
-                throw new IllegalArgumentException("요청된 결제 금액과 포인트 적용 금액이 일치하지 않습니다.");
+                throw new IllegalArgumentException("??? ?? ??? ??? ?? ??? ???? ????.");
             }
         }
 
-        // 서버 계산값으로 세팅
         payments.setAmount(expectedAmount);
         payments.setOriginalAmount(originalAmount);
         payments.setUsedPoint(usedPoint);
 
-        // 포인트 잔액 사전 검증
         if (usedPoint.compareTo(BigDecimal.ZERO) > 0) {
             pointService.validatePointBalance(userId, usedPoint);
         }
@@ -247,6 +251,30 @@ public class PaymentsServiceImpl implements PaymentsService {
         payments.setRequestedAt(LocalDateTime.now());
 
         return pointOnly;
+    }
+
+
+    private BigDecimal getUpgradeExtraAmountIfApplicable(String userId, String planCode) {
+        if (planCode == null || userId == null) {
+            return null;
+        }
+        if (!"PRO".equalsIgnoreCase(planCode)) {
+            return null;
+        }
+
+        try {
+            UpgradeQuoteResponse quote = subscriptionDomainService.getUpgradeQuote(userId, planCode);
+            if (quote != null
+                    && quote.isUpgrade()
+                    && quote.getExtraAmount() != null
+                    && quote.getExtraAmount().compareTo(BigDecimal.ZERO) > 0) {
+                return quote.getExtraAmount();
+            }
+        } catch (Exception e) {
+            System.err.println("upgrade quote ?? ??: " + e.getMessage());
+        }
+
+        return null;
     }
 
     private BigDecimal applyServerPriceIfNecessary(Payments payments,
