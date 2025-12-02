@@ -52,8 +52,10 @@ public class PaymentsServiceImpl implements PaymentsService {
         boolean pointOnly = normalizeAmountsAndValidate(payments, userId);
 
         // 2) DB ?? (idempotent)
+        // 2) DB ?? (idempotent)
         Payments persisted = upsertPayment(payments);
 
+        // ??? ?? ??? ???? ?? ??
         // ??? ?? ??? ???? ?? ??
         if (pointOnly) {
             handlePointOnlyFlow(userId, persisted);
@@ -198,7 +200,12 @@ public class PaymentsServiceImpl implements PaymentsService {
      * 금액/포인트 정규화 + 유효성 검사 + 포인트 잔액 검증
      */
     
+    
     private boolean normalizeAmountsAndValidate(Payments payments, String userId) {
+
+        BigDecimal clientAmount   = nvl(payments.getAmount());          // ????? ??? ?? ?? ??
+        BigDecimal originalAmount = nvl(payments.getOriginalAmount());  // ?? ?? ??
+        BigDecimal usedPoint      = nvl(payments.getUsedPoint());       // ??? ???
 
         BigDecimal clientAmount   = nvl(payments.getAmount());          // ????? ??? ?? ?? ??
         BigDecimal originalAmount = nvl(payments.getOriginalAmount());  // ?? ?? ??
@@ -206,6 +213,11 @@ public class PaymentsServiceImpl implements PaymentsService {
 
         BigDecimal serverPrice =
                 subscriptionDomainService.getMonthlyPrice(payments.getPlanCode());
+
+        BigDecimal upgradeExtra = getUpgradeExtraAmountIfApplicable(userId, payments.getPlanCode());
+        if (upgradeExtra != null && upgradeExtra.compareTo(BigDecimal.ZERO) > 0) {
+            serverPrice = upgradeExtra;
+        }
 
         BigDecimal upgradeExtra = getUpgradeExtraAmountIfApplicable(userId, payments.getPlanCode());
         if (upgradeExtra != null && upgradeExtra.compareTo(BigDecimal.ZERO) > 0) {
@@ -221,20 +233,29 @@ public class PaymentsServiceImpl implements PaymentsService {
             usedPoint = originalAmount;
         }
 
+        // 사용 포인트가 원금보다 크면 원금까지만 사용하도록 서버에서 보정
+        if (usedPoint.compareTo(originalAmount) > 0) {
+            usedPoint = originalAmount;
+        }
+
         validateAmountRanges(originalAmount, usedPoint);
 
         BigDecimal expectedAmount = originalAmount.subtract(usedPoint);
         if (expectedAmount.compareTo(BigDecimal.ZERO) < 0) {
             throw new IllegalArgumentException("?? ?? ??? 0 ??? ? ????.");
+            throw new IllegalArgumentException("?? ?? ??? 0 ??? ? ????.");
         }
 
+        boolean pointOnly = expectedAmount.compareTo(BigDecimal.ZERO) == 0;
         boolean pointOnly = expectedAmount.compareTo(BigDecimal.ZERO) == 0;
 
         if (!pointOnly) {
             if (clientAmount.compareTo(BigDecimal.ZERO) <= 0) {
                 throw new IllegalArgumentException("?? ??? ???? ????.");
+                throw new IllegalArgumentException("?? ??? ???? ????.");
             }
             if (clientAmount.compareTo(expectedAmount) != 0) {
+                throw new IllegalArgumentException("??? ?? ??? ??? ?? ??? ???? ????.");
                 throw new IllegalArgumentException("??? ?? ??? ??? ?? ??? ???? ????.");
             }
         }
@@ -251,6 +272,30 @@ public class PaymentsServiceImpl implements PaymentsService {
         payments.setRequestedAt(LocalDateTime.now());
 
         return pointOnly;
+    }
+
+
+    private BigDecimal getUpgradeExtraAmountIfApplicable(String userId, String planCode) {
+        if (planCode == null || userId == null) {
+            return null;
+        }
+        if (!"PRO".equalsIgnoreCase(planCode)) {
+            return null;
+        }
+
+        try {
+            UpgradeQuoteResponse quote = subscriptionDomainService.getUpgradeQuote(userId, planCode);
+            if (quote != null
+                    && quote.isUpgrade()
+                    && quote.getExtraAmount() != null
+                    && quote.getExtraAmount().compareTo(BigDecimal.ZERO) > 0) {
+                return quote.getExtraAmount();
+            }
+        } catch (Exception e) {
+            System.err.println("upgrade quote ?? ??: " + e.getMessage());
+        }
+
+        return null;
     }
 
 
