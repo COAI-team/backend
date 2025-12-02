@@ -3,7 +3,6 @@ package kr.or.kosa.backend.admin.controller;
 import kr.or.kosa.backend.admin.dto.response.PageResponseDto;
 import kr.or.kosa.backend.admin.dto.response.UserFindResponseDto;
 import kr.or.kosa.backend.admin.service.AdminService;
-import kr.or.kosa.backend.user.service.UserService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
