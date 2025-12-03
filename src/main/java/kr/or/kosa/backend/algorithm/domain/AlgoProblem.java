@@ -1,5 +1,6 @@
 package kr.or.kosa.backend.algorithm.domain;
 
+import com.google.protobuf.DescriptorProtos;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;

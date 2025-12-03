@@ -7,10 +7,6 @@ import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
 
-/**
- * 알고리즘 문제 MyBatis 매퍼 인터페이스
- * 기본 조회 기능만 구현
- */
 @Mapper
 public interface AlgorithmProblemMapper {
 

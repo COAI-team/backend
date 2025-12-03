@@ -19,6 +19,7 @@ public class InsightsController {
     @GetMapping("/history/{userId}")
     public ResponseEntity<List<CodeResultDTO>> getAnalysisHistory(@PathVariable Long userId) {
         // In a real app, userId would come from the security context
+        // List<CodeResultDTO> history = insightsService.getCodeResult(userId);
         List<CodeResultDTO> history = insightsService.getCodeResult(userId);
         return ResponseEntity.ok(history);
     }
@@ -28,5 +29,17 @@ public class InsightsController {
         // In a real app, userId would come from the security context
         List<UserCodePatternDTO> patterns = insightsService.getUserCodePatterns(userId);
         return ResponseEntity.ok(patterns);
+    }
+
+    @GetMapping("/trends/{userId}")
+    public ResponseEntity<java.util.Map<String, Object>> getPatternTrends(@PathVariable Long userId) {
+        return ResponseEntity.ok(insightsService.getPatternTrends(userId));
+    }
+
+    @GetMapping("/patterns/{userId}/detail")
+    public ResponseEntity<List<java.util.Map<String, Object>>> getPatternDetails(
+            @PathVariable Long userId,
+            @RequestParam String pattern) {
+        return ResponseEntity.ok(insightsService.getPatternDetails(userId, pattern));
     }
 }

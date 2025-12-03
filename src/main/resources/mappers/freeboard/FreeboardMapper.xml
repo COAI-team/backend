@@ -6,52 +6,68 @@
 <mapper namespace="kr.or.kosa.backend.freeboard.mapper.FreeboardMapper">
 
     <!-- 게시글 목록 (페이징) -->
-    <select id="selectPage" resultType="kr.or.kosa.backend.freeboard.domain.Freeboard">
+    <select id="selectPage" resultMap="FreeboardWithTagsMap">
         SELECT
-        freeboard_id,
-        user_id,
-        freeboard_title,
-        freeboard_content,
-        freeboard_click,
-        freeboard_image,
-        freeboard_represent_image,
-        freeboard_created_at,
-        freeboard_deleted_yn
-        FROM freeboard
-        WHERE freeboard_deleted_yn = 'N'
-        ORDER BY freeboard_id DESC
+        f.FREEBOARD_ID,
+        f.USER_ID,
+        f.FREEBOARD_TITLE,
+        f.FREEBOARD_CONTENT,
+        f.FREEBOARD_CLICK,
+        f.FREEBOARD_REPRESENT_IMAGE,
+        f.FREEBOARD_CREATED_AT,
+        t.TAG_NAME
+        FROM FREEBOARD f
+        LEFT JOIN FREEBOARD_TAG ft ON f.FREEBOARD_ID = ft.FREEBOARD_ID
+        LEFT JOIN TAG t ON ft.TAG_ID = t.TAG_ID
+        ORDER BY f.FREEBOARD_ID DESC
         LIMIT #{size} OFFSET #{offset}
     </select>
+
+    <!-- 태그 불러오는 resultMap -->
+    <resultMap id="FreeboardWithTagsMap" type="kr.or.kosa.backend.freeboard.domain.Freeboard">
+        <id property="freeboardId" column="FREEBOARD_ID"/>
+
+        <result property="userId" column="USER_ID"/>
+        <result property="freeboardTitle" column="FREEBOARD_TITLE"/>
+        <result property="freeboardContent" column="FREEBOARD_CONTENT"/>
+        <result property="freeboardClick" column="FREEBOARD_CLICK"/>
+        <result property="freeboardRepresentImage" column="FREEBOARD_REPRESENT_IMAGE"/>
+        <result property="freeboardCreatedAt" column="FREEBOARD_CREATED_AT"/>
+
+        <collection property="tags" ofType="java.lang.String">
+            <result column="TAG_NAME"/>
+        </collection>
+    </resultMap>
 
     <!-- 상세 조회 -->
     <select id="selectById" parameterType="long" resultType="kr.or.kosa.backend.freeboard.domain.Freeboard">
         SELECT
-        freeboard_id,
-        user_id,
-        freeboard_title,
-        freeboard_content,
-        freeboard_click,
-        freeboard_image,
-        freeboard_represent_image,
-        freeboard_created_at,
-        freeboard_deleted_yn
-        FROM freeboard
-        WHERE freeboard_id = #{id}
-        AND freeboard_deleted_yn = 'N'
+        FREEBOARD_ID,
+        USER_ID,
+        FREEBOARD_TITLE,
+        FREEBOARD_CONTENT,
+        FREEBOARD_CLICK,
+        FREEBOARD_IMAGE,
+        FREEBOARD_REPRESENT_IMAGE,
+        FREEBOARD_CREATED_AT,
+        FREEBOARD_DELETED_YN
+        FROM FREEBOARD
+        WHERE FREEBOARD_ID = #{id}
+        AND FREEBOARD_DELETED_YN = 'N'
     </select>
 
     <!-- 등록 -->
     <insert id="insert" parameterType="kr.or.kosa.backend.freeboard.domain.Freeboard"
             useGeneratedKeys="true" keyProperty="freeboardId">
-        INSERT INTO freeboard (
-        user_id,
-        freeboard_title,
-        freeboard_content,
-        freeboard_click,
-        freeboard_image,
-        freeboard_represent_image,
-        freeboard_created_at,
-        freeboard_deleted_yn
+        INSERT INTO FREEBOARD (
+        USER_ID,
+        FREEBOARD_TITLE,
+        FREEBOARD_CONTENT,
+        FREEBOARD_CLICK,
+        FREEBOARD_IMAGE,
+        FREEBOARD_REPRESENT_IMAGE,
+        FREEBOARD_CREATED_AT,
+        FREEBOARD_DELETED_YN
         ) VALUES (
         #{userId},
         #{freeboardTitle},
@@ -66,50 +82,50 @@
 
     <!-- 수정 -->
     <update id="update" parameterType="kr.or.kosa.backend.freeboard.domain.Freeboard">
-        UPDATE freeboard
+        UPDATE FREEBOARD
         SET
-        freeboard_title = #{freeboardTitle},
-        freeboard_content = #{freeboardContent},
-        freeboard_image = #{freeboardImage},
-        freeboard_represent_image = #{freeboardRepresentImage}
-        WHERE freeboard_id = #{freeboardId}
-        AND freeboard_deleted_yn = 'N'
+        FREEBOARD_TITLE = #{freeboardTitle},
+        FREEBOARD_CONTENT = #{freeboardContent},
+        FREEBOARD_IMAGE = #{freeboardImage},
+        FREEBOARD_REPRESENT_IMAGE = #{freeboardRepresentImage}
+        WHERE FREEBOARD_ID = #{freeboardId}
+        AND FREEBOARD_DELETED_YN = 'N'
     </update>
 
     <!-- 삭제 -->
     <update id="delete" parameterType="long">
-        UPDATE freeboard
-        SET freeboard_deleted_yn = 'Y'
-        WHERE freeboard_id = #{id}
+        UPDATE FREEBOARD
+        SET FREEBOARD_DELETED_YN = 'Y'
+        WHERE FREEBOARD_ID = #{id}
     </update>
 
     <!-- 조회수 증가 -->
     <update id="increaseClick" parameterType="long">
-        UPDATE freeboard
-        SET freeboard_click = freeboard_click + 1
-        WHERE freeboard_id = #{id}
+        UPDATE FREEBOARD
+        SET FREEBOARD_CLICK = FREEBOARD_CLICK + 1
+        WHERE FREEBOARD_ID = #{id}
     </update>
 
     <!-- 전체 게시글 수 -->
     <select id="countAll" resultType="int">
         SELECT COUNT(*)
-        FROM freeboard
-        WHERE freeboard_deleted_yn = 'N'
+        FROM FREEBOARD
+        WHERE FREEBOARD_DELETED_YN = 'N'
     </select>
 
     <!-- 좋아요 개수 증가 -->
     <update id="incrementLikeCount">
-        UPDATE freeboard
-        SET like_count = like_count + 1
-        WHERE freeboard_id = #{freeboardId}
+        UPDATE FREEBOARD
+        SET LIKE_COUNT = LIKE_COUNT + 1
+        WHERE FREEBOARD_ID = #{freeboardId}
     </update>
 
     <!-- 좋아요 개수 감소 -->
     <update id="decrementLikeCount">
-        UPDATE freeboard
-        SET like_count = like_count - 1
-        WHERE freeboard_id = #{freeboardId}
-        AND like_count > 0
+        UPDATE FREEBOARD
+        SET LIKE_COUNT = LIKE_COUNT - 1
+        WHERE FREEBOARD_ID = #{freeboardId}
+        AND LIKE_COUNT > 0
     </update>
 
 </mapper>

@@ -2,48 +2,25 @@ package kr.or.kosa.backend.algorithm.service;
 
 import kr.or.kosa.backend.algorithm.domain.AlgoProblem;
 import kr.or.kosa.backend.algorithm.domain.AlgoTestcase;
-import kr.or.kosa.backend.algorithm.dto.ProblemGenerationResponseDto;
+import kr.or.kosa.backend.algorithm.dto.*;
 import kr.or.kosa.backend.algorithm.mapper.AlgorithmProblemMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
-/**
- * 알고리즘 문제 서비스 - Phase 1
- * 기본 조회 기능만 구현
- */
+@Slf4j
 @Service
 @RequiredArgsConstructor
-@Slf4j
 @Transactional(readOnly = true)
 public class AlgorithmProblemService {
 
     private final AlgorithmProblemMapper algorithmProblemMapper;
 
-    /**
-     * 문제 목록 조회 (페이징)
-     * 
-     * @param offset 시작 위치
-     * @param limit  조회 개수
-     * @return 문제 목록
-     */
-    public List<AlgoProblem> getProblems(int offset, int limit) {
-        log.debug("문제 목록 조회 - offset: {}, limit: {}", offset, limit);
-
-        try {
-            List<AlgoProblem> problems = algorithmProblemMapper.selectProblems(offset, limit);
-            log.debug("문제 목록 조회 완료 - 조회된 문제 수: {}", problems.size());
-
-            return problems;
-
-        } catch (Exception e) {
-            log.error("문제 목록 조회 실패 - offset: {}, limit: {}", offset, limit, e);
-            throw new RuntimeException("문제 목록 조회 중 오류가 발생했습니다.", e);
-        }
-    }
 
     /**
      * 전체 문제 수 조회
@@ -67,18 +44,19 @@ public class AlgorithmProblemService {
 
     /**
      * 문제 목록 조회 (필터 포함)
-     * 
+     *
      * @param offset     시작 위치
      * @param limit      조회 개수
      * @param difficulty 난이도 필터 (nullable)
      * @param source     출처 필터 (nullable)
      * @param keyword    검색어 (nullable)
+     * @param topic      주제 필터 (nullable)
      * @return 문제 목록
      */
     public List<AlgoProblem> getProblemsWithFilter(int offset, int limit, String difficulty, String source,
-            String keyword) {
-        log.debug("문제 목록 조회 (필터) - offset: {}, limit: {}, difficulty: {}, source: {}, keyword: {}",
-                offset, limit, difficulty, source, keyword);
+            String keyword, String topic) {
+        log.debug("문제 목록 조회 (필터) - offset: {}, limit: {}, difficulty: {}, source: {}, keyword: {}, topic: {}",
+                offset, limit, difficulty, source, keyword, topic);
 
         try {
             List<AlgoProblem> problems = algorithmProblemMapper.selectProblemsWithFilter(offset, limit, difficulty,
@@ -88,22 +66,24 @@ public class AlgorithmProblemService {
             return problems;
 
         } catch (Exception e) {
-            log.error("문제 목록 조회 실패 - offset: {}, limit: {}, difficulty: {}, source: {}, keyword: {}",
-                    offset, limit, difficulty, source, keyword, e);
+            log.error("문제 목록 조회 실패 - offset: {}, limit: {}, difficulty: {}, source: {}, keyword: {}, topic: {}",
+                    offset, limit, difficulty, source, keyword, topic, e);
             throw new RuntimeException("문제 목록 조회 중 오류가 발생했습니다.", e);
         }
     }
 
     /**
      * 전체 문제 수 조회 (필터 포함)
-     * 
+     *
      * @param difficulty 난이도 필터 (nullable)
      * @param source     출처 필터 (nullable)
      * @param keyword    검색어 (nullable)
+     * @param topic      주제 필터 (nullable)
      * @return 필터링된 문제 개수
      */
-    public int getTotalProblemsCountWithFilter(String difficulty, String source, String keyword) {
-        log.debug("전체 문제 수 조회 (필터) - difficulty: {}, source: {}, keyword: {}", difficulty, source, keyword);
+    public int getTotalProblemsCountWithFilter(String difficulty, String source, String keyword, String topic) {
+        log.debug("전체 문제 수 조회 (필터) - difficulty: {}, source: {}, keyword: {}, topic: {}",
+                difficulty, source, keyword, topic);
 
         try {
             int count = algorithmProblemMapper.countProblemsWithFilter(difficulty, source, keyword);
@@ -112,14 +92,94 @@ public class AlgorithmProblemService {
             return count;
 
         } catch (Exception e) {
-            log.error("전체 문제 수 조회 실패 (필터) - difficulty: {}, source: {}, keyword: {}", difficulty, source, keyword, e);
+            log.error("전체 문제 수 조회 실패 (필터) - difficulty: {}, source: {}, keyword: {}, topic: {}",
+                    difficulty, source, keyword, topic, e);
             throw new RuntimeException("전체 문제 수 조회 중 오류가 발생했습니다.", e);
         }
     }
 
     /**
+     * 문제 목록 조회 (V2 - 통계 포함)
+     *
+     * @param request 문제 목록 조회 요청 DTO
+     * @return 문제 목록 및 페이징 정보
+     */
+    public Map<String, Object> getProblemListWithStats(ProblemListRequestDto request) {
+        log.debug("문제 목록 조회 (V2) - request: {}", request);
+
+        try {
+            // 문제 목록 조회
+            List<AlgoProblem> problems = getProblemsWithFilter(
+                    request.getOffset(),
+                    request.getLimit(),
+                    request.getDifficulty(),
+                    request.getSource(),
+                    request.getKeyword(),
+                    request.getTopic()
+            );
+
+            // 전체 개수 조회
+            int totalCount = getTotalProblemsCountWithFilter(
+                    request.getDifficulty(),
+                    request.getSource(),
+                    request.getKeyword(),
+                    request.getTopic()
+            );
+
+            // 페이징 정보 계산
+            int totalPages = (int) Math.ceil((double) totalCount / request.getLimit());
+
+            // 응답 데이터 구성
+            Map<String, Object> responseData = new HashMap<>();
+            responseData.put("problems", problems);
+            responseData.put("totalCount", totalCount);
+            responseData.put("currentPage", request.getPage());
+            responseData.put("pageSize", request.getLimit());
+            responseData.put("totalPages", totalPages);
+            responseData.put("hasNext", request.getPage() < totalPages);
+            responseData.put("hasPrevious", request.getPage() > 1);
+
+            log.debug("문제 목록 조회 완료 - totalCount: {}, problems: {}", totalCount, problems.size());
+
+            return responseData;
+
+        } catch (Exception e) {
+            log.error("문제 목록 조회 실패 (V2)", e);
+            throw new RuntimeException("문제 목록 조회 중 오류가 발생했습니다.", e);
+        }
+    }
+
+    /**
+     * 통계 정보 조회
+     *
+     * @param userId 사용자 ID (nullable)
+     * @return 통계 정보
+     */
+    public ProblemStatisticsDto getProblemStatistics(Long userId) {
+        log.debug("통계 정보 조회 - userId: {}", userId);
+
+        try {
+            // 전체 문제 수 조회
+            int totalProblems = getTotalProblemsCount();
+
+            // TODO: Mapper에 selectProblemStatistics 메서드 구현 필요
+            // 현재는 기본값 반환 (merge 충돌 해결을 위한 임시 구현)
+            return ProblemStatisticsDto.builder()
+                    .totalProblems(totalProblems)
+                    .solvedProblems(0)      // TODO: 사용자별 해결 문제 수 조회
+                    .averageAccuracy(0.0)   // TODO: 평균 정답률 계산
+                    .totalAttempts(0)       // TODO: 총 응시자 수 조회
+                    .build();
+
+        } catch (Exception e) {
+            log.error("통계 정보 조회 실패 - userId: {}", userId, e);
+            throw new RuntimeException("통계 정보 조회 중 오류가 발생했습니다.", e);
+        }
+    }
+
+    /**
      * 문제 상세 조회
-     * 
+     *
      * @param problemId 문제 ID
      * @return 문제 정보
      */
@@ -288,8 +348,8 @@ public class AlgorithmProblemService {
             log.info("테스트케이스 저장 완료 - 문제 ID: {}, 저장 개수: {}", problemId, savedCount);
 
         } catch (Exception e) {
-            log.error("테스트케이스 저장 중 오류 발생", e);
-            throw new RuntimeException("테스트케이스 저장 실패: " + e.getMessage(), e);
+            log.error("전체 테스트케이스 조회 실패 - problemId: {}", problemId, e);
+            throw new RuntimeException("전체 테스트케이스 조회 중 오류가 발생했습니다.", e);
         }
     }
 }

@@ -16,8 +16,8 @@ import kr.or.kosa.backend.like.service.LikeService;
 import kr.or.kosa.backend.like.domain.ReferenceType;
 import kr.or.kosa.backend.notification.service.NotificationService;
 import kr.or.kosa.backend.notification.domain.NotificationType;
-import kr.or.kosa.backend.user.domain.User;
-import kr.or.kosa.backend.user.mapper.UserMapper;
+import kr.or.kosa.backend.users.domain.Users;
+import kr.or.kosa.backend.users.mapper.UserMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -41,6 +41,9 @@ public class CommentService {
 
     @Transactional
     public CommentResponse createComment(CommentCreateRequest request, Long userId) {
+        // 게시글 존재 여부 확인
+        Long boardAuthorId = getBoardAuthorId(request.boardType(), request.boardId());
+
         // 대댓글인 경우 부모 댓글 검증
         if (request.parentCommentId() != null) {
             Comment parentComment = commentMapper.selectCommentById(request.parentCommentId());
@@ -66,8 +69,6 @@ public class CommentService {
         }
         // 댓글인 경우 게시글 작성자에게 알림
         else {
-            Long boardAuthorId = getBoardAuthorId(request.boardType(), request.boardId());
-
             if (!boardAuthorId.equals(userId)) {
                 ReferenceType referenceType = switch (request.boardType()) {
                     case "CODEBOARD" -> ReferenceType.POST_CODEBOARD;
@@ -99,7 +100,28 @@ public class CommentService {
             throw new CustomBusinessException(CommentErrorCode.INSERT_ERROR);
         }
 
-        return CommentResponse.from(comment);
+        // DB에서 다시 조회하여 자동 생성된 필드 값 가져오기
+        Comment savedComment = commentMapper.selectCommentById(comment.getCommentId());
+
+        // 사용자 닉네임 조회
+        Users user = userMapper.findById(userId);
+        String userNickname = user != null ? user.getUserNickname() : null;
+
+        return CommentResponse.builder()
+                .commentId(savedComment.getCommentId())
+                .boardId(savedComment.getBoardId())
+                .boardType(savedComment.getBoardType())
+                .parentCommentId(savedComment.getParentCommentId())
+                .userId(savedComment.getUserId())
+                .userNickname(userNickname)
+                .content(savedComment.getContent())
+                .likeCount(savedComment.getLikeCount())
+                .isLiked(false)
+                .isAuthor(savedComment.getUserId().equals(boardAuthorId))
+                .isDeleted(savedComment.getIsDeleted())
+                .createdAt(savedComment.getCreatedAt())
+                .updatedAt(savedComment.getUpdatedAt())
+                .build();
     }
 
     public List<CommentWithRepliesResponse> getCommentsByBoard(Long boardId, String boardType, Long currentUserId) {
@@ -257,11 +279,11 @@ public class CommentService {
             return Collections.emptyMap();
         }
 
-        List<User> users = userMapper.selectUsersByIds(userIds);
+        List<Users> users = userMapper.selectUsersByIds(userIds);
         return users.stream()
                 .collect(Collectors.toMap(
-                        User::getId,
-                        User::getNickname
+                        Users::getUserId,
+                        Users::getUserNickname
                 ));
     }
 }
