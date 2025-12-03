@@ -25,7 +25,7 @@ public class AlgoSubmission {
 
     // 제출 코드 및 언어
     private String sourceCode;              // 제출한 소스코드
-    private ProgrammingLanguage language;   // 프로그래밍 언어
+    private String language;                // 프로그래밍 언어 (DB 언어명: "Python 3", "Java 17", "C++17" 등)
 
     // Judge0 채점 결과
     private JudgeResult judgeResult;        // AC, WA, TLE, MLE, RE, CE, PENDING

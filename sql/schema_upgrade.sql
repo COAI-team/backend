@@ -17,7 +17,7 @@ CREATE TABLE `CODE_ANALYSIS_HISTORY` (
     FOREIGN KEY (`USER_ID`) REFERENCES `MEMBER`(`id`)
 );
 
--- Table to track users-specific coding patterns and habits identified from analyses
+-- Table to track user-specific coding patterns and habits identified from analyses
 CREATE TABLE `USER_CODE_PATTERNS` (
     `PATTERN_ID` VARCHAR(255) PRIMARY KEY,
     `USER_ID` BIGINT NOT NULL,
@@ -29,6 +29,6 @@ CREATE TABLE `USER_CODE_PATTERNS` (
 );
 
 -- Note: The original document referenced USER(USER_ID).
--- Based on typical Spring Boot security and JPA setups, the users table is often named 'MEMBER'
+-- Based on typical Spring Boot security and JPA setups, the user table is often named 'MEMBER'
 -- and the primary key is 'id' of type BIGINT. This script assumes 'MEMBER' and 'id'.
--- Please adjust if your users table is named differently (e.g., 'USERS', 'APP_USER').
+-- Please adjust if your user table is named differently (e.g., 'USERS', 'APP_USER').

@@ -1,6 +1,5 @@
 package kr.or.kosa.backend.algorithm.dto;
 
-import kr.or.kosa.backend.algorithm.domain.ProgrammingLanguage;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -23,7 +22,7 @@ public class SubmissionResponseDto {
     private Long submissionId;
     private Long problemId;
     private String problemTitle;
-    private ProgrammingLanguage language;
+    private String language; // DB 언어명 (예: "Python 3", "Java 17")
     private String sourceCode;
 
     // 채점 결과

@@ -169,9 +169,9 @@ public class AlgoTestcase {
         }
 
         return output.trim()
-                .replaceAll("\\r\\n", "\n")  // CRLF -> LF
-                .replaceAll("\\r", "\n")     // CR -> LF
-                .replaceAll("[ \\t]+", " ");  // 연속 공백/탭 -> 단일 공백
+                .replaceAll("\\r\\n", "\n") // CRLF -> LF
+                .replaceAll("\\r", "\n") // CR -> LF
+                .replaceAll("[ \\t]+", " "); // 연속 공백/탭 -> 단일 공백
     }
 
     /**
@@ -229,7 +229,8 @@ public class AlgoTestcase {
     /**
      * 채점 결과 설정
      */
-    public void setJudgeResult(String actualOutput, boolean passed, Long executionTime, Long memoryUsage, String errorMessage) {
+    public void setJudgeResult(String actualOutput, boolean passed, Long executionTime, Long memoryUsage,
+            String errorMessage) {
         this.actualOutput = actualOutput;
         this.passed = passed;
         this.executionTime = executionTime;
