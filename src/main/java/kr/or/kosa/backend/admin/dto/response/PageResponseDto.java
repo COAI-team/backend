@@ -1,5 +1,6 @@
 package kr.or.kosa.backend.admin.dto.response;
 
+
 import java.util.List;
 
 public record PageResponseDto<T>(
@@ -29,10 +30,10 @@ public record PageResponseDto<T>(
 
     private static boolean hasNext(int page, int totalCount, int size){
         int totalPages = calcTotalPages(totalCount, size);
-        return page < totalPages - 1;
+        return page < totalPages;
     }
 
     private static boolean hasPrevious(int page){
-        return page > 0;
+        return page - 1 > 0;
     }
 }

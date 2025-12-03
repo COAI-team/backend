@@ -7,11 +7,11 @@
 
     <resultMap id="findCondition"
                type="kr.or.kosa.backend.admin.dto.response.UserFindResponseDto">
-        <id     column="USER_ID"    property="userId"/>
+        <id     column="USER_ID"            property="userId"/>
         <result column="USER_EMAIL"         property="userEmail"/>
-        <result column="USER_NICKNAME"  property="userNickName"/>
-        <result column="USER_GRADE"       property="userGrade"/>
-        <result column="USER_ROLE"       property="userRole"/>
+        <result column="USER_NICKNAME"      property="userNickName"/>
+        <result column="USER_GRADE"         property="userGrade"/>
+        <result column="USER_ROLE"          property="userRole"/>
     </resultMap>
 
     <select id="findCondition"
