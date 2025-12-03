@@ -5,6 +5,8 @@ import kr.or.kosa.backend.users.domain.Users;
 import kr.or.kosa.backend.users.dto.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.Map;
+
 public interface UserService {
 
     Long register(UserRegisterRequestDto dto, MultipartFile imageFile);
@@ -34,4 +36,8 @@ public interface UserService {
     Users githubLogin(GitHubUserResponse gitHubUser);
 
     boolean disconnectGithub(Long userId);
+
+    boolean isGithubLinked(Long userId);
+
+    Map<String, Object> getGithubUserInfo(Long userId);
 }

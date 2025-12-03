@@ -6,6 +6,7 @@ import org.apache.ibatis.annotations.Param;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 @Mapper
 public interface UserMapper {
@@ -66,4 +67,8 @@ public interface UserMapper {
     );
 
     int deleteSocialAccount(Long userId, String provider);
+
+    Integer countSocialAccount(Long userId, String provider);
+
+    Map<String, Object> getGithubUserInfo(@Param("userId") Long userId);
 }

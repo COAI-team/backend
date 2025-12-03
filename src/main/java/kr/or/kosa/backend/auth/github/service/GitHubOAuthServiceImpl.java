@@ -32,18 +32,6 @@ public class GitHubOAuthServiceImpl implements GitHubOAuthService {
 
     @Value("${github.redirect-uri}")
     private String redirectUri;
-
-    /**
-     * 🔗 GitHub OAuth 인증 URL 생성
-     */
-    @Override
-    public String getGithubAuthorizeUrl() {
-        return "https://github.com/login/oauth/authorize"
-                + "?client_id=" + clientId
-                + "&redirect_uri=" + redirectUri
-                + "&scope=user:email";
-    }
-
     /**
      * 🔥 code로 Access Token + 프로필 정보 조회
      */
@@ -102,7 +90,7 @@ public class GitHubOAuthServiceImpl implements GitHubOAuthService {
         String url = "https://api.github.com/user";
 
         HttpHeaders headers = new HttpHeaders();
-        headers.set("Authorization", "Bearer " + accessToken);
+        headers.set("Authorization", "token " + accessToken);
         headers.set("Accept", "application/json");
 
         HttpEntity<Void> entity = new HttpEntity<>(headers);

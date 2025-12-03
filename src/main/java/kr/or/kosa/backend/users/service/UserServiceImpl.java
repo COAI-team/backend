@@ -19,6 +19,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -467,8 +468,8 @@ public class UserServiceImpl implements UserService {
     }
 
     // ---------------------------------------------------------
-// GitHub 연동 해제
-// ---------------------------------------------------------
+    // GitHub 연동 해제
+    // ---------------------------------------------------------
     @Override
     public boolean disconnectGithub(Long userId) {
 
@@ -481,5 +482,25 @@ public class UserServiceImpl implements UserService {
         int result = userMapper.deleteSocialAccount(userId, "github");
 
         return result > 0;
+    }
+
+    // ---------------------------------------------------------
+    // GitHub 연동 여부 확인
+    // ---------------------------------------------------------
+    @Override
+    public boolean isGithubLinked(Long userId) {
+
+        // 소셜 로그인 추가 여부 확인 (userMapper 필요)
+        Integer count = userMapper.countSocialAccount(userId, "github");
+
+        return count != null && count > 0;
+    }
+
+    // ---------------------------------------------------------
+    // GitHub 연동 정보 조회
+    // ---------------------------------------------------------
+    @Override
+    public Map<String, Object> getGithubUserInfo(Long userId) {
+        return userMapper.getGithubUserInfo(userId);
     }
 }

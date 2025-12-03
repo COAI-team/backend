@@ -186,7 +186,7 @@ public class UserController {
     public ResponseEntity<Map<String, Object>> requestDelete(
             @AuthenticationPrincipal JwtUserDetails user
     ) {
-        boolean result = userService.requestDelete(Long.valueOf(user.id()));
+        boolean result = userService.requestDelete(user.id());
 
         return ResponseEntity.ok(Map.of(
                 KEY_SUCCESS, result,
@@ -203,7 +203,7 @@ public class UserController {
     public ResponseEntity<Map<String, Object>> restoreUser(
             @AuthenticationPrincipal JwtUserDetails user
     ) {
-        boolean result = userService.restoreUser(Long.valueOf(user.id()));
+        boolean result = userService.restoreUser(user.id());
 
         return ResponseEntity.ok(Map.of(
                 KEY_SUCCESS, result,
