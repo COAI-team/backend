@@ -28,56 +28,57 @@ public class SecurityConfig {
 
     private final JwtProvider jwtProvider;
 
-    @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        http
-                .cors(Customizer.withDefaults())
-                .csrf(AbstractHttpConfigurer::disable)
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(
-                                "/",                       // 헬스 등
-                                "/auth/github/**",        // 소셜 로그인 콜백
-                                "/users/register",        // 회원가입
-                                "/users/login",           // 로그인
-                                "/email/**",              // 이메일 인증 관련
-                                "/swagger-ui/**", "/v3/api-docs/**" // 문서(있다면)
-                        ).permitAll()
-                        .anyRequest().authenticated()
-                )
-                .addFilterBefore(
-                        new JwtAuthenticationFilter(jwtProvider),
-                        UsernamePasswordAuthenticationFilter.class
-                );
-
-        return http.build();
-    }
-
-
-
-
 //    @Bean
 //    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-//
 //        http
 //                .cors(Customizer.withDefaults())
 //                .csrf(AbstractHttpConfigurer::disable)
 //                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-//
 //                .authorizeHttpRequests(auth -> auth
-//                        // .requestMatchers(
-//                        // "/**"
-//                        // )
-//                        // .permitAll()
-//                        .anyRequest().permitAll());
-//
-//        // .addFilterBefore(
-//        // new JwtAuthenticationFilter(jwtProvider),
-//        // UsernamePasswordAuthenticationFilter.class
-//        // );
+//                        .requestMatchers(
+//                                "/",                       // 헬스 등
+//                                "/auth/github/**",        // 소셜 로그인 콜백
+//                                "/users/register",        // 회원가입
+//                                "/users/login",           // 로그인
+//                                "/email/**",              // 이메일 인증 관련
+//                                "/swagger-ui/**", "/v3/api-docs/**", // 문서(있다면)
+//                                "/algo/**"  // 알고리즘
+//                        ).permitAll()
+//                        .anyRequest().authenticated()
+//                )
+//                .addFilterBefore(
+//                        new JwtAuthenticationFilter(jwtProvider),
+//                        UsernamePasswordAuthenticationFilter.class
+//                );
 //
 //        return http.build();
 //    }
+
+
+
+
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+
+        http
+                .cors(Customizer.withDefaults())
+                .csrf(AbstractHttpConfigurer::disable)
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+
+                .authorizeHttpRequests(auth -> auth
+                        // .requestMatchers(
+                        // "/**"
+                        // )
+                        // .permitAll()
+                        .anyRequest().permitAll());
+
+        // .addFilterBefore(
+        // new JwtAuthenticationFilter(jwtProvider),
+        // UsernamePasswordAuthenticationFilter.class
+        // );
+
+        return http.build();
+    }
 
     @Bean
     public PasswordEncoder passwordEncoder() {
