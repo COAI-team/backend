@@ -48,17 +48,29 @@ public class AlgoProblem {
     private ProblemSource algoProblemSource;
 
     /**
-     * 지원 프로그래밍 언어 (기본값: ALL)
+     * 문제 유형 (기본값: ALGORITHM)
+     * ALGORITHM: 일반 알고리즘 문제
+     * SQL: 데이터베이스 쿼리 문제
      */
-    private String language;
+    private ProblemType problemType;
+
+    /**
+     * SQL 문제용 초기화 스크립트
+     * problemType이 SQL인 경우 테이블 생성 및 초기 데이터 삽입 스크립트
+     * 예: "CREATE TABLE users (id INT, name VARCHAR(50)); INSERT INTO users VALUES
+     * (1, 'Alice');"
+     */
+    private String initScript;
 
     /**
      * 시간 제한(ms) (기본값: 1000ms)
+     * 실제 채점 시에는 LANGUAGE_CONSTANTS의 배수를 적용한 값 사용
      */
     private Integer timelimit;
 
     /**
      * 메모리 제한(MB) (기본값: 256MB)
+     * 실제 채점 시에는 LANGUAGE_CONSTANTS의 배수를 적용한 값 사용
      */
     private Integer memorylimit;
 
@@ -98,9 +110,9 @@ public class AlgoProblem {
     /**
      * 문제 통계 정보 (조인 시 사용)
      */
-    private Integer totalAttempts;    // 총 시도 횟수
-    private Integer successCount;     // 성공 횟수
-    private Double averageScore;      // 평균 점수
+    private Integer totalAttempts; // 총 시도 횟수
+    private Integer successCount; // 성공 횟수
+    private Double averageScore; // 평균 점수
 
     // === 편의 메서드 ===
 
@@ -108,7 +120,8 @@ public class AlgoProblem {
      * 난이도 배지 색상 반환
      */
     public String getDifficultyColor() {
-        if (algoProblemDifficulty == null) return "#gray";
+        if (algoProblemDifficulty == null)
+            return "#gray";
 
         return switch (algoProblemDifficulty) {
             case BRONZE -> "#cd7f32";
@@ -133,13 +146,34 @@ public class AlgoProblem {
     }
 
     /**
-     * 태그를 배열로 변환 (쉼표 구분 문자열 → 리스트)
+     * 태그를 배열로 변환
+     * JSON 배열 형식("[\"수학\", \"구현\"]") 또는 쉼표 구분 문자열("수학,구현") 모두 지원
      */
     public List<String> getTagsAsList() {
         if (algoProblemTags == null || algoProblemTags.trim().isEmpty()) {
             return new ArrayList<>();
         }
-        return Arrays.asList(algoProblemTags.split(","))
+
+        String trimmed = algoProblemTags.trim();
+
+        // JSON 배열 형식인 경우 (예: "[\"수학\", \"구현\"]")
+        if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+            try {
+                // JSON 배열 파싱: 대괄호 제거 후 쌍따옴표로 감싸진 항목 추출
+                String content = trimmed.substring(1, trimmed.length() - 1); // [ ] 제거
+                return Arrays.stream(content.split(","))
+                        .map(String::trim)
+                        .map(s -> s.replaceAll("^\"|\"$", "")) // 앞뒤 쌍따옴표 제거
+                        .filter(tag -> !tag.isEmpty())
+                        .collect(Collectors.toList());
+            } catch (Exception e) {
+                // 파싱 실패 시 빈 리스트 반환
+                return new ArrayList<>();
+            }
+        }
+
+        // 쉼표 구분 문자열인 경우 (예: "수학,구현")
+        return Arrays.asList(trimmed.split(","))
                 .stream()
                 .map(String::trim)
                 .filter(tag -> !tag.isEmpty())

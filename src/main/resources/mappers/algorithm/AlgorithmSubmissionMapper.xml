@@ -38,14 +38,14 @@
     <insert id="insertSubmission" parameterType="kr.or.kosa.backend.algorithm.domain.AlgoSubmission"
             useGeneratedKeys="true" keyProperty="algosubmissionId">
         INSERT INTO ALGO_SUBMISSIONS (
-        ALGO_PROBLEM_ID, USER_ID, SOURCE_CODE, EXECUTION_TIME, MEMORY_USAGE,
+        ALGO_PROBLEM_ID, USER_ID, SOURCE_CODE, LANGUAGE, EXECUTION_TIME, MEMORY_USAGE,
         PASSED_TEST_COUNT, TOTAL_TEST_COUNT, AI_FEEDBACK, AI_FEEDBACK_STATUS, AI_FEEDBACK_TYPE,
         JUDGE_RESULT, FOCUS_SCORE, AI_SCORE, TIME_EFFICIENCY_SCORE, FINAL_SCORE,
         SCORE_WEIGHTS, FOCUS_SESSION_ID, EYETRACKED, STARTSOLVING, ENDSOLVING,
         SOLVING_DURATION_SECONDS, GITHUB_COMMIT_REQUESTED, GITHUB_COMMIT_STATUS,
         IS_SHARED, SUBMITTED_AT
         ) VALUES (
-        #{algoProblemId}, #{userId}, #{sourceCode}, #{executionTime}, #{memoryUsage},
+        #{algoProblemId}, #{userId}, #{sourceCode}, #{language}, #{executionTime}, #{memoryUsage},
         #{passedTestCount}, #{totalTestCount}, #{aiFeedback}, #{aiFeedbackStatus}, #{aiFeedbackType},
         #{judgeResult}, #{focusScore}, #{aiScore}, #{timeEfficiencyScore}, #{finalScore},
         #{scoreWeights}, #{focusSessionId}, #{eyetracked}, #{startSolving}, #{endSolving},
@@ -61,6 +61,7 @@
         s.ALGO_PROBLEM_ID,
         s.USER_ID,
         s.SOURCE_CODE,
+        s.LANGUAGE,
         s.EXECUTION_TIME,
         s.MEMORY_USAGE,
         s.PASSED_TEST_COUNT,
@@ -82,8 +83,7 @@
         s.GITHUB_COMMIT_REQUESTED,
         s.GITHUB_COMMIT_STATUS,
         s.SUBMITTED_AT,
-        s.IS_SHARED,
-        p.LANGUAGE as LANGUAGE  -- ✅ PROBLEMS 테이블에서 LANGUAGE 가져오기
+        s.IS_SHARED
         FROM ALGO_SUBMISSIONS s
         LEFT JOIN ALGO_PROBLEMS p ON s.ALGO_PROBLEM_ID = p.ALGO_PROBLEM_ID
         WHERE s.ALGOSUBMISSION_ID = #{submissionId}
@@ -113,8 +113,7 @@
     <select id="selectSubmissionsByUserId" resultMap="algoSubmissionResultMap">
         SELECT
         s.*,
-        p.ALGO_PROBLEM_TITLE,
-        p.LANGUAGE as LANGUAGE
+        p.ALGO_PROBLEM_TITLE
         FROM ALGO_SUBMISSIONS s
         LEFT JOIN ALGO_PROBLEMS p ON s.ALGO_PROBLEM_ID = p.ALGO_PROBLEM_ID
         WHERE s.USER_ID = #{userId}
@@ -131,8 +130,7 @@
     <select id="selectPublicSubmissionsByProblemId" resultMap="algoSubmissionResultMap">
         SELECT
         s.*,
-        u.USER_NAME,
-        p.LANGUAGE as LANGUAGE
+        u.USER_NAME
         FROM ALGO_SUBMISSIONS s
         LEFT JOIN USER u ON s.USER_ID = u.USER_ID
         LEFT JOIN ALGO_PROBLEMS p ON s.ALGO_PROBLEM_ID = p.ALGO_PROBLEM_ID
@@ -144,10 +142,8 @@
     <!-- 특정 사용자의 특정 문제 최고 점수 제출 조회 -->
     <select id="selectBestSubmissionByUserAndProblem" resultMap="algoSubmissionResultMap">
         SELECT
-        s.*,
-        p.LANGUAGE as LANGUAGE
+        *
         FROM ALGO_SUBMISSIONS s
-        LEFT JOIN ALGO_PROBLEMS p ON s.ALGO_PROBLEM_ID = p.ALGO_PROBLEM_ID
         WHERE s.USER_ID = #{userId} AND s.ALGO_PROBLEM_ID = #{problemId}
         ORDER BY s.FINAL_SCORE DESC, s.SUBMITTED_AT ASC
         LIMIT 1

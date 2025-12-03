@@ -1,11 +1,12 @@
 package kr.or.kosa.backend.algorithm.service;
 
 import kr.or.kosa.backend.algorithm.domain.AlgoSubmission;
-import kr.or.kosa.backend.algorithm.domain.AlgoTestcase;
-import kr.or.kosa.backend.algorithm.domain.ProgrammingLanguage;
 import kr.or.kosa.backend.algorithm.dto.Judge0RequestDto;
 import kr.or.kosa.backend.algorithm.dto.Judge0ResponseDto;
-import kr.or.kosa.backend.algorithm.dto.SubmissionResponseDto;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -17,7 +18,6 @@ import org.springframework.web.reactive.function.client.WebClient;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.stream.Collectors;
 
 /**
  * Judge0 API 연동 서비스 (ALG-07 관련) - 수정 버전
@@ -43,38 +43,165 @@ public class Judge0Service {
     private Integer memoryLimit;
 
     /**
-     * 프로그래밍 언어를 Judge0 언어 ID로 매핑
+     * DB 언어명을 Judge0 언어 ID로 직접 매핑
+     * LANGUAGE_CONSTANTS 테이블의 LANGUAGE_NAME → Judge0 API language_id
+     * Judge0 공식 문서: https://ce.judge0.com/languages
+     *
+     * @param dbLanguageName DB 언어명 (예: "Python 3", "Java 17", "C++17")
+     * @return Judge0 API language_id
      */
-    private Integer getLanguageId(ProgrammingLanguage language) {
-        switch (language) {
-            case JAVA:
-                return 62; // Java (OpenJDK 13.0.1)
-            case PYTHON:
-                return 71; // Python (3.8.1)
-            case CPP:
-                return 54; // C++ (GCC 9.2.0)
-            case JAVASCRIPT:
-                return 63; // JavaScript (Node.js 12.14.0)
-            case C:
-                return 50; // C (GCC 9.2.0)
-            default:
-                throw new IllegalArgumentException("지원하지 않는 언어입니다: " + language);
+    private Integer getJudge0LanguageId(String dbLanguageName) {
+        if (dbLanguageName == null) {
+            throw new IllegalArgumentException("언어명이 null입니다");
         }
+
+        // DB 언어명 → Judge0 language_id 직접 매핑
+        return switch (dbLanguageName) {
+            // === Assembly ===
+            case "Assembly (32bit)", "Assembly (64bit)" -> 45; // Assembly (NASM 2.14.02)
+
+            // === Bash ===
+            case "Bash" -> 46; // Bash (5.0.0)
+
+            // === C 계열 ===
+            case "C (Clang)" -> 104; // C (Clang 18.1.8)
+            case "C11", "C17", "C23", "C90", "C99", "C2x", "C2x (Clang)", "C90 (Clang)" ->
+                50; // C (GCC 9.2.0) - 기본
+
+            // === C++ 계열 ===
+            case "C++ (Clang)" -> 76; // C++ (Clang 7.0.1)
+            case "C++11", "C++14", "C++17", "C++20", "C++23", "C++26", "C++98" ->
+                54; // C++ (GCC 9.2.0) - 기본
+
+            // === C# ===
+            case "C#", "MonoDevelop C#" -> 51; // C# (Mono 6.6.0.161)
+
+            // === COBOL ===
+            case "Cobol" -> 77; // COBOL (GnuCOBOL 2.2)
+
+            // === Clojure ===
+            case "Clojure" -> 86; // Clojure (1.10.1)
+
+            // === D ===
+            case "D", "D (LDC)" -> 56; // D (DMD 2.089.1)
+
+            // === Elixir ===
+            case "Elixir" -> 57; // Elixir (1.9.4)
+
+            // === Erlang ===
+            case "Erlang" -> 58; // Erlang (OTP 22.2)
+
+            // === F# ===
+            case "F# (.NET)", "F# (Mono)" -> 87; // F# (.NET Core SDK 3.1.202)
+
+            // === Fortran ===
+            case "Fortran" -> 59; // Fortran (GFortran 9.2.0)
+
+            // === Go ===
+            case "Go" -> 107; // Go (1.23.5) - 최신 버전
+            case "Go (gccgo)" -> 60; // Go (1.13.5)
+
+            // === Haskell ===
+            case "Haskell" -> 61; // Haskell (GHC 8.8.1)
+
+            // === Java 계열 ===
+            case "Java (JDK 17)", "Java 17" -> 91; // Java (JDK 17.0.6)
+            case "Java (JDK 21)", "Java 21" -> 91; // Java 21은 17로 대체
+            case "Java 11", "Java 15", "Java 19", "Java 8", "Java 8 (OpenJDK)" ->
+                62; // Java (OpenJDK 13.0.1) - 기본
+
+            // === JavaScript 계열 ===
+            case "node.js" -> 102; // JavaScript (Node.js 22.08.0) - 최신
+            case "Rhino" -> 63; // JavaScript (Node.js 12.14.0)
+            case "TypeScript" -> 101; // TypeScript (5.6.2) - 최신
+
+            // === Kotlin ===
+            case "Kotlin (JVM)", "Kotlin (Native)" -> 111; // Kotlin (2.1.10) - 최신
+
+            // === Lua ===
+            case "Lua" -> 64; // Lua (5.3.5)
+
+            // === Objective-C ===
+            case "Objective-C", "Objective-C++" -> 79; // Objective-C (Clang 7.0.1)
+
+            // === OCaml ===
+            case "OCaml" -> 65; // OCaml (4.09.0)
+
+            // === Pascal ===
+            case "Pascal", "Pascal (FPC)" -> 67; // Pascal (FPC 3.0.4)
+
+            // === Perl ===
+            case "Perl", "Perl 6" -> 85; // Perl (5.28.1)
+
+            // === PHP ===
+            case "PHP" -> 98; // PHP (8.3.11) - 최신
+
+            // === Prolog ===
+            case "Prolog" -> 69; // Prolog (GNU Prolog 1.4.5)
+
+            // === Python 계열 ===
+            case "Python 3" -> 113; // Python (3.14.0) - 최신
+            case "Python 2" -> 70; // Python (2.7.17)
+            case "PyPy3" -> 113; // Python 3 최신으로 대체
+            case "PyPy2" -> 70; // Python 2로 대체
+
+            // === R ===
+            case "R" -> 99; // R (4.4.1) - 최신
+
+            // === Ruby ===
+            case "Ruby" -> 72; // Ruby (2.7.0)
+
+            // === Rust 계열 ===
+            case "Rust", "Rust 2018", "Rust 2021" -> 108; // Rust (1.85.0) - 최신
+
+            // === Scala ===
+            case "Scala" -> 112; // Scala (3.4.2) - 최신
+
+            // === Swift ===
+            case "Swift", "Swift (Apple)" -> 83; // Swift (5.2.3)
+
+            // === SQL ===
+            case "SQLite" -> 82; // SQL (SQLite 3.27.2)
+            case "MySQL", "PostgreSQL" -> 82; // SQLite로 대체 (Judge0에서 MySQL/PostgreSQL 미지원)
+
+            // === 기타 지원되지 않는 언어 ===
+            case "Ada", "Algol 68", "AWK", "Befunge", "Brainf**k", "Ceylon", "Cobra",
+                 "Golfscript", "Haxe", "Nemerle", "Nim", "Nimrod", "Pike", "Pony",
+                 "Scheme (Chicken)", "Scheme (Racket)", "Sed", "Tcl", "Text", "Vim",
+                 "Visual Basic", "Whitespace", "아희 (Aheui)", "아희 (Aheui) (Bok-sil)", "아희 (Aheui) (C)" ->
+                throw new IllegalArgumentException(
+                    "Judge0에서 지원하지 않는 언어입니다: " + dbLanguageName +
+                    ". DB에는 존재하지만 Judge0 API에서는 사용할 수 없습니다.");
+
+            default -> throw new IllegalArgumentException(
+                "알 수 없는 언어입니다: " + dbLanguageName +
+                ". LANGUAGE_CONSTANTS 테이블에 등록된 언어가 아니거나 Judge0 매핑이 누락되었습니다.");
+        };
     }
 
     /**
      * 모든 테스트케이스에 대해 순차적으로 채점 실행
+     *
+     * @param sourceCode      제출할 소스 코드
+     * @param dbLanguageName  DB 언어명 (예: "Python 3", "Java 17")
+     * @param testCases       테스트케이스 목록
+     * @param timeLimit       시간 제한 (ms)
+     * @param memoryLimit     메모리 제한 (KB)
+     * @return 채점 결과
      */
     public CompletableFuture<JudgeResultDto> judgeCode(
             String sourceCode,
-            ProgrammingLanguage language,
-            List<TestCaseDto> testCases) {
+            String dbLanguageName,
+            List<TestCaseDto> testCases,
+            Integer timeLimit,
+            Integer memoryLimit) {
 
         return CompletableFuture.supplyAsync(() -> {
-            log.info("Judge0 채점 시작 - language: {}, testCases: {}", language, testCases.size());
+            log.info("Judge0 채점 시작 - language: {}, testCases: {}, timeLimit: {}ms, memoryLimit: {}MB",
+                    dbLanguageName, testCases.size(), timeLimit, memoryLimit);
 
             List<TestCaseResultDto> results = new ArrayList<>();
-            Integer languageId = getLanguageId(language);
+            Integer languageId = getJudge0LanguageId(dbLanguageName);
             int passedCount = 0;
             int maxExecutionTime = 0;
             int maxMemoryUsage = 0;
@@ -86,7 +213,7 @@ public class Judge0Service {
                     log.debug("테스트케이스 {} 실행 중...", i + 1);
 
                     TestCaseResultDto result = executeSingleTestCase(
-                            sourceCode, languageId, testCase, i + 1);
+                            sourceCode, languageId, testCase, i + 1, timeLimit, memoryLimit);
 
                     results.add(result);
 
@@ -136,21 +263,28 @@ public class Judge0Service {
     /**
      * 단일 테스트케이스 실행
      */
-    @Retryable(value = {Exception.class}, maxAttempts = 3, backoff = @Backoff(delay = 1000))
+    @Retryable(retryFor = { Exception.class }, maxAttempts = 3, backoff = @Backoff(delay = 1000))
     private TestCaseResultDto executeSingleTestCase(
             String sourceCode,
             Integer languageId,
             TestCaseDto testCase,
-            Integer testCaseNumber) {
+            Integer testCaseNumber,
+            Integer timeLimit,
+            Integer memoryLimit) {
 
         // 1. Judge0 요청 DTO
+        // timeLimit (ms) -> cpu_time_limit (seconds) 변환 필요
+        // Judge0는 초 단위 (float) 지원
+        float cpuTimeLimitSec = timeLimit != null ? timeLimit / 1000.0f : this.cpuTimeLimit.floatValue();
+        int memoryLimitKb = memoryLimit != null ? memoryLimit * 1000 : this.memoryLimit; // MB -> KB
+
         Judge0RequestDto request = Judge0RequestDto.builder()
                 .source_code(sourceCode)
                 .language_id(languageId)
                 .stdin(testCase.getInput())
                 .expected_output(testCase.getExpectedOutput())
-                .cpu_time_limit(cpuTimeLimit.intValue())
-                .memory_limit(memoryLimit)
+                .cpu_time_limit(cpuTimeLimitSec)
+                .memory_limit(memoryLimitKb)
                 .enable_per_process_and_thread_time_limit(true)
                 .enable_per_process_and_thread_memory_limit(true)
                 .build();
@@ -189,7 +323,6 @@ public class Judge0Service {
         }
     }
 
-
     /**
      * Judge0 응답 결과 해석
      */
@@ -198,14 +331,13 @@ public class Judge0Service {
             TestCaseDto testCase,
             Integer testCaseNumber) {
 
-        TestCaseResultDto.TestCaseResultDtoBuilder builder =
-                TestCaseResultDto.builder()
-                        .testCaseNumber(testCaseNumber)
-                        .input(testCase.getInput())
-                        .expectedOutput(testCase.getExpectedOutput())
-                        .actualOutput(response.getStdout())
-                        .executionTime(response.getTime() != null ? (int) Math.round(response.getTime() * 1000) : null)
-                        .memoryUsage(response.getMemory() != null ? response.getMemory().intValue() : null);
+        TestCaseResultDto.TestCaseResultDtoBuilder builder = TestCaseResultDto.builder()
+                .testCaseNumber(testCaseNumber)
+                .input(testCase.getInput())
+                .expectedOutput(testCase.getExpectedOutput())
+                .actualOutput(response.getStdout())
+                .executionTime(response.getTime() != null ? (int) Math.round(response.getTime() * 1000) : null)
+                .memoryUsage(response.getMemory() != null ? response.getMemory().intValue() : null);
 
         // 컴파일 에러 확인
         if (response.getCompile_output() != null && !response.getCompile_output().trim().isEmpty()) {
@@ -247,7 +379,8 @@ public class Judge0Service {
             case RE:
                 return builder
                         .result("ERROR")
-                        .errorMessage("런타임 에러: " + (response.getMessage() != null ? response.getMessage() : "알 수 없는 오류"))
+                        .errorMessage(
+                                "런타임 에러: " + (response.getMessage() != null ? response.getMessage() : "알 수 없는 오류"))
                         .build();
             case CE:
                 return builder
@@ -299,10 +432,10 @@ public class Judge0Service {
 
     // DTO 클래스들
 
-    @lombok.Data
-    @lombok.Builder
-    @lombok.NoArgsConstructor
-    @lombok.AllArgsConstructor
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class TestCaseDto {
         private String input;
         private String expectedOutput;
@@ -322,10 +455,10 @@ public class Judge0Service {
         private List<TestCaseResultDto> testCaseResults;
     }
 
-    @lombok.Data
-    @lombok.Builder
-    @lombok.NoArgsConstructor
-    @lombok.AllArgsConstructor
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class TestCaseResultDto {
         private Integer testCaseNumber;
         private String input;

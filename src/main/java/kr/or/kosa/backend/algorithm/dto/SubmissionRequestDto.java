@@ -1,7 +1,6 @@
 package kr.or.kosa.backend.algorithm.dto;
 
 import kr.or.kosa.backend.algorithm.domain.AlgoSubmission;
-import kr.or.kosa.backend.algorithm.domain.ProgrammingLanguage;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -20,7 +19,7 @@ import java.time.LocalDateTime;
 public class SubmissionRequestDto {
 
     private Long problemId;
-    private ProgrammingLanguage language;
+    private String language; // DB 언어명 (예: "Python 3", "Java 17", "C++17")
     private String sourceCode;
 
     // 시간 추적 정보

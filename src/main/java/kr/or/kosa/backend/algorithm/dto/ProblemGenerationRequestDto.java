@@ -19,9 +19,9 @@ public class ProblemGenerationRequestDto {
     /** 문제 주제/유형 (필수) - String으로 받음 */
     private String topic;
 
-    /** 프로그래밍 언어 (선택) 기본값: ALL */
+    /** 문제 타입 (ALGORITHM, SQL) */
     @Builder.Default
-    private String language = "ALL";
+    private String problemType = "ALGORITHM";
 
     /** 추가 요구사항 */
     private String additionalRequirements;

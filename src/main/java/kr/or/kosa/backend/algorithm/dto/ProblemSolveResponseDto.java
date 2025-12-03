@@ -37,6 +37,11 @@ public class ProblemSolveResponseDto {
     // 이전 제출 정보 (있다면)
     private SubmissionSummaryDto previousSubmission;
 
+    // 추가 정보 (SQL 문제 및 언어별 제한)
+    private String problemType; // ALGORITHM, SQL
+    private String initScript; // SQL 문제용 초기화 스크립트
+    private List<LanguageOption> availableLanguages; // 언어별 제한 정보
+
     @Data
     @Builder
     @NoArgsConstructor
@@ -56,5 +61,16 @@ public class ProblemSolveResponseDto {
         private String judgeResult;
         private BigDecimal finalScore;
         private LocalDateTime submittedAt;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class LanguageOption {
+        private String languageName; // 표시명 (예: "Java 17")
+        private String value; // 제출용 값 (예: "JAVA")
+        private Integer timeLimit; // 계산된 시간 제한
+        private Integer memoryLimit; // 계산된 메모리 제한
     }
 }
