@@ -23,7 +23,7 @@ public class AdminController {
         @RequestParam(defaultValue = "") String userEmail,
         @RequestParam(defaultValue = "") String userRole
     ){
-        adminService.findByCondotion();
-        return null;
+        return adminService.findByCondotion();
+        
     }
 }
