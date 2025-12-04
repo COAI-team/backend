@@ -5,6 +5,7 @@
 
 <mapper namespace="kr.or.kosa.backend.admin.mapper.AdminMapper">
 
+<!--                 유저 검색                -->
     <resultMap id="findCondition"
                type="kr.or.kosa.backend.admin.dto.response.UserFindResponseDto">
         <id     column="USER_ID"            property="userId"/>
@@ -19,14 +20,21 @@
         SELECT USER_ID, USER_EMAIL, USER_NICKNAME, USER_GRADE, USER_ROLE
         FROM USERS
         <where>
-            <if test="userRole != null and userRole != ''">
-                USER_ROLE = #{userRole}
-            </if>
+            <choose>
+                <when test="filter instanceof java.lang.Integer">
+                    USER_ISDELETED = #{filter}
+                </when>
+                <when test="filter instanceof java.lang.String and filter != ''">
+                    USER_ROLE = #{filter}
+                </when>
+            </choose>
+
+
             <if test="userEmail != null and userEmail != ''">
                 AND USER_EMAIL LIKE CONCAT('%', #{userEmail}, '%')
             </if>
         </where>
-        ORDER BY USER_ID DESC
+        ORDER BY ${sortField} ${sortOrder}
         LIMIT #{limit} OFFSET #{offset}
     </select>
 
@@ -37,13 +45,42 @@
         FROM
         USERS
         <where>
-            <if test="userRole != null and userRole != ''">
-                USER_ROLE = #{userRole}
-            </if>
+            <choose>
+                <when test="filter instanceof java.lang.Integer">
+                    USER_ISDELETED = #{filter}
+                </when>
+                <when test="filter instanceof java.lang.String and filter != ''">
+                    USER_ROLE = #{filter}
+                </when>
+            </choose>
+
             <if test="userEmail != null and userEmail != ''">
                 AND USER_EMAIL LIKE CONCAT('%', #{userEmail}, '%')
             </if>
         </where>
     </select>
+
+    <!--                 유저 상세 정보                 -->
+    <resultMap id="findOneUserByUseerId"
+               type="kr.or.kosa.backend.admin.dto.response.AdminUserDetailResponseDto">
+        <!-- 기본 키 -->
+        <id     column="USER_ID"             property="userId"/>
+        <!-- 기본 정보 -->
+        <result column="USER_EMAIL"          property="userEmail"/>
+        <result column="USER_NAME"           property="userName"/>
+        <result column="USER_NICKNAME"       property="userNickName"/>
+        <result column="USER_ROLE"           property="userRole"/>
+        <result column="USER_GRADE"          property="userGrade"/>
+        <!-- 날짜/시간 정보 -->
+        <result column="USER_CREATEDAT"      property="userCreateAt"/>
+        <result column="USER_DELETEDAT"      property="userDeleteAt"/>
+        <!-- 기타 상태 정보 -->
+        <result column="USER_POINT"          property="userPoint"/>
+        <result column="USER_ISSUBSCRIBED"   property="userIsSubscribed"/>
+        <result column="USER_SUBSCRIBE_START" property="userSubscribeStart"/>
+        <result column="USER_SUBSCRIBE_END"   property="userSubscribeEnd"/>
+    </resultMap>
+
+
 
 </mapper>

@@ -23,4 +23,12 @@ public class AdminController {
         PageResponseDto<UserFindResponseDto> result = adminService.findByCondotion(req);
         return  ResponseEntity.ok(ApiResponse.success(result));
     }
+
+    @GetMapping("/userdetail/{userId}")
+    public ResponseEntity<ApiResponse<Void>> findOneUser(
+        @PathVariable("userId") Long userId
+    ){
+        System.out.println("userId = " + userId);
+        return null;
+    }
 }
