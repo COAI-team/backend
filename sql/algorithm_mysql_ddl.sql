@@ -11,25 +11,28 @@ USE `algorithm_platform`;
 -- =============================================
 -- 0. 사용자 테이블 (외래키 참조를 위해 먼저 생성)
 -- =============================================
-CREATE TABLE `USERS` (
-    `USER_ID` BIGINT AUTO_INCREMENT PRIMARY KEY,
-    `USER_EMAIL` VARCHAR(255) NOT NULL,
-    `USER_PW` VARCHAR(255) NOT NULL,
-    `USER_NAME` VARCHAR(100) NOT NULL,
-    `USER_NICKNAME` VARCHAR(50) NOT NULL,
-    `USER_IMAGE` VARCHAR(500) NULL,
-    `USER_GRADE` INT DEFAULT 1 NOT NULL,
-    `USER_ROLE` ENUM('ROLE_USER', 'ROLE_ADMIN') DEFAULT 'ROLE_USER' NOT NULL,
-    `USER_ISDELETED` TINYINT(1) DEFAULT 0 NOT NULL,
-    `USER_DELETEDAT` DATETIME NULL,
-    `USER_CREATEDAT` DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    `USER_UPDATEDAT` DATETIME DEFAULT CURRENT_TIMESTAMP NULL ON UPDATE CURRENT_TIMESTAMP,
-    `USER_ENABLED` TINYINT(1) DEFAULT 1 NOT NULL,
-    `USER_ISSUBSCRIBED` TINYINT(1) DEFAULT 0 NOT NULL,
-    
-    CONSTRAINT `UQ_USERS_EMAIL` UNIQUE (`USER_EMAIL`),
-    CONSTRAINT `UQ_USERS_NICKNAME` UNIQUE (`USER_NICKNAME`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='사용자';
+create table USERS
+(
+    USER_ID           bigint auto_increment
+        primary key,
+    USER_EMAIL        varchar(255)                                               not null,
+    USER_PW           varchar(255)                                               not null,
+    USER_NAME         varchar(100)                                               not null,
+    USER_NICKNAME     varchar(50)                                                not null,
+    USER_IMAGE        varchar(500)                                               null,
+    USER_GRADE        int                              default 1                 not null,
+    USER_ROLE         enum ('ROLE_USER', 'ROLE_ADMIN') default 'ROLE_USER'       not null,
+    USER_ISDELETED    tinyint(1)                       default 0                 not null,
+    USER_DELETEDAT    datetime                                                   null,
+    USER_CREATEDAT    datetime                         default CURRENT_TIMESTAMP not null,
+    USER_UPDATEDAT    datetime                         default CURRENT_TIMESTAMP null on update CURRENT_TIMESTAMP,
+    USER_ENABLED      tinyint(1)                       default 1                 not null,
+    USER_ISSUBSCRIBED tinyint(1)                       default 0                 not null,
+    constraint UQ_USERS_EMAIL
+        unique (USER_EMAIL),
+    constraint UQ_USERS_NICKNAME
+        unique (USER_NICKNAME)
+);
 
 -- =============================================
 -- 1. 알고리즘 문제 테이블 (SQL 문제 지원 추가)
