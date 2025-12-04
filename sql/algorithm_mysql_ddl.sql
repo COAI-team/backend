@@ -96,6 +96,10 @@ CREATE TABLE `ALGO_TESTCASES` (
 -- =============================================
 -- 4. 알고리즘 제출 테이블
 -- =============================================
+-- 변경사항:
+-- - FOCUS_SCORE, FOCUS_SESSION_ID, EYETRACKED 컬럼 제거 (모니터링이 점수에 미반영)
+-- - SOLVE_MODE 추가: 'BASIC'(자유 풀이) vs 'FOCUS'(집중 모드 - 시간제한+모니터링)
+-- - MONITORING_SESSION_ID 추가: 모니터링 세션과 연결
 CREATE TABLE `ALGO_SUBMISSIONS` (
     `ALGOSUBMISSION_ID` BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '제출 고유 식별자',
     `ALGO_PROBLEM_ID` BIGINT NOT NULL COMMENT '문제 고유 식별자',
@@ -110,13 +114,12 @@ CREATE TABLE `ALGO_SUBMISSIONS` (
     `AI_FEEDBACK_STATUS` ENUM('PENDING', 'COMPLETED', 'FAILED') DEFAULT 'PENDING' COMMENT 'AI 리뷰 진행 상태',
     `AI_FEEDBACK_TYPE` ENUM('QUALITY', 'PERFORMANCE', 'STYLE', 'COMPREHENSIVE') DEFAULT 'COMPREHENSIVE' COMMENT 'AI 피드백 유형',
     `JUDGE_RESULT` ENUM('AC', 'WA', 'TLE', 'MLE', 'RE', 'CE', 'PENDING') DEFAULT 'PENDING' COMMENT '채점 결과',
-    `FOCUS_SCORE` DECIMAL(5,2) DEFAULT 0.00 COMMENT '시선추적 집중도 점수 (0-100)',
+    `SOLVE_MODE` ENUM('BASIC', 'FOCUS') DEFAULT 'BASIC' COMMENT '풀이 모드 (BASIC: 자유, FOCUS: 집중모드)',
+    `MONITORING_SESSION_ID` VARCHAR(255) NULL COMMENT '연결된 모니터링 세션 ID (FOCUS 모드일 때만)',
     `AI_SCORE` DECIMAL(5,2) DEFAULT 0.00 COMMENT 'AI 코드 품질 점수 (0-100)',
     `TIME_EFFICIENCY_SCORE` DECIMAL(5,2) DEFAULT 0.00 COMMENT '시간 효율성 점수 (0-100)',
     `FINAL_SCORE` DECIMAL(5,2) DEFAULT 0.00 COMMENT '최종 종합 점수 (0-100)',
     `SCORE_WEIGHTS` JSON NULL COMMENT '점수 가중치 정보',
-    `FOCUS_SESSION_ID` VARCHAR(255) NULL COMMENT '연결된 집중 추적 세션 ID',
-    `EYETRACKED` TINYINT(1) DEFAULT 0 COMMENT '시선 추적 사용 여부',
     `STARTSOLVING` TIMESTAMP NULL COMMENT '문제 풀이 시작 시각',
     `ENDSOLVING` TIMESTAMP NULL COMMENT '문제 풀이 종료 시각',
     `SOLVING_DURATION_SECONDS` INT NULL COMMENT '총 풀이 소요 시간(초)',
@@ -124,67 +127,71 @@ CREATE TABLE `ALGO_SUBMISSIONS` (
     `GITHUB_COMMIT_STATUS` ENUM('NONE', 'PENDING', 'COMPLETED', 'FAILED') DEFAULT 'NONE' COMMENT 'GitHub 커밋 진행 상태',
     `SUBMITTED_AT` TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '제출 시각',
     `IS_SHARED` TINYINT(1) DEFAULT 0 COMMENT '게시글로 공유 여부',
-    
+
     -- 외래키
     FOREIGN KEY (`ALGO_PROBLEM_ID`) REFERENCES `ALGO_PROBLEMS`(`ALGO_PROBLEM_ID`) ON DELETE CASCADE,
     FOREIGN KEY (`USER_ID`) REFERENCES `USERS`(`USER_ID`) ON DELETE CASCADE,
-    
+
     -- 인덱스
     INDEX `idx_user_problem` (`USER_ID`, `ALGO_PROBLEM_ID`),
     INDEX `idx_final_score` (`FINAL_SCORE` DESC),
     INDEX `idx_submitted_at` (`SUBMITTED_AT` DESC),
-    INDEX `idx_focus_session` (`FOCUS_SESSION_ID`),
-    INDEX `idx_judge_result` (`JUDGE_RESULT`)
+    INDEX `idx_monitoring_session` (`MONITORING_SESSION_ID`),
+    INDEX `idx_judge_result` (`JUDGE_RESULT`),
+    INDEX `idx_solve_mode` (`SOLVE_MODE`)
 ) ENGINE=InnoDB AUTO_INCREMENT=1000 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='알고리즘 제출 기록';
 
 -- =============================================
--- 5. 집중 추적 세션 테이블
+-- 5. 모니터링 세션 테이블 (집중 모드 전용)
 -- =============================================
-CREATE TABLE `FOCUS_SESSIONS` (
+-- 설계 근거:
+-- 1. 기존 FOCUS_SESSIONS + FOCUS_SUMMARY + VIOLATION_LOGS 3개 테이블을 1개로 통합
+-- 2. 위반 유형별 개별 카운트 컬럼 사용 (JSON 대신) → 쿼리 단순화, 인덱스 활용 가능
+-- 3. 모니터링은 점수에 영향 없음 (정보 제공 및 경고 목적)
+-- 4. FOCUS 모드에서만 생성됨 (BASIC 모드에서는 생성 안함)
+CREATE TABLE `MONITORING_SESSIONS` (
     `SESSION_ID` VARCHAR(255) PRIMARY KEY COMMENT '세션 고유 식별자 (UUID)',
     `USER_ID` BIGINT NOT NULL COMMENT '사용자 ID',
     `ALGO_PROBLEM_ID` BIGINT NOT NULL COMMENT '문제 ID',
-    `SESSION_STATUS` ENUM('ACTIVE', 'COMPLETED', 'TERMINATED') DEFAULT 'ACTIVE' COMMENT '세션 진행 상태',
+    `ALGOSUBMISSION_ID` BIGINT NULL COMMENT '연결된 제출 ID (제출 후 연결)',
+
+    -- 세션 상태 및 시간
+    `SESSION_STATUS` ENUM('ACTIVE', 'COMPLETED', 'TIMEOUT', 'TERMINATED') DEFAULT 'ACTIVE' COMMENT '세션 상태',
     `STARTED_AT` TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '세션 시작 시각',
     `ENDED_AT` TIMESTAMP NULL COMMENT '세션 종료 시각',
-    `REDIS_EXPIRES_AT` TIMESTAMP NULL COMMENT 'Redis 데이터 만료 시점',
-    `REDIS_DATA_AVAILABLE` TINYINT(1) DEFAULT 1 COMMENT 'Redis 상세 데이터 존재 여부',
-    `VIOLATION_COUNT` INT DEFAULT 0 COMMENT '감지된 부정행위 총 횟수',
-    `SUMMARY_CREATED` TINYINT(1) DEFAULT 0 COMMENT '배치 요약 생성 완료 여부',
-    
+
+    -- 시간 제한 설정
+    `TIME_LIMIT_MINUTES` INT NOT NULL COMMENT '설정된 제한 시간(분)',
+    `REMAINING_SECONDS` INT NULL COMMENT '종료 시 남은 시간(초)',
+    `AUTO_SUBMITTED` TINYINT(1) DEFAULT 0 COMMENT '시간 초과로 자동 제출 여부',
+
+    -- 위반 유형별 카운트 (각 모니터링 요소)
+    `GAZE_AWAY_COUNT` INT DEFAULT 0 COMMENT '시선 이탈 횟수',
+    `SLEEPING_COUNT` INT DEFAULT 0 COMMENT '졸음 감지 횟수',
+    `NO_FACE_COUNT` INT DEFAULT 0 COMMENT '얼굴 미감지 횟수 (자리비움)',
+    `MASK_DETECTED_COUNT` INT DEFAULT 0 COMMENT '마스크 착용 감지 횟수',
+    `MULTIPLE_FACES_COUNT` INT DEFAULT 0 COMMENT '복수 인원 감지 횟수',
+    `MOUSE_LEAVE_COUNT` INT DEFAULT 0 COMMENT '마우스 화면 이탈 횟수',
+    `TAB_SWITCH_COUNT` INT DEFAULT 0 COMMENT '탭/브라우저 전환 횟수',
+    `FULLSCREEN_EXIT_COUNT` INT DEFAULT 0 COMMENT '전체화면 해제 횟수',
+
+    -- 집계
+    `TOTAL_VIOLATIONS` INT DEFAULT 0 COMMENT '총 위반 횟수',
+    `WARNING_SHOWN_COUNT` INT DEFAULT 0 COMMENT '경고 팝업 표시 횟수',
+
+    -- 외래키
     FOREIGN KEY (`ALGO_PROBLEM_ID`) REFERENCES `ALGO_PROBLEMS`(`ALGO_PROBLEM_ID`) ON DELETE CASCADE,
     FOREIGN KEY (`USER_ID`) REFERENCES `USERS`(`USER_ID`) ON DELETE CASCADE,
-    
+
+    -- 인덱스
     INDEX `idx_user_started` (`USER_ID`, `STARTED_AT` DESC),
     INDEX `idx_session_status` (`SESSION_STATUS`),
-    INDEX `idx_summary_processing` (`SUMMARY_CREATED`, `ENDED_AT`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='집중 추적 세션';
+    INDEX `idx_problem_user` (`ALGO_PROBLEM_ID`, `USER_ID`),
+    INDEX `idx_submission` (`ALGOSUBMISSION_ID`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='집중 모드 모니터링 세션';
 
 -- =============================================
--- 6. 집중도 요약 테이블
--- =============================================
-CREATE TABLE `FOCUS_SUMMARY` (
-    `SUMMARY_ID` BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '요약 고유 식별자',
-    `SESSION_ID` VARCHAR(255) NOT NULL UNIQUE COMMENT '연결된 세션 ID',
-    `USER_ID` BIGINT NOT NULL COMMENT '사용자 ID',
-    `TOTAL_EVENTS` INT DEFAULT 0 COMMENT '총 시선 추적 이벤트 수',
-    `FOCUS_IN_PERCENTAGE` DECIMAL(5,2) DEFAULT 0.00 COMMENT '전체 시간 대비 집중 비율',
-    `TOTAL_VIOLATIONS` INT DEFAULT 0 COMMENT '총 부정행위 감지 횟수',
-    `CRITICAL_VIOLATIONS` INT DEFAULT 0 COMMENT '치명적 부정행위 횟수',
-    `FINAL_FOCUS_SCORE` DECIMAL(5,2) DEFAULT 0.00 COMMENT '최종 집중도 점수',
-    `FOCUS_GRADE` ENUM('EXCELLENT', 'GOOD', 'FAIR', 'POOR') NULL COMMENT '집중도 등급',
-    `PROCESSED_AT` TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '배치 처리 완료 시각',
-    
-    FOREIGN KEY (`SESSION_ID`) REFERENCES `FOCUS_SESSIONS`(`SESSION_ID`) ON DELETE CASCADE,
-    FOREIGN KEY (`USER_ID`) REFERENCES `USERS`(`USER_ID`) ON DELETE CASCADE,
-    
-    UNIQUE INDEX `uk_session_id` (`SESSION_ID`),
-    INDEX `idx_user_score` (`USER_ID`, `FINAL_FOCUS_SCORE` DESC),
-    INDEX `idx_focus_grade` (`FOCUS_GRADE`)
-) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='집중도 배치 요약';
-
--- =============================================
--- 7. GitHub 커밋 테이블
+-- 6. GitHub 커밋 테이블
 -- =============================================
 CREATE TABLE `GITHUB_COMMITS` (
     `COMMIT_ID` BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '커밋 고유 식별자',
@@ -210,27 +217,14 @@ CREATE TABLE `GITHUB_COMMITS` (
 ) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='GitHub 자동 커밋';
 
 -- =============================================
--- 8. 부정행위 로그 테이블
+-- (삭제됨) 부정행위 로그 테이블
 -- =============================================
-CREATE TABLE `VIOLATION_LOGS` (
-    `VIOLATION_ID` BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '부정행위 고유 식별자',
-    `SESSION_ID` VARCHAR(255) NOT NULL COMMENT '연결된 세션 ID',
-    `USER_ID` BIGINT NOT NULL COMMENT '사용자 ID',
-    `VIOLATION_TYPE` ENUM('TAB_SWITCH', 'SCREEN_EXIT', 'FACE_MISSING', 'SUSPICIOUS_PATTERN') NOT NULL COMMENT '부정행위 유형',
-    `SEVERITY` ENUM('HIGH', 'CRITICAL') NOT NULL COMMENT '부정행위 심각도',
-    `OCCURRENCE_COUNT` INT DEFAULT 1 COMMENT '연속 발생 횟수',
-    `AUTO_ACTION` ENUM('WARNING', 'TIME_REDUCTION', 'SESSION_TERMINATE') NOT NULL COMMENT '자동 처리 조치',
-    `PENALTY_SCORE` DECIMAL(5,2) DEFAULT 0.00 COMMENT '적용된 감점',
-    `DETECTED_AT` TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '부정행위 감지 시각',
-    `SESSION_TIME_OFFSET_SECONDS` INT NOT NULL COMMENT '세션 시작으로부터 오프셋(초)',
-    
-    FOREIGN KEY (`SESSION_ID`) REFERENCES `FOCUS_SESSIONS`(`SESSION_ID`) ON DELETE CASCADE,
-    FOREIGN KEY (`USER_ID`) REFERENCES `USERS`(`USER_ID`) ON DELETE CASCADE,
-    
-    INDEX `idx_session_severity` (`SESSION_ID`, `SEVERITY`),
-    INDEX `idx_user_violations` (`USER_ID`, `DETECTED_AT` DESC),
-    INDEX `idx_violation_type` (`VIOLATION_TYPE`)
-) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='중대 부정행위 로그';
+-- 변경 사유: VIOLATION_LOGS 테이블 삭제
+-- 개별 위반 로그 대신 MONITORING_SESSIONS 테이블의 각 위반 유형별 카운트 컬럼으로 대체
+-- 이유:
+-- 1. 점수에 반영하지 않으므로 상세 로그 불필요
+-- 2. 경고 목적으로는 실시간 카운트만 필요
+-- 3. 테이블 구조 단순화 및 성능 향상
 
 -- =============================================
 -- AUTO_INCREMENT 시작값 설정
@@ -238,9 +232,8 @@ CREATE TABLE `VIOLATION_LOGS` (
 ALTER TABLE `ALGO_PROBLEMS` AUTO_INCREMENT = 1;
 ALTER TABLE `ALGO_TESTCASES` AUTO_INCREMENT = 1;
 ALTER TABLE `ALGO_SUBMISSIONS` AUTO_INCREMENT = 1000;
-ALTER TABLE `FOCUS_SUMMARY` AUTO_INCREMENT = 1;
 ALTER TABLE `GITHUB_COMMITS` AUTO_INCREMENT = 1;
-ALTER TABLE `VIOLATION_LOGS` AUTO_INCREMENT = 1;
+-- MONITORING_SESSIONS은 UUID(VARCHAR) Primary Key 사용으로 AUTO_INCREMENT 불필요
 
 -- =============================================
 -- 언어별 상수 데이터 삽입 (제공된 표 반영 + LANGUAGE_TYPE)
@@ -380,13 +373,16 @@ INSERT INTO `ALGO_TESTCASES` (`ALGO_PROBLEM_ID`, `INPUT_DATA`, `EXPECTED_OUTPUT`
 -- =============================================
 
 -- 사용자별 종합 통계 뷰
+-- 변경: FOCUS_SCORE 제거 (모니터링이 점수에 미반영)
+-- 추가: solve_mode별 통계
 CREATE VIEW `V_USER_STATS` AS
-SELECT 
+SELECT
     s.USER_ID,
     COUNT(s.ALGOSUBMISSION_ID) AS total_submissions,
     COUNT(CASE WHEN s.JUDGE_RESULT = 'AC' THEN 1 END) AS accepted_count,
     ROUND(AVG(s.FINAL_SCORE), 2) AS avg_final_score,
-    ROUND(AVG(s.FOCUS_SCORE), 2) AS avg_focus_score,
+    COUNT(CASE WHEN s.SOLVE_MODE = 'FOCUS' THEN 1 END) AS focus_mode_count,
+    COUNT(CASE WHEN s.SOLVE_MODE = 'BASIC' THEN 1 END) AS basic_mode_count,
     COUNT(DISTINCT s.ALGO_PROBLEM_ID) AS unique_problems
 FROM ALGO_SUBMISSIONS s
 GROUP BY s.USER_ID;
