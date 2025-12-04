@@ -3,7 +3,7 @@ package kr.or.kosa.backend.like.service;
 import kr.or.kosa.backend.codeboard.mapper.CodeboardMapper;
 import kr.or.kosa.backend.freeboard.mapper.FreeboardMapper;
 import kr.or.kosa.backend.comment.mapper.CommentMapper;
-import kr.or.kosa.backend.like.domain.LikeRecord;
+import kr.or.kosa.backend.like.domain.Like;
 import kr.or.kosa.backend.like.domain.ReferenceType;
 import kr.or.kosa.backend.like.mapper.LikeMapper;
 import lombok.RequiredArgsConstructor;
@@ -27,7 +27,7 @@ public class LikeService {
 
     @Transactional
     public boolean toggleLike(Long userId, ReferenceType referenceType, Long referenceId) {
-        LikeRecord existingLike = likeMapper.selectLike(userId, referenceType, referenceId);
+        Like existingLike = likeMapper.selectLike(userId, referenceType, referenceId);
 
         if (existingLike != null) {
             // 좋아요 취소
@@ -36,7 +36,7 @@ public class LikeService {
             return false;
         } else {
             // 좋아요 추가
-            LikeRecord likeRecord = LikeRecord.builder()
+            Like likeRecord = Like.builder()
                     .userId(userId)
                     .referenceType(referenceType)
                     .referenceId(referenceId)

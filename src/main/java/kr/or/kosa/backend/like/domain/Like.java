@@ -11,8 +11,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class LikeRecord {
-
+public class Like {
     private Long likeId;
     private Long userId;
     private ReferenceType referenceType;
