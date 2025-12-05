@@ -39,8 +39,12 @@ public class FreeboardController {
     }
 
     @GetMapping("/{freeboardId}")
-    public ResponseEntity<FreeboardDetailResponseDto> get(@PathVariable Long freeboardId) {
-        FreeboardDetailResponseDto freeboard = freeboardService.detail(freeboardId);
+    public ResponseEntity<FreeboardDetailResponseDto> get(
+            @PathVariable Long freeboardId,
+            @RequestAttribute(value = "userId", required = false) Long userId
+    ) {
+        Long actualUserId = (userId != null) ? userId : 1L;
+        FreeboardDetailResponseDto freeboard = freeboardService.detail(freeboardId, actualUserId);
         return ResponseEntity.ok(freeboard);
     }
 

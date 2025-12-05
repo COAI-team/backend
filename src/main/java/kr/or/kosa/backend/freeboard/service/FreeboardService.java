@@ -8,6 +8,9 @@ import kr.or.kosa.backend.freeboard.dto.FreeboardDto;
 import kr.or.kosa.backend.freeboard.dto.FreeboardListResponseDto;
 import kr.or.kosa.backend.freeboard.exception.FreeboardErrorCode;
 import kr.or.kosa.backend.freeboard.mapper.FreeboardMapper;
+import kr.or.kosa.backend.like.domain.Like;
+import kr.or.kosa.backend.like.domain.ReferenceType;
+import kr.or.kosa.backend.like.mapper.LikeMapper;
 import kr.or.kosa.backend.tag.service.TagService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,6 +33,7 @@ public class FreeboardService {
     private final FreeboardMapper mapper;
     private final ObjectMapper objectMapper;
     private final TagService tagService;
+    private final LikeMapper likeMapper;
 
     public Map<String, Object> listPage(int page, int size) {
         int offset = (page - 1) * size;
@@ -47,17 +51,14 @@ public class FreeboardService {
         return result;
     }
 
-    // 검색/정렬 기능이 포함된 게시글 목록 조회
     public Page<FreeboardListResponseDto> getList(Pageable pageable, String keyword) {
         int offset = (int) pageable.getOffset();
         int pageSize = pageable.getPageSize();
         String sortField = getSortField(pageable);
         String sortDirection = getSortDirection(pageable);
 
-        // 전체 게시글 수 조회
         int totalCount = mapper.countPosts(keyword);
 
-        // 게시글 목록 조회
         List<FreeboardListResponseDto> posts = mapper.findPosts(
                 offset,
                 pageSize,
@@ -69,9 +70,6 @@ public class FreeboardService {
         return new PageImpl<>(posts, pageable, totalCount);
     }
 
-    /**
-     * 정렬 필드 추출
-     */
     private String getSortField(Pageable pageable) {
         if (pageable.getSort().isEmpty()) {
             return "created_at";
@@ -93,9 +91,6 @@ public class FreeboardService {
         }
     }
 
-    /**
-     * 정렬 방향 추출
-     */
     private String getSortDirection(Pageable pageable) {
         if (pageable.getSort().isEmpty()) {
             return "DESC";
@@ -105,7 +100,7 @@ public class FreeboardService {
     }
 
     @Transactional
-    public FreeboardDetailResponseDto detail(Long id) {
+    public FreeboardDetailResponseDto detail(Long id, Long userId) {
         mapper.increaseClick(id);
 
         FreeboardDetailResponseDto freeboard = mapper.selectById(id);
@@ -114,8 +109,23 @@ public class FreeboardService {
         }
 
         List<String> tags = tagService.getFreeboardTags(id);
+        Like existingLike = likeMapper.selectLike(userId, ReferenceType.POST_FREEBOARD, id);
+        boolean isLiked = existingLike != null;
 
-        return freeboard.withTags(tags);
+        return FreeboardDetailResponseDto.builder()
+                .freeboardId(freeboard.getFreeboardId())
+                .userId(freeboard.getUserId())
+                .userNickname(freeboard.getUserNickname())
+                .freeboardTitle(freeboard.getFreeboardTitle())
+                .freeboardContent(freeboard.getFreeboardContent())
+                .freeboardClick(freeboard.getFreeboardClick())
+                .likeCount(freeboard.getLikeCount() != null ? freeboard.getLikeCount() : 0)
+                .freeboardImage(freeboard.getFreeboardImage())
+                .freeboardRepresentImage(freeboard.getFreeboardRepresentImage())
+                .freeboardCreatedAt(freeboard.getFreeboardCreatedAt())
+                .tags(tags)
+                .isLiked(isLiked)
+                .build();
     }
 
     @Transactional
@@ -156,7 +166,6 @@ public class FreeboardService {
 
     @Transactional
     public void edit(Long id, FreeboardDto dto, Long userId) {
-
         FreeboardDetailResponseDto existing = mapper.selectById(id);
         if (existing == null) {
             throw new CustomBusinessException(FreeboardErrorCode.NOT_FOUND);

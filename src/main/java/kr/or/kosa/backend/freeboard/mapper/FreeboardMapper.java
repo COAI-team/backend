@@ -14,7 +14,7 @@ public interface FreeboardMapper {
     List<FreeboardListResponseDto> selectPage(@Param("offset") int offset, @Param("size") int size);
 
     // 게시글 상세 조회
-    FreeboardDetailResponseDto selectById(Long id);
+    FreeboardDetailResponseDto selectById(Long freeboardId);
 
     // 게시글 작성
     int insert(Freeboard board);

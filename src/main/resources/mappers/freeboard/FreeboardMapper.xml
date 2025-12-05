@@ -133,13 +133,14 @@
         <result property="freeboardTitle" column="FREEBOARD_TITLE"/>
         <result property="freeboardContent" column="FREEBOARD_CONTENT"/>
         <result property="freeboardClick" column="FREEBOARD_CLICK"/>
+        <result property="likeCount" column="LIKE_COUNT"/>
         <result property="freeboardImage" column="FREEBOARD_IMAGE"/>
         <result property="freeboardRepresentImage" column="FREEBOARD_REPRESENT_IMAGE"/>
         <result property="freeboardCreatedAt" column="FREEBOARD_CREATED_AT"/>
     </resultMap>
 
     <!-- 상세 조회 -->
-    <select id="selectById" parameterType="long" resultMap="FreeboardDetailResponseMap">
+    <select id="selectById" resultMap="FreeboardDetailResponseMap">
         SELECT
         f.FREEBOARD_ID,
         f.USER_ID,
@@ -149,10 +150,11 @@
         f.FREEBOARD_IMAGE,
         f.FREEBOARD_REPRESENT_IMAGE,
         f.FREEBOARD_CREATED_AT,
+        f.LIKE_COUNT,
         u.USER_NICKNAME
         FROM FREEBOARD f
         LEFT JOIN USERS u ON f.USER_ID = u.USER_ID
-        WHERE f.FREEBOARD_ID = #{id}
+        WHERE f.FREEBOARD_ID = #{freeboardId}
         AND f.FREEBOARD_DELETED_YN = 'N'
     </select>
 
@@ -214,19 +216,18 @@
         WHERE FREEBOARD_DELETED_YN = 'N'
     </select>
 
-    <!-- 좋아요 개수 증가 -->
+    <!-- 좋아요 수 증가 -->
     <update id="incrementLikeCount">
         UPDATE FREEBOARD
         SET LIKE_COUNT = LIKE_COUNT + 1
         WHERE FREEBOARD_ID = #{freeboardId}
     </update>
 
-    <!-- 좋아요 개수 감소 -->
+    <!-- 좋아요 수 감소 -->
     <update id="decrementLikeCount">
         UPDATE FREEBOARD
-        SET LIKE_COUNT = LIKE_COUNT - 1
+        SET LIKE_COUNT = GREATEST(LIKE_COUNT - 1, 0)
         WHERE FREEBOARD_ID = #{freeboardId}
-        AND LIKE_COUNT > 0
     </update>
 
 </mapper>
