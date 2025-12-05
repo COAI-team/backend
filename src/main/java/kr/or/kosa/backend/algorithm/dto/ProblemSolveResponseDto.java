@@ -2,20 +2,22 @@ package kr.or.kosa.backend.algorithm.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.Getter;
 
 import java.time.LocalDateTime;
 import java.math.BigDecimal;
 import java.util.List;
 
-// ====== ProblemSolveResponseDto.java ======
 /**
  * 문제 풀이 시작 응답 DTO (ALG-04)
+ *
+ * Response DTO: 서비스에서 빌더로 생성, JSON 직렬화용
+ * - @Builder: 서비스에서 객체 생성
+ * - @AllArgsConstructor: Builder 내부에서 사용
+ * - @Getter: Jackson이 JSON 직렬화
  */
-@Data
+@Getter
 @Builder
-@NoArgsConstructor
 @AllArgsConstructor
 public class ProblemSolveResponseDto {
 
@@ -42,9 +44,8 @@ public class ProblemSolveResponseDto {
     private String initScript; // SQL 문제용 초기화 스크립트
     private List<LanguageOption> availableLanguages; // 언어별 제한 정보
 
-    @Data
+    @Getter
     @Builder
-    @NoArgsConstructor
     @AllArgsConstructor
     public static class TestCaseDto {
         private String input;
@@ -52,9 +53,8 @@ public class ProblemSolveResponseDto {
         private Boolean isSample;
     }
 
-    @Data
+    @Getter
     @Builder
-    @NoArgsConstructor
     @AllArgsConstructor
     public static class SubmissionSummaryDto {
         private Long submissionId;
@@ -63,9 +63,8 @@ public class ProblemSolveResponseDto {
         private LocalDateTime submittedAt;
     }
 
-    @Data
+    @Getter
     @Builder
-    @NoArgsConstructor
     @AllArgsConstructor
     public static class LanguageOption {
         private String languageName; // 표시명 (예: "Java 17")

@@ -1,18 +1,21 @@
 package kr.or.kosa.backend.algorithm.dto;
 
 import kr.or.kosa.backend.algorithm.dto.enums.JudgeResult;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 /**
  * Judge0 API 응답 DTO
+ *
+ * 외부 API 수신용 DTO: JSON 역직렬화
+ * - @NoArgsConstructor: Jackson이 기본 생성자로 객체 생성
+ * - @Setter: Jackson이 값 주입
+ * - @Getter: 서비스에서 값 읽기
  */
-@Data
-@Builder
+@Getter
+@Setter
 @NoArgsConstructor
-@AllArgsConstructor
 public class Judge0ResponseDto {
 
     private String token;
@@ -24,10 +27,9 @@ public class Judge0ResponseDto {
     private Double time;
     private Double memory;
 
-    @Data
-    @Builder
+    @Getter
+    @Setter
     @NoArgsConstructor
-    @AllArgsConstructor
     public static class StatusDto {
         private Integer id;
         private String description;

@@ -2,10 +2,9 @@ package kr.or.kosa.backend.algorithm.dto;
 
 import kr.or.kosa.backend.algorithm.dto.enums.AiFeedbackType;
 import kr.or.kosa.backend.algorithm.dto.enums.SolveMode;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.time.LocalDateTime;
 
@@ -16,11 +15,15 @@ import java.time.LocalDateTime;
  * 변경사항:
  * - focusSessionId → monitoringSessionId 변경
  * - solveMode 추가 (BASIC/FOCUS)
+ *
+ * Request DTO: JSON 역직렬화용
+ * - @NoArgsConstructor: Jackson이 기본 생성자로 객체 생성
+ * - @Setter: Jackson이 값 주입
+ * - @Getter: 서비스에서 값 읽기
  */
-@Data
-@Builder
+@Getter
+@Setter
 @NoArgsConstructor
-@AllArgsConstructor
 public class SubmissionRequestDto {
 
     private Long problemId;

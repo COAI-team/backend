@@ -4,18 +4,21 @@ import kr.or.kosa.backend.algorithm.dto.enums.ProblemDifficulty;
 import kr.or.kosa.backend.algorithm.dto.enums.ProblemSource;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.Getter;
 
 import java.time.LocalDateTime;
 
 /**
  * 문제 목록 응답 Dto
+ *
+ * Response DTO: 서비스에서 빌더로 생성, JSON 직렬화용
+ * - @Builder: 서비스에서 객체 생성
+ * - @AllArgsConstructor: Builder 내부에서 사용
+ * - @Getter: Jackson이 JSON 직렬화
  */
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
+@Getter
 @Builder
+@AllArgsConstructor
 public class ProblemListResponseDto {
 
     // 문제 기본 정보

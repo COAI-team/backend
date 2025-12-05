@@ -2,8 +2,8 @@ package kr.or.kosa.backend.algorithm.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.Getter;
+import lombok.Setter;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -11,10 +11,16 @@ import java.util.List;
 /**
  * AI 문제 생성 응답 DTO
  * AI가 생성한 문제 정보 + 테스트케이스
+ *
+ * 양방향 DTO: 서비스에서 빌더로 생성 + DB 저장 후 ID 설정
+ * - @Builder: 서비스에서 객체 생성
+ * - @AllArgsConstructor: Builder 내부에서 사용
+ * - @Getter: Jackson이 JSON 직렬화
+ * - @Setter: DB 저장 후 problemId 설정 (AlgorithmProblemService.saveGeneratedProblem)
  */
-@Data
+@Getter
+@Setter
 @Builder
-@NoArgsConstructor
 @AllArgsConstructor
 public class ProblemGenerationResponseDto {
 
