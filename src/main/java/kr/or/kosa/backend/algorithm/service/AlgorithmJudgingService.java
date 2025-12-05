@@ -37,7 +37,7 @@ public class AlgorithmJudgingService {
      * - Judge0 채점 후 즉시 AI 평가 시작
      */
     @Async("judgeExecutor") // ✅ 비동기 어노테이션 추가
-    protected void processCompleteJudgingFlow(Long submissionId, SubmissionRequestDto request, AlgoProblemDto problem) {
+    public void processCompleteJudgingFlow(Long submissionId, SubmissionRequestDto request, AlgoProblemDto problem) {
         log.info("🔄 [스레드: {}] 통합 채점 프로세스 시작 - submissionId: {}",
                 Thread.currentThread().getName(), submissionId);
 
@@ -76,9 +76,15 @@ public class AlgorithmJudgingService {
                     submissionId, judgeResult.getOverallResult());
 
             // 4. AI 평가 및 점수 계산 비동기 시작 (분리된 서비스)
-            log.info("🤖 AI 평가 서비스 호출 시작 - submissionId: {}", submissionId);
-            evaluationService.processEvaluationAsync(submissionId, problem, judgeResult);
-            log.info("✅ AI 평가 서비스 호출 완료 - submissionId: {}", submissionId);
+            log.info("🤖 AI 평가 서비스 호출 시작 - submissionId: {}, 현재 스레드: {}",
+                    submissionId, Thread.currentThread().getName());
+            try {
+                evaluationService.processEvaluationAsync(submissionId, problem, judgeResult);
+                log.info("✅ AI 평가 서비스 호출 완료 - submissionId: {}", submissionId);
+            } catch (Exception aiEx) {
+                log.error("❌ AI 평가 서비스 호출 실패 - submissionId: {}", submissionId, aiEx);
+                throw aiEx; // 상위 catch 블록에서 처리하도록 재던짐
+            }
 
         } catch (Exception e) {
             log.error("통합 채점 프로세스 중 오류 발생 - submissionId: {}", submissionId, e);
