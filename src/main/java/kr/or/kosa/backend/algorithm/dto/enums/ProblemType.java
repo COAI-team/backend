@@ -1,4 +1,4 @@
-package kr.or.kosa.backend.algorithm.domain;
+package kr.or.kosa.backend.algorithm.dto.enums;
 
 /**
  * 문제 유형 Enum
@@ -10,7 +10,7 @@ public enum ProblemType {
      * C++, Java, Python 등의 일반 프로그래밍 언어로 풀이
      */
     ALGORITHM,
-    
+
     /**
      * SQL 문제
      * MySQL, PostgreSQL 등의 DB 언어로 풀이

@@ -1,4 +1,4 @@
-package kr.or.kosa.backend.algorithm.domain;
+package kr.or.kosa.backend.algorithm.dto.enums;
 
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;

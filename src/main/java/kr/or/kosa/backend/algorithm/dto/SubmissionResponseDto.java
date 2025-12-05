@@ -11,6 +11,10 @@ import java.util.List;
 
 /**
  * 제출 결과 응답 DTO
+ *
+ * 변경사항:
+ * - focusScore 제거 (모니터링은 점수에 미반영)
+ * - solveMode, monitoringSessionId 추가
  */
 @Data
 @Builder
@@ -42,8 +46,11 @@ public class SubmissionResponseDto {
     private String aiFeedbackStatus;
     private BigDecimal aiScore;
 
-    // 점수 정보
-    private BigDecimal focusScore;
+    // 풀이 모드 및 모니터링
+    private String solveMode; // BASIC, FOCUS
+    private String monitoringSessionId;
+
+    // 점수 정보 (focusScore 제거됨 - 모니터링은 점수에 미반영)
     private BigDecimal timeEfficiencyScore;
     private BigDecimal finalScore;
     private ScoreBreakdownDto scoreBreakdown;
@@ -81,8 +88,8 @@ public class SubmissionResponseDto {
     public static class ScoreBreakdownDto {
         private BigDecimal judgeScore;      // 채점 점수 (40%)
         private BigDecimal aiScore;         // AI 품질 점수 (30%)
-        private BigDecimal timeScore;       // 시간 효율성 (20%)
-        private BigDecimal focusScore;      // 집중도 점수 (10%)
+        private BigDecimal timeScore;       // 시간 효율성 (30%)
+        // focusScore 제거됨 - 모니터링은 점수에 미반영
         private String scoreWeights;        // 가중치 설명
     }
 }

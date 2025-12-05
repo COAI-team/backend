@@ -5,10 +5,10 @@
 <mapper namespace="kr.or.kosa.backend.algorithm.mapper.LanguageConstantMapper">
 
     <!-- ResultMap: LanguageConstant 매핑 -->
-    <resultMap id="LanguageConstantResultMap" type="kr.or.kosa.backend.algorithm.domain.LanguageConstant">
+    <resultMap id="LanguageConstantResultMap" type="kr.or.kosa.backend.algorithm.dto.LanguageConstantDto">
         <id property="languageName" column="LANGUAGE_NAME"/>
         <result property="languageType" column="LANGUAGE_TYPE"
-                javaType="kr.or.kosa.backend.algorithm.domain.LanguageType"/>
+                javaType="kr.or.kosa.backend.algorithm.dto.enums.LanguageType"/>
         <result property="timeFactor" column="TIME_FACTOR"/>
         <result property="timeAddition" column="TIME_ADDITION"/>
         <result property="memoryFactor" column="MEMORY_FACTOR"/>
