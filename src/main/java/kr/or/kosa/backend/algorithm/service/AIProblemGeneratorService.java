@@ -18,10 +18,14 @@ import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.chat.prompt.PromptTemplate;
 import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
+import reactor.core.scheduler.Schedulers;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -75,6 +79,117 @@ public class AIProblemGeneratorService {
                     .status(ProblemGenerationResponseDto.GenerationStatus.FAILED)
                     .errorMessage(e.getMessage())
                     .build();
+        }
+    }
+
+    /**
+     * AI 문제 생성 (스트리밍 버전)
+     * SSE를 통해 실시간으로 생성 과정을 클라이언트에 전송
+     */
+    public Flux<String> generateProblemStream(ProblemGenerationRequestDto request) {
+        return Flux.create(sink -> {
+            // 별도 스레드에서 실행
+            Schedulers.boundedElastic().schedule(() -> {
+                long startTime = System.currentTimeMillis();
+
+                try {
+                    // 1단계: 시작 알림
+                    emitStep(sink, "프롬프트 생성 중...");
+                    Thread.sleep(300); // 시각적 피드백을 위한 짧은 대기
+
+                    // 2단계: 프롬프트 생성
+                    String prompt = buildPrompt(request);
+                    emitStep(sink, "AI에게 문제 생성 요청 중...");
+
+                    // 3단계: OpenAI API 호출
+                    String aiResponse = callOpenAI(prompt);
+                    emitStep(sink, "응답 분석 중...");
+                    Thread.sleep(200);
+
+                    // 4단계: 파싱
+                    emitStep(sink, "문제 정보 파싱 중...");
+                    AlgoProblemDto problem = parseAIProblemResponse(aiResponse, request);
+                    List<AlgoTestcaseDto> testCases = parseAITestCaseResponse(aiResponse);
+
+                    // 5단계: DB 저장
+                    emitStep(sink, "데이터베이스에 저장 중...");
+
+                    // 문제 저장 (MyBatis useGeneratedKeys로 ID 자동 설정)
+                    algorithmProblemMapper.insertProblem(problem);
+                    Long problemId = problem.getAlgoProblemId();
+
+                    // 테스트케이스 저장
+                    for (AlgoTestcaseDto tc : testCases) {
+                        tc.setAlgoProblemId(problemId);
+                        algorithmProblemMapper.insertTestcase(tc);
+                    }
+
+                    double generationTime = (System.currentTimeMillis() - startTime) / 1000.0;
+
+                    // 6단계: 완료 이벤트 전송
+                    Map<String, Object> completeData = new HashMap<>();
+                    completeData.put("problemId", problemId);
+                    completeData.put("title", problem.getAlgoProblemTitle());
+                    completeData.put("description", problem.getAlgoProblemDescription());
+                    completeData.put("difficulty", problem.getAlgoProblemDifficulty());
+                    completeData.put("testCaseCount", testCases.size());
+                    completeData.put("generationTime", generationTime);
+
+                    emitComplete(sink, completeData);
+
+                    log.info("스트리밍 문제 생성 완료 - 문제 ID: {}, 소요시간: {}초", problemId, generationTime);
+
+                } catch (Exception e) {
+                    log.error("스트리밍 문제 생성 실패", e);
+                    emitError(sink, e.getMessage());
+                }
+            });
+        });
+    }
+
+    /**
+     * SSE 단계 이벤트 전송
+     */
+    private void emitStep(reactor.core.publisher.FluxSink<String> sink, String message) {
+        try {
+            Map<String, Object> event = new HashMap<>();
+            event.put("type", "STEP");
+            event.put("message", message);
+            sink.next(objectMapper.writeValueAsString(event));
+        } catch (JsonProcessingException e) {
+            log.error("이벤트 JSON 변환 실패", e);
+        }
+    }
+
+    /**
+     * SSE 완료 이벤트 전송
+     */
+    private void emitComplete(reactor.core.publisher.FluxSink<String> sink, Map<String, Object> data) {
+        try {
+            Map<String, Object> event = new HashMap<>();
+            event.put("type", "COMPLETE");
+            event.put("data", data);
+            sink.next(objectMapper.writeValueAsString(event));
+            sink.complete();
+        } catch (JsonProcessingException e) {
+            log.error("완료 이벤트 JSON 변환 실패", e);
+            sink.complete();
+        }
+    }
+
+    /**
+     * SSE 에러 이벤트 전송
+     */
+    private void emitError(reactor.core.publisher.FluxSink<String> sink, String message) {
+        try {
+            Map<String, Object> event = new HashMap<>();
+            event.put("type", "ERROR");
+            event.put("message", message);
+            sink.next(objectMapper.writeValueAsString(event));
+            sink.complete();
+        } catch (JsonProcessingException e) {
+            log.error("에러 이벤트 JSON 변환 실패", e);
+            sink.complete();
         }
     }
 
