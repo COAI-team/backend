@@ -61,7 +61,7 @@
     </select>
 
     <!--                 유저 상세 정보                 -->
-    <resultMap id="findOneUserByUseerId"
+    <resultMap id="findOneUserByUserId"
                type="kr.or.kosa.backend.admin.dto.response.AdminUserDetailResponseDto">
         <!-- 기본 키 -->
         <id     column="USER_ID"             property="userId"/>
@@ -75,12 +75,43 @@
         <result column="USER_CREATEDAT"      property="userCreateAt"/>
         <result column="USER_DELETEDAT"      property="userDeleteAt"/>
         <!-- 기타 상태 정보 -->
-        <result column="USER_POINT"          property="userPoint"/>
-        <result column="USER_ISSUBSCRIBED"   property="userIsSubscribed"/>
-        <result column="USER_SUBSCRIBE_START" property="userSubscribeStart"/>
-        <result column="USER_SUBSCRIBE_END"   property="userSubscribeEnd"/>
+        <result column="balance"          property="userPoint"/>
+        <result column="start_date" property="userSubscribeStart"/>
+        <result column="end_date"   property="userSubscribeEnd"/>
     </resultMap>
 
+    <select id="findOneUserByUseerId" resultType="kr.or.kosa.backend.admin.dto.response.AdminUserDetailResponseDto">
+        SELECT
+        u.USER_ID,
+        u.USER_EMAIL,
+        u.USER_NAME,
+        u.USER_NICKNAME,
+        u.USER_ROLE,
+        u.USER_GRADE,
+        u.USER_CREATEDAT,
+        u.USER_DELETEDAT,
+        up.balance,
+        MAX(s.start_date) AS start_date,
+        MAX(s.end_date) AS end_date,
+        CASE
+        WHEN MAX(s.end_date) > NOW() THEN 'ACTIVE'
+        WHEN MAX(s.end_date) IS NULL THEN 'NONE'
+        ELSE 'EXPIRED'
+        END AS subscription_status
+        FROM USERS u
+        LEFT JOIN user_points up ON up.user_id = u.USER_ID
+        LEFT JOIN subscriptions s ON s.user_id = u.USER_ID AND s.status = 'ACTIVE'
+        WHERE u.USER_ID = #{userId}
+        GROUP BY
+        u.USER_ID, u.USER_EMAIL, u.USER_NAME, u.USER_NICKNAME,
+        u.USER_ROLE, u.USER_GRADE, u.USER_CREATEDAT, u.USER_DELETEDAT, up.balance;
 
+    </select>
+
+
+<!--    <select id="">-->
+<!--        select user_id, plan_code, amount, approved_at from payments-->
+<!--        where user_id = #{userId} and status = 'DONE'-->
+<!--    </select>-->
 
 </mapper>

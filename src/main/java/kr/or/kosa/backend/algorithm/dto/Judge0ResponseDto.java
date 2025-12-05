@@ -1,6 +1,6 @@
 package kr.or.kosa.backend.algorithm.dto;
 
-import kr.or.kosa.backend.algorithm.domain.AlgoSubmission;
+import kr.or.kosa.backend.algorithm.dto.enums.JudgeResult;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -34,35 +34,35 @@ public class Judge0ResponseDto {
     }
 
     // Judge0 상태 코드 매핑
-    public AlgoSubmission.JudgeResult toJudgeResult() {
+    public JudgeResult toJudgeResult() {
         if (status == null || status.getId() == null) {
-            return AlgoSubmission.JudgeResult.PENDING;
+            return JudgeResult.PENDING;
         }
 
         switch (status.getId()) {
             case 1: // In Queue
             case 2: // Processing
-                return AlgoSubmission.JudgeResult.PENDING;
+                return JudgeResult.PENDING;
             case 3: // Accepted
-                return AlgoSubmission.JudgeResult.AC;
+                return JudgeResult.AC;
             case 4: // Wrong Answer
-                return AlgoSubmission.JudgeResult.WA;
+                return JudgeResult.WA;
             case 5: // Time Limit Exceeded
-                return AlgoSubmission.JudgeResult.TLE;
+                return JudgeResult.TLE;
             case 6: // Compilation Error
-                return AlgoSubmission.JudgeResult.CE;
+                return JudgeResult.CE;
             case 7: // SIGSEGV
             case 8: // SIGXFSZ
             case 9: // SIGFPE
             case 10: // SIGABRT
             case 11: // NZEC
             case 12: // Other
-                return AlgoSubmission.JudgeResult.RE;
+                return JudgeResult.RE;
             case 13: // Internal Error
             case 14: // Exec Format Error
-                return AlgoSubmission.JudgeResult.RE;
+                return JudgeResult.RE;
             default:
-                return AlgoSubmission.JudgeResult.PENDING;
+                return JudgeResult.PENDING;
         }
     }
 }

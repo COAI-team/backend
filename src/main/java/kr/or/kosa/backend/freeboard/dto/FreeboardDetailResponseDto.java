@@ -23,8 +23,10 @@ public class FreeboardDetailResponseDto {
     private String freeboardRepresentImage;
     private LocalDateTime freeboardCreatedAt;
     private List<String> tags;
+    private Boolean isLiked;
+    private Integer likeCount;
 
-    // 태그를 포함한 새 인스턴스 생성
+    // 태그와 좋아요 여부 포함한 새 인스턴스 생성
     public FreeboardDetailResponseDto withTags(List<String> tags) {
         return FreeboardDetailResponseDto.builder()
                 .freeboardId(this.freeboardId)
@@ -37,6 +39,8 @@ public class FreeboardDetailResponseDto {
                 .freeboardRepresentImage(this.freeboardRepresentImage)
                 .freeboardCreatedAt(this.freeboardCreatedAt)
                 .tags(tags)
+                .isLiked(this.isLiked)
+                .likeCount(this.likeCount)
                 .build();
     }
 }

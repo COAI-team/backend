@@ -16,12 +16,43 @@ public record AdminUserDetailResponseDto(
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd HH:mm:ss")
     LocalDateTime userDeleteAt, // 탈퇴일
     int userPoint, // 보유 포인트
-    boolean userIsSubscribed,
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd HH:mm:ss")
     LocalDateTime userSubscribeStart,
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd HH:mm:ss")
-    LocalDateTime userSubscribeEnd
-) { }
+    LocalDateTime userSubscribeEnd,
+    String subscriptionStatus
+) {
+    // 💡 커스텀 생성자 (null 처리 및 변환용)
+    public AdminUserDetailResponseDto(
+        Long userId,
+        String userEmail,
+        String userName,
+        String userNickName,
+        String userRole,
+        int userGrade,
+        LocalDateTime userCreateAt,
+        LocalDateTime userDeleteAt,
+        Integer userPoint,
+        LocalDateTime userSubscribeStart,
+        LocalDateTime userSubscribeEnd,
+        String subscriptionStatus
+    ) {
+        this(
+            userId,
+            userEmail,
+            userName,
+            userNickName,
+            userRole,
+            userGrade, // null이면 기본 등급 1
+            userCreateAt,
+            userDeleteAt,
+            userPoint != null ? userPoint : 0, // null이면 0포인트
+            userSubscribeStart,
+            userSubscribeEnd,
+            subscriptionStatus
+        );
+    }
+}
 
 
 

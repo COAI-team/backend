@@ -1,9 +1,11 @@
 package kr.or.kosa.backend.algorithm.service;
 
-import kr.or.kosa.backend.algorithm.domain.AlgoProblem;
-import kr.or.kosa.backend.algorithm.domain.AlgoSubmission;
-import kr.or.kosa.backend.algorithm.domain.AlgoTestcase;
+import kr.or.kosa.backend.algorithm.dto.AlgoProblemDto;
+import kr.or.kosa.backend.algorithm.dto.AlgoSubmissionDto;
+import kr.or.kosa.backend.algorithm.dto.AlgoTestcaseDto;
 import kr.or.kosa.backend.algorithm.dto.SubmissionRequestDto;
+import kr.or.kosa.backend.algorithm.dto.enums.AiFeedbackStatus;
+import kr.or.kosa.backend.algorithm.dto.enums.JudgeResult;
 import kr.or.kosa.backend.algorithm.mapper.AlgorithmProblemMapper;
 import kr.or.kosa.backend.algorithm.mapper.AlgorithmSubmissionMapper;
 import lombok.RequiredArgsConstructor;
@@ -35,13 +37,13 @@ public class AlgorithmJudgingService {
      * - Judge0 채점 후 즉시 AI 평가 시작
      */
     @Async("judgeExecutor") // ✅ 비동기 어노테이션 추가
-    protected void processCompleteJudgingFlow(Long submissionId, SubmissionRequestDto request, AlgoProblem problem) {
+    public void processCompleteJudgingFlow(Long submissionId, SubmissionRequestDto request, AlgoProblemDto problem) {
         log.info("🔄 [스레드: {}] 통합 채점 프로세스 시작 - submissionId: {}",
                 Thread.currentThread().getName(), submissionId);
 
         try {
             // 1. 모든 테스트케이스 조회
-            List<AlgoTestcase> testCases = problemMapper.selectTestCasesByProblemId(request.getProblemId());
+            List<AlgoTestcaseDto> testCases = problemMapper.selectTestCasesByProblemId(request.getProblemId());
 
             List<Judge0Service.TestCaseDto> testCaseDtos = testCases.stream()
                     .map(tc -> Judge0Service.TestCaseDto.builder()
@@ -74,9 +76,15 @@ public class AlgorithmJudgingService {
                     submissionId, judgeResult.getOverallResult());
 
             // 4. AI 평가 및 점수 계산 비동기 시작 (분리된 서비스)
-            log.info("🤖 AI 평가 서비스 호출 시작 - submissionId: {}", submissionId);
-            evaluationService.processEvaluationAsync(submissionId, problem, judgeResult);
-            log.info("✅ AI 평가 서비스 호출 완료 - submissionId: {}", submissionId);
+            log.info("🤖 AI 평가 서비스 호출 시작 - submissionId: {}, 현재 스레드: {}",
+                    submissionId, Thread.currentThread().getName());
+            try {
+                evaluationService.processEvaluationAsync(submissionId, problem, judgeResult);
+                log.info("✅ AI 평가 서비스 호출 완료 - submissionId: {}", submissionId);
+            } catch (Exception aiEx) {
+                log.error("❌ AI 평가 서비스 호출 실패 - submissionId: {}", submissionId, aiEx);
+                throw aiEx; // 상위 catch 블록에서 처리하도록 재던짐
+            }
 
         } catch (Exception e) {
             log.error("통합 채점 프로세스 중 오류 발생 - submissionId: {}", submissionId, e);
@@ -89,12 +97,12 @@ public class AlgorithmJudgingService {
      */
     private void updateSubmissionWithJudgeResult(Long submissionId, Judge0Service.JudgeResultDto judgeResult,
             SubmissionRequestDto request) {
-        AlgoSubmission submission = submissionMapper.selectSubmissionById(submissionId);
+        AlgoSubmissionDto submission = submissionMapper.selectSubmissionById(submissionId);
         if (submission == null)
             return;
 
         // Judge 결과 설정
-        submission.setJudgeResult(AlgoSubmission.JudgeResult.valueOf(judgeResult.getOverallResult()));
+        submission.setJudgeResult(JudgeResult.valueOf(judgeResult.getOverallResult()));
         submission.setExecutionTime(judgeResult.getMaxExecutionTime());
         submission.setMemoryUsage(judgeResult.getMaxMemoryUsage());
         submission.setPassedTestCount(judgeResult.getPassedTestCount());
@@ -121,10 +129,10 @@ public class AlgorithmJudgingService {
      */
     private void markSubmissionFailed(Long submissionId, String errorMessage) {
         try {
-            AlgoSubmission submission = submissionMapper.selectSubmissionById(submissionId);
+            AlgoSubmissionDto submission = submissionMapper.selectSubmissionById(submissionId);
             if (submission != null) {
-                submission.setJudgeResult(AlgoSubmission.JudgeResult.PENDING);
-                submission.setAiFeedbackStatus(AlgoSubmission.AiFeedbackStatus.FAILED);
+                submission.setJudgeResult(JudgeResult.PENDING);
+                submission.setAiFeedbackStatus(AiFeedbackStatus.FAILED);
                 submissionMapper.updateSubmission(submission);
             }
         } catch (Exception e) {

@@ -1,7 +1,7 @@
 package kr.or.kosa.backend.algorithm.service;
 
-import kr.or.kosa.backend.algorithm.domain.LanguageConstant;
-import kr.or.kosa.backend.algorithm.domain.LanguageType;
+import kr.or.kosa.backend.algorithm.dto.LanguageConstantDto;
+import kr.or.kosa.backend.algorithm.dto.enums.LanguageType;
 import kr.or.kosa.backend.algorithm.mapper.LanguageConstantMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -95,8 +95,8 @@ public class LanguageConstantService {
      * @param languageName 언어명 (예: "Java 17")
      * @return 언어 상수, 없으면 null
      */
-    public LanguageConstant getByLanguageName(String languageName) {
-        LanguageConstant constant = languageConstantMapper.selectByLanguageName(languageName);
+    public LanguageConstantDto getByLanguageName(String languageName) {
+        LanguageConstantDto constant = languageConstantMapper.selectByLanguageName(languageName);
 
         if (constant == null) {
             log.warn("⚠️ 언어 '{}'를 찾을 수 없습니다. 지원하지 않는 언어일 수 있습니다.", languageName);
@@ -121,7 +121,7 @@ public class LanguageConstantService {
      *
      * @return 전체 언어 상수 리스트
      */
-    public List<LanguageConstant> getAllLanguages() {
+    public List<LanguageConstantDto> getAllLanguages() {
         return languageConstantMapper.selectAll();
     }
 
@@ -138,7 +138,7 @@ public class LanguageConstantService {
      * @param languageType 언어 유형 (GENERAL 또는 DB)
      * @return 해당 유형의 언어 상수 리스트
      */
-    public List<LanguageConstant> getLanguagesByType(LanguageType languageType) {
+    public List<LanguageConstantDto> getLanguagesByType(LanguageType languageType) {
         return languageConstantMapper.selectAll().stream()
                 .filter(lc -> lc.getLanguageType() == languageType)
                 .sorted((a, b) -> a.getLanguageName().compareTo(b.getLanguageName()))
@@ -155,13 +155,13 @@ public class LanguageConstantService {
 
     /**
      * 실제 시간 제한 계산 (편의 메서드)
-     * 
+     *
      * @param languageName  언어명
      * @param baseTimeLimit 문제의 기본 시간 제한 (ms)
      * @return 계산된 실제 시간 제한 (ms), 언어를 찾을 수 없으면 기본값 반환
      */
     public int calculateRealTimeLimit(String languageName, int baseTimeLimit) {
-        LanguageConstant constant = getByLanguageName(languageName);
+        LanguageConstantDto constant = getByLanguageName(languageName);
 
         if (constant == null) {
             log.warn("⚠️  언어 '{}'를 찾을 수 없어 기본 시간 제한 사용: {}ms", languageName, baseTimeLimit);
@@ -173,13 +173,13 @@ public class LanguageConstantService {
 
     /**
      * 실제 메모리 제한 계산 (편의 메서드)
-     * 
+     *
      * @param languageName    언어명
      * @param baseMemoryLimit 문제의 기본 메모리 제한 (MB)
      * @return 계산된 실제 메모리 제한 (MB), 언어를 찾을 수 없으면 기본값 반환
      */
     public int calculateRealMemoryLimit(String languageName, int baseMemoryLimit) {
-        LanguageConstant constant = getByLanguageName(languageName);
+        LanguageConstantDto constant = getByLanguageName(languageName);
 
         if (constant == null) {
             log.warn("⚠️ 언어 '{}'를 찾을 수 없어 기본 메모리 제한 사용: {}MB", languageName, baseMemoryLimit);
@@ -196,7 +196,7 @@ public class LanguageConstantService {
      * @param languageConstant 업데이트할 언어 상수
      */
     @Transactional
-    public void updateLanguageConstant(LanguageConstant languageConstant) {
+    public void updateLanguageConstant(LanguageConstantDto languageConstant) {
         log.info("🔧 언어 상수 업데이트 요청: {}", languageConstant.getLanguageName());
 
         int updatedRows = languageConstantMapper.update(languageConstant);
@@ -235,7 +235,7 @@ public class LanguageConstantService {
      * @param languageConstant 추가할 언어 상수
      */
     @Transactional
-    public void addLanguageConstant(LanguageConstant languageConstant) {
+    public void addLanguageConstant(LanguageConstantDto languageConstant) {
         log.info("➕ 새 언어 추가 요청: {}", languageConstant.getLanguageName());
 
         languageConstantMapper.insert(languageConstant);

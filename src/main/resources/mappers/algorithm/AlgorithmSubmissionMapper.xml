@@ -4,7 +4,8 @@
 <mapper namespace="kr.or.kosa.backend.algorithm.mapper.AlgorithmSubmissionMapper">
 
     <!-- Result Map 정의 -->
-    <resultMap id="algoSubmissionResultMap" type="kr.or.kosa.backend.algorithm.domain.AlgoSubmission">
+    <!-- 변경사항: focusScore, focusSessionId, eyetracked 제거 / solveMode, monitoringSessionId 추가 -->
+    <resultMap id="algoSubmissionResultMap" type="kr.or.kosa.backend.algorithm.dto.AlgoSubmissionDto">
         <id property="algosubmissionId" column="ALGOSUBMISSION_ID"/>
         <result property="algoProblemId" column="ALGO_PROBLEM_ID"/>
         <result property="userId" column="USER_ID"/>
@@ -18,7 +19,8 @@
         <result property="aiFeedback" column="AI_FEEDBACK"/>
         <result property="aiFeedbackStatus" column="AI_FEEDBACK_STATUS"/>
         <result property="aiFeedbackType" column="AI_FEEDBACK_TYPE"/>
-        <result property="focusScore" column="FOCUS_SCORE"/>
+        <result property="solveMode" column="SOLVE_MODE"/>
+        <result property="monitoringSessionId" column="MONITORING_SESSION_ID"/>
         <result property="aiScore" column="AI_SCORE"/>
         <result property="timeEfficiencyScore" column="TIME_EFFICIENCY_SCORE"/>
         <result property="finalScore" column="FINAL_SCORE"/>
@@ -26,8 +28,6 @@
         <result property="startSolving" column="STARTSOLVING"/>
         <result property="endSolving" column="ENDSOLVING"/>
         <result property="solvingDurationSeconds" column="SOLVING_DURATION_SECONDS"/>
-        <result property="focusSessionId" column="FOCUS_SESSION_ID"/>
-        <result property="eyetracked" column="EYETRACKED"/>
         <result property="githubCommitRequested" column="GITHUB_COMMIT_REQUESTED"/>
         <result property="githubCommitStatus" column="GITHUB_COMMIT_STATUS"/>
         <result property="isShared" column="IS_SHARED"/>
@@ -35,26 +35,28 @@
     </resultMap>
 
     <!-- 제출 저장 -->
-    <insert id="insertSubmission" parameterType="kr.or.kosa.backend.algorithm.domain.AlgoSubmission"
+    <!-- 변경사항: focusScore, focusSessionId, eyetracked 제거 / solveMode, monitoringSessionId 추가 -->
+    <insert id="insertSubmission" parameterType="kr.or.kosa.backend.algorithm.dto.AlgoSubmissionDto"
             useGeneratedKeys="true" keyProperty="algosubmissionId">
         INSERT INTO ALGO_SUBMISSIONS (
         ALGO_PROBLEM_ID, USER_ID, SOURCE_CODE, LANGUAGE, EXECUTION_TIME, MEMORY_USAGE,
         PASSED_TEST_COUNT, TOTAL_TEST_COUNT, AI_FEEDBACK, AI_FEEDBACK_STATUS, AI_FEEDBACK_TYPE,
-        JUDGE_RESULT, FOCUS_SCORE, AI_SCORE, TIME_EFFICIENCY_SCORE, FINAL_SCORE,
-        SCORE_WEIGHTS, FOCUS_SESSION_ID, EYETRACKED, STARTSOLVING, ENDSOLVING,
+        JUDGE_RESULT, SOLVE_MODE, MONITORING_SESSION_ID, AI_SCORE, TIME_EFFICIENCY_SCORE, FINAL_SCORE,
+        SCORE_WEIGHTS, STARTSOLVING, ENDSOLVING,
         SOLVING_DURATION_SECONDS, GITHUB_COMMIT_REQUESTED, GITHUB_COMMIT_STATUS,
         IS_SHARED, SUBMITTED_AT
         ) VALUES (
         #{algoProblemId}, #{userId}, #{sourceCode}, #{language}, #{executionTime}, #{memoryUsage},
         #{passedTestCount}, #{totalTestCount}, #{aiFeedback}, #{aiFeedbackStatus}, #{aiFeedbackType},
-        #{judgeResult}, #{focusScore}, #{aiScore}, #{timeEfficiencyScore}, #{finalScore},
-        #{scoreWeights}, #{focusSessionId}, #{eyetracked}, #{startSolving}, #{endSolving},
+        #{judgeResult}, #{solveMode}, #{monitoringSessionId}, #{aiScore}, #{timeEfficiencyScore}, #{finalScore},
+        #{scoreWeights}, #{startSolving}, #{endSolving},
         #{solvingDurationSeconds}, #{githubCommitRequested}, #{githubCommitStatus},
         #{isShared}, NOW()
         )
     </insert>
 
     <!-- 제출 ID로 조회 -->
+    <!-- 변경사항: focusScore, focusSessionId, eyetracked 제거 / solveMode, monitoringSessionId 추가 -->
     <select id="selectSubmissionById" resultMap="algoSubmissionResultMap">
         SELECT
         s.ALGOSUBMISSION_ID,
@@ -70,13 +72,12 @@
         s.AI_FEEDBACK_STATUS,
         s.AI_FEEDBACK_TYPE,
         s.JUDGE_RESULT,
-        s.FOCUS_SCORE,
+        s.SOLVE_MODE,
+        s.MONITORING_SESSION_ID,
         s.AI_SCORE,
         s.TIME_EFFICIENCY_SCORE,
         s.FINAL_SCORE,
         s.SCORE_WEIGHTS,
-        s.FOCUS_SESSION_ID,
-        s.EYETRACKED,
         s.STARTSOLVING,
         s.ENDSOLVING,
         s.SOLVING_DURATION_SECONDS,
@@ -90,7 +91,8 @@
     </select>
 
     <!-- 제출 정보 업데이트 -->
-    <update id="updateSubmission" parameterType="kr.or.kosa.backend.algorithm.domain.AlgoSubmission">
+    <!-- 변경사항: focusScore 제거 (모니터링은 점수에 미반영) -->
+    <update id="updateSubmission" parameterType="kr.or.kosa.backend.algorithm.dto.AlgoSubmissionDto">
         UPDATE ALGO_SUBMISSIONS SET
         JUDGE_RESULT = #{judgeResult},
         EXECUTION_TIME = #{executionTime},
@@ -100,7 +102,6 @@
         AI_FEEDBACK = #{aiFeedback},
         AI_FEEDBACK_STATUS = #{aiFeedbackStatus},
         AI_SCORE = #{aiScore},
-        FOCUS_SCORE = #{focusScore},
         TIME_EFFICIENCY_SCORE = #{timeEfficiencyScore},
         FINAL_SCORE = #{finalScore},
         SCORE_WEIGHTS = #{scoreWeights},

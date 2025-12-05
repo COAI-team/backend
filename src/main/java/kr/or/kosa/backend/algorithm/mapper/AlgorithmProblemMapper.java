@@ -1,7 +1,7 @@
 package kr.or.kosa.backend.algorithm.mapper;
 
-import kr.or.kosa.backend.algorithm.domain.AlgoProblem;
-import kr.or.kosa.backend.algorithm.domain.AlgoTestcase;
+import kr.or.kosa.backend.algorithm.dto.AlgoProblemDto;
+import kr.or.kosa.backend.algorithm.dto.AlgoTestcaseDto;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -17,7 +17,7 @@ public interface AlgorithmProblemMapper {
          * @param limit  조회 개수
          * @return 문제 목록
          */
-        List<AlgoProblem> selectProblems(@Param("offset") int offset, @Param("limit") int limit);
+        List<AlgoProblemDto> selectProblems(@Param("offset") int offset, @Param("limit") int limit);
 
         /**
          * 전체 문제 수 조회
@@ -36,7 +36,7 @@ public interface AlgorithmProblemMapper {
          * @param keyword    검색어 (nullable)
          * @return 문제 목록
          */
-        List<AlgoProblem> selectProblemsWithFilter(
+        List<AlgoProblemDto> selectProblemsWithFilter(
                         @Param("offset") int offset,
                         @Param("limit") int limit,
                         @Param("difficulty") String difficulty,
@@ -62,7 +62,7 @@ public interface AlgorithmProblemMapper {
          * @param problemId 문제 ID
          * @return 문제 정보 (없으면 null)
          */
-        AlgoProblem selectProblemById(@Param("problemId") Long problemId);
+        AlgoProblemDto selectProblemById(@Param("problemId") Long problemId);
 
         /**
          * 문제 존재 여부 확인
@@ -79,7 +79,7 @@ public interface AlgorithmProblemMapper {
          * @param problem 문제 엔티티
          * @return 저장된 행 수
          */
-        int insertProblem(AlgoProblem problem);
+        int insertProblem(AlgoProblemDto problem);
 
         /**
          * 테스트케이스 저장
@@ -87,7 +87,7 @@ public interface AlgorithmProblemMapper {
          * @param testcase 테스트케이스 엔티티
          * @return 저장된 행 수
          */
-        int insertTestcase(AlgoTestcase testcase);
+        int insertTestcase(AlgoTestcaseDto testcase);
 
         /**
          * 문제 ID로 테스트케이스 목록 조회
@@ -95,15 +95,15 @@ public interface AlgorithmProblemMapper {
          * @param problemId 문제 ID
          * @return 테스트케이스 목록
          */
-        List<AlgoTestcase> selectTestcasesByProblemId(@Param("problemId") Long problemId);
+        List<AlgoTestcaseDto> selectTestcasesByProblemId(@Param("problemId") Long problemId);
 
         /**
          * 샘플 테스트케이스 조회 (is_sample = true)
          */
-        List<AlgoTestcase> selectSampleTestCasesByProblemId(@Param("problemId") Long problemId);
+        List<AlgoTestcaseDto> selectSampleTestCasesByProblemId(@Param("problemId") Long problemId);
 
         /**
          * 모든 테스트케이스 조회
          */
-        List<AlgoTestcase> selectTestCasesByProblemId(@Param("problemId") Long problemId);
+        List<AlgoTestcaseDto> selectTestCasesByProblemId(@Param("problemId") Long problemId);
 }

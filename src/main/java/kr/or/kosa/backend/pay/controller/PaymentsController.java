@@ -41,6 +41,7 @@ public class PaymentsController {
      *   "amount": 34800
      * }
      */
+
     @PostMapping("/ready")
     public ResponseEntity<Object> createPaymentReady(@AuthenticationPrincipal JwtUserDetails user,
                                                      @RequestBody Payments payments) {

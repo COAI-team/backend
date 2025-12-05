@@ -1,6 +1,6 @@
 package kr.or.kosa.backend.algorithm.mapper;
 
-import kr.or.kosa.backend.algorithm.domain.AlgoSubmission;
+import kr.or.kosa.backend.algorithm.dto.AlgoSubmissionDto;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -17,21 +17,21 @@ public interface AlgorithmSubmissionMapper {
      * @param submission 제출 정보
      * @return 영향받은 행 수
      */
-    int insertSubmission(AlgoSubmission submission);
+    int insertSubmission(AlgoSubmissionDto submission);
 
     /**
      * 제출 ID로 조회
      * @param submissionId 제출 ID
      * @return 제출 정보
      */
-    AlgoSubmission selectSubmissionById(@Param("submissionId") Long submissionId);
+    AlgoSubmissionDto selectSubmissionById(@Param("submissionId") Long submissionId);
 
     /**
      * 제출 정보 업데이트 (채점 결과 등)
      * @param submission 제출 정보
      * @return 영향받은 행 수
      */
-    int updateSubmission(AlgoSubmission submission);
+    int updateSubmission(AlgoSubmissionDto submission);
 
     /**
      * 사용자별 제출 목록 조회 (페이징)
@@ -40,7 +40,7 @@ public interface AlgorithmSubmissionMapper {
      * @param limit 조회 수
      * @return 제출 목록
      */
-    List<AlgoSubmission> selectSubmissionsByUserId(
+    List<AlgoSubmissionDto> selectSubmissionsByUserId(
             @Param("userId") Long userId,
             @Param("offset") int offset,
             @Param("limit") int limit
@@ -60,7 +60,7 @@ public interface AlgorithmSubmissionMapper {
      * @param limit 조회 수
      * @return 제출 목록
      */
-    List<AlgoSubmission> selectPublicSubmissionsByProblemId(
+    List<AlgoSubmissionDto> selectPublicSubmissionsByProblemId(
             @Param("problemId") Long problemId,
             @Param("offset") int offset,
             @Param("limit") int limit
@@ -72,7 +72,7 @@ public interface AlgorithmSubmissionMapper {
      * @param problemId 문제 ID
      * @return 최고 점수 제출
      */
-    AlgoSubmission selectBestSubmissionByUserAndProblem(
+    AlgoSubmissionDto selectBestSubmissionByUserAndProblem(
             @Param("userId") Long userId,
             @Param("problemId") Long problemId
     );
