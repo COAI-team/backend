@@ -77,3 +77,9 @@ jwt-secret*
 *.pfx
 *.pkcs12
 *.der
+
+# keystore
+keystore.p12
+src/main/resources/keystore.p12
+*.p12
+*.jks

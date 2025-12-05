@@ -4,41 +4,15 @@
 
 <mapper namespace="kr.or.kosa.backend.like.mapper.LikeMapper">
 
-    <resultMap id="likeResultMap" type="kr.or.kosa.backend.like.domain.Like">
-        <id property="likeId" column="LIKE_ID"/>
-        <result property="userId" column="USER_ID"/>
+    <resultMap id="LikeResultMap" type="kr.or.kosa.backend.like.domain.Like">
+        <id property="userId" column="USER_ID"/>
         <result property="referenceType" column="REFERENCE_TYPE"
-                typeHandler="org.apache.ibatis.type.EnumTypeHandler"/>
+                javaType="kr.or.kosa.backend.like.domain.ReferenceType"/>
         <result property="referenceId" column="REFERENCE_ID"/>
         <result property="createdAt" column="CREATED_AT"/>
     </resultMap>
 
-    <!-- 좋아요 추가 -->
-    <insert id="insertLike" parameterType="kr.or.kosa.backend.like.domain.Like"
-            useGeneratedKeys="true" keyProperty="likeId">
-        INSERT INTO `LIKE` (
-        USER_ID,
-        REFERENCE_TYPE,
-        REFERENCE_ID,
-        CREATED_AT
-        ) VALUES (
-        #{userId},
-        #{referenceType},
-        #{referenceId},
-        NOW()
-        )
-    </insert>
-
-    <!-- 좋아요 삭제 -->
-    <delete id="deleteLike">
-        DELETE FROM `LIKE`
-        WHERE USER_ID = #{userId}
-        AND REFERENCE_TYPE = #{referenceType}
-        AND REFERENCE_ID = #{referenceId}
-    </delete>
-
-    <!-- 좋아요 존재 여부 확인 -->
-    <select id="selectLike" resultMap="likeResultMap">
+    <select id="selectLike" resultMap="LikeResultMap">
         SELECT *
         FROM `LIKE`
         WHERE USER_ID = #{userId}
@@ -46,22 +20,15 @@
         AND REFERENCE_ID = #{referenceId}
     </select>
 
-    <!-- 사용자가 좋아요 누른 ID 목록 조회 -->
-    <select id="selectLikedReferenceIds" resultType="long">
-        SELECT REFERENCE_ID
-        FROM `LIKE`
+    <insert id="insertLike">
+        INSERT INTO `LIKE` (USER_ID, REFERENCE_TYPE, REFERENCE_ID, CREATED_AT)
+        VALUES (#{userId}, #{referenceType}, #{referenceId}, NOW())
+    </insert>
+
+    <delete id="deleteLike">
+        DELETE FROM `LIKE`
         WHERE USER_ID = #{userId}
         AND REFERENCE_TYPE = #{referenceType}
-        AND REFERENCE_ID IN
-        <foreach collection="referenceIds" item="refId" open="(" separator="," close=")">
-            #{refId}
-        </foreach>
-    </select>
-
-    <!-- 참조 대상의 모든 좋아요 삭제 -->
-    <delete id="deleteByReference">
-        DELETE FROM `LIKE`
-        WHERE REFERENCE_TYPE = #{referenceType}
         AND REFERENCE_ID = #{referenceId}
     </delete>
 
