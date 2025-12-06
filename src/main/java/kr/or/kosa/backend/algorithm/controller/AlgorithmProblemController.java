@@ -1,7 +1,8 @@
 package kr.or.kosa.backend.algorithm.controller;
 
-import kr.or.kosa.backend.algorithm.domain.AlgoProblem;
+import kr.or.kosa.backend.algorithm.dto.AlgoProblemDto;
 import kr.or.kosa.backend.algorithm.dto.*;
+import kr.or.kosa.backend.algorithm.dto.enums.ProblemDifficulty;
 import kr.or.kosa.backend.algorithm.exception.AlgoErrorCode;
 import kr.or.kosa.backend.algorithm.service.AIProblemGeneratorService;
 import kr.or.kosa.backend.algorithm.service.AlgorithmProblemService;
@@ -11,9 +12,11 @@ import kr.or.kosa.backend.security.jwt.JwtAuthentication;
 import kr.or.kosa.backend.security.jwt.JwtUserDetails;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import reactor.core.publisher.Flux;
 
 import java.util.HashMap;
 import java.util.List;
@@ -95,6 +98,47 @@ public class AlgorithmProblemController {
     }
 
     /**
+     * AI 문제 생성 (SSE 스트리밍)
+     * GET /api/algo/problems/generate/stream
+     *
+     * 실시간으로 생성 과정을 클라이언트에 전송
+     */
+    @GetMapping(value = "/generate/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<String> generateProblemStream(
+            @RequestParam String difficulty,
+            @RequestParam String topic,
+            @RequestParam(required = false) String problemType,
+            @RequestParam(required = false) String additionalRequirements) {
+
+        log.info("AI 문제 생성 스트리밍 요청 - 난이도: {}, 주제: {}, 타입: {}", difficulty, topic, problemType);
+
+        // 요청 DTO 생성
+        ProblemGenerationRequestDto request = ProblemGenerationRequestDto.builder()
+                .difficulty(ProblemDifficulty.valueOf(difficulty))
+                .topic(topic)
+                .problemType(problemType != null ? problemType : "ALGORITHM")
+                .additionalRequirements(additionalRequirements)
+                .build();
+
+        return aiProblemGeneratorService.generateProblemStream(request)
+                .map(event -> {
+                    try {
+                        // SSE 이벤트 형식으로 변환
+                        return "data: " + event + "\n\n";
+                    } catch (Exception e) {
+                        log.error("SSE 이벤트 변환 실패", e);
+                        return "data: {\"type\":\"ERROR\",\"message\":\"이벤트 변환 실패\"}\n\n";
+                    }
+                })
+                .onErrorResume(e -> {
+                    log.error("스트리밍 중 에러 발생", e);
+                    return Flux.just("data: {\"type\":\"ERROR\",\"message\":\"" + e.getMessage() + "\"}\n\n");
+                })
+                .doOnComplete(() -> log.info("스트리밍 완료"))
+                .doOnCancel(() -> log.info("스트리밍 취소됨"));
+    }
+
+    /**
      * 문제 목록 조회 (기존 - 하위 호환성 유지)
      * GET /api/algo/problems?page=1&size=10&difficulty=BRONZE&source=AI_GENERATED&keyword=검색어&topic=배열
      */
@@ -149,7 +193,7 @@ public class AlgorithmProblemController {
                     offset, size, difficulty, source, keyword, topic);
 
             // Service 호출에 topic 추가
-            List<AlgoProblem> problems = algorithmProblemService.getProblemsWithFilter(
+            List<AlgoProblemDto> problems = algorithmProblemService.getProblemsWithFilter(
                     offset, size, difficulty, source, keyword, topic);
 
             log.info("Service 호출 후 - 조회된 문제 수: {}", problems.size());
@@ -274,7 +318,7 @@ public class AlgorithmProblemController {
      * GET /api/algo/problems/{problemId}
      */
     @GetMapping("/{problemId}")
-    public ResponseEntity<ApiResponse<AlgoProblem>> getProblemDetail(@PathVariable Long problemId) {
+    public ResponseEntity<ApiResponse<AlgoProblemDto>> getProblemDetail(@PathVariable Long problemId) {
 
         log.info("알고리즘 문제 상세 조회 - problemId: {}", problemId);
 
@@ -284,7 +328,7 @@ public class AlgorithmProblemController {
                 throw new CustomBusinessException(AlgoErrorCode.PROBLEM_NOT_FOUND);
             }
 
-            AlgoProblem problem = algorithmProblemService.getProblemDetail(problemId);
+            AlgoProblemDto problem = algorithmProblemService.getProblemDetail(problemId);
 
             log.info("문제 상세 조회 성공 - problemId: {}, title: {}", problemId, problem.getAlgoProblemTitle());
 

@@ -1,6 +1,7 @@
 package kr.or.kosa.backend.algorithm.dto;
 
-import kr.or.kosa.backend.algorithm.domain.AlgoSubmission;
+import kr.or.kosa.backend.algorithm.dto.enums.AiFeedbackType;
+import kr.or.kosa.backend.algorithm.dto.enums.SolveMode;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -11,6 +12,10 @@ import java.time.LocalDateTime;
 /**
  * 코드 제출 요청 DTO (ALG-07)
  * Validation은 서비스 계층에서 처리
+ *
+ * 변경사항:
+ * - focusSessionId → monitoringSessionId 변경
+ * - solveMode 추가 (BASIC/FOCUS)
  */
 @Data
 @Builder
@@ -26,11 +31,12 @@ public class SubmissionRequestDto {
     private LocalDateTime startTime;
     private LocalDateTime endTime;
 
-    // Eye Tracking 세션 ID (선택사항)
-    private String focusSessionId;
+    // 풀이 모드 및 모니터링 세션
+    private SolveMode solveMode;
+    private String monitoringSessionId; // FOCUS 모드일 때만 사용
 
     // AI 피드백 요청 타입
-    private AlgoSubmission.AiFeedbackType feedbackType;
+    private AiFeedbackType feedbackType;
 
     // GitHub 커밋 요청 여부
     private Boolean requestGithubCommit;

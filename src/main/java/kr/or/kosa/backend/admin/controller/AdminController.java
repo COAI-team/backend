@@ -1,6 +1,7 @@
 package kr.or.kosa.backend.admin.controller;
 
 import kr.or.kosa.backend.admin.dto.request.SearchConditionRequestDto;
+import kr.or.kosa.backend.admin.dto.response.AdminUserDetailResponseDto;
 import kr.or.kosa.backend.admin.dto.response.PageResponseDto;
 import kr.or.kosa.backend.admin.dto.response.UserFindResponseDto;
 import kr.or.kosa.backend.admin.service.AdminService;
@@ -25,10 +26,21 @@ public class AdminController {
     }
 
     @GetMapping("/userdetail/{userId}")
-    public ResponseEntity<ApiResponse<Void>> findOneUser(
+    public ResponseEntity<ApiResponse<AdminUserDetailResponseDto>> findOneUser(
         @PathVariable("userId") Long userId
-    ){
-        System.out.println("userId = " + userId);
+    ) {
+        AdminUserDetailResponseDto result = adminService.userDetail(userId);
+        System.out.println("컨트롤러에서 result => " + result.toString());
+        return ResponseEntity.ok(ApiResponse.success(result));
+    }
+
+    @GetMapping("/subscribecheck/{userId}")
+    public ResponseEntity<ApiResponse<Void>> subscribeCheck(
+        @PathVariable("userId") Long userId
+    ) {
+        adminService.subscribeCheck(userId);
+
+//        return ResponseEntity.ok(ApiResponse.success(result));
         return null;
     }
 }

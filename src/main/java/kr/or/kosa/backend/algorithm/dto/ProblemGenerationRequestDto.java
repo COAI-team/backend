@@ -1,7 +1,7 @@
 package kr.or.kosa.backend.algorithm.dto;
 
-import kr.or.kosa.backend.algorithm.domain.ProblemDifficulty;
-import kr.or.kosa.backend.algorithm.domain.ProblemTopic;
+import kr.or.kosa.backend.algorithm.dto.enums.ProblemDifficulty;
+import kr.or.kosa.backend.algorithm.dto.enums.ProblemTopic;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;

@@ -2,10 +2,10 @@ package kr.or.kosa.backend.algorithm.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import kr.or.kosa.backend.algorithm.domain.AlgoProblem;
-import kr.or.kosa.backend.algorithm.domain.ProblemDifficulty;
-import kr.or.kosa.backend.algorithm.domain.ProblemSource;
-import kr.or.kosa.backend.algorithm.domain.ProblemType;
+import kr.or.kosa.backend.algorithm.dto.AlgoProblemDto;
+import kr.or.kosa.backend.algorithm.dto.enums.ProblemDifficulty;
+import kr.or.kosa.backend.algorithm.dto.enums.ProblemSource;
+import kr.or.kosa.backend.algorithm.dto.enums.ProblemType;
 import kr.or.kosa.backend.algorithm.dto.external.LeetCodeProblemDto;
 import kr.or.kosa.backend.algorithm.dto.external.SolvedAcProblemDto;
 import kr.or.kosa.backend.algorithm.mapper.AlgorithmProblemMapper;
@@ -114,7 +114,7 @@ public class ProblemCrawlerService {
         // 태그를 JSON 문자열로 변환
         String tagsJson = convertTagsToJson(dto.getKoreanTagNames());
 
-        AlgoProblem problem = AlgoProblem.builder()
+        AlgoProblemDto problem = AlgoProblemDto.builder()
                 .algoProblemTitle(title)
                 .algoProblemDescription(description)
                 .algoProblemDifficulty(ProblemDifficulty.valueOf(dto.getDifficultyEnum()))
@@ -208,7 +208,7 @@ public class ProblemCrawlerService {
         // 태그를 JSON 문자열로 변환
         String tagsJson = convertTagsToJson(dto.getTagNames());
 
-        AlgoProblem problem = AlgoProblem.builder()
+        AlgoProblemDto problem = AlgoProblemDto.builder()
                 .algoProblemTitle(title)
                 .algoProblemDescription(description)
                 .algoProblemDifficulty(ProblemDifficulty.valueOf(dto.getDifficultyEnum()))
@@ -230,7 +230,7 @@ public class ProblemCrawlerService {
      */
     private boolean isDuplicate(String title) {
         try {
-            List<AlgoProblem> problems = problemMapper.selectProblemsWithFilter(
+            List<AlgoProblemDto> problems = problemMapper.selectProblemsWithFilter(
                     0, 1, null, null, title
             );
             return !problems.isEmpty();

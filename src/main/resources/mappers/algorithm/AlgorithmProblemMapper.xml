@@ -7,7 +7,7 @@
 <mapper namespace="kr.or.kosa.backend.algorithm.mapper.AlgorithmProblemMapper">
 
     <!-- ResultMap 정의 -->
-    <resultMap id="AlgoProblemResultMap" type="kr.or.kosa.backend.algorithm.domain.AlgoProblem">
+    <resultMap id="AlgoProblemResultMap" type="kr.or.kosa.backend.algorithm.dto.AlgoProblemDto">
         <id property="algoProblemId" column="ALGO_PROBLEM_ID"/>
         <result property="algoProblemTitle" column="ALGO_PROBLEM_TITLE"/>
         <result property="algoProblemDescription" column="ALGO_PROBLEM_DESCRIPTION"/>
@@ -119,7 +119,7 @@
     <!-- AI 생성 문제 저장 -->
     <!-- 1. 문제 저장 (AUTO_INCREMENT) -->
     <insert id="insertProblem"
-            parameterType="kr.or.kosa.backend.algorithm.domain.AlgoProblem"
+            parameterType="kr.or.kosa.backend.algorithm.dto.AlgoProblemDto"
             useGeneratedKeys="true"
             keyProperty="algoProblemId"
             keyColumn="ALGO_PROBLEM_ID">
@@ -136,7 +136,7 @@
 
     <!-- 2. 테스트케이스 저장 -->
     <insert id="insertTestcase"
-            parameterType="kr.or.kosa.backend.algorithm.domain.AlgoTestcase"
+            parameterType="kr.or.kosa.backend.algorithm.dto.AlgoTestcaseDto"
             useGeneratedKeys="true"
             keyProperty="testcaseId"
             keyColumn="TESTCASE_ID">
@@ -165,7 +165,7 @@
     </select>
 
     <!-- algoTestcaseResultMap이 기존 파일에 없다면 추가 -->
-    <resultMap id="algoTestcaseResultMap" type="kr.or.kosa.backend.algorithm.domain.AlgoTestcase">
+    <resultMap id="algoTestcaseResultMap" type="kr.or.kosa.backend.algorithm.dto.AlgoTestcaseDto">
         <id property="testcaseId" column="TESTCASE_ID"/>
         <result property="algoProblemId" column="ALGO_PROBLEM_ID"/>
         <result property="inputData" column="INPUT_DATA"/>

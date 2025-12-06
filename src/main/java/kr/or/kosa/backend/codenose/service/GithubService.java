@@ -1,4 +1,5 @@
 package kr.or.kosa.backend.codenose.service;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import kr.or.kosa.backend.codenose.dto.dtoReal.*;
@@ -27,7 +28,7 @@ public class GithubService {
     private final AnalysisMapper analysisMapper;
 
     @Value("${github.token:}")
-    private String githubToken;  // application.properties에 설정
+    private String githubToken; // application.properties에 설정
 
     private HttpHeaders createHeaders() {
         HttpHeaders headers = new HttpHeaders();
@@ -39,6 +40,7 @@ public class GithubService {
     }
 
     public List<GithubRepositoryDTO> listRepositories(String owner) {
+        System.out.println("[TRACE] GithubService.listRepositories called with owner: " + owner);
         try {
             // 수정: users/ 추가
             String url = String.format("https://api.github.com/users/%s/repos", owner);
@@ -66,6 +68,7 @@ public class GithubService {
     }
 
     public List<GithubBranchDTO> listBranches(String owner, String repo) {
+        System.out.println("[TRACE] GithubService.listBranches called with owner: " + owner + ", repo: " + repo);
         try {
             String url = String.format("https://api.github.com/repos/%s/%s/branches", owner, repo);
             HttpEntity<String> entity = new HttpEntity<>(createHeaders());
@@ -87,8 +90,11 @@ public class GithubService {
     }
 
     public List<GithubTreeEntryDTO> getTree(String owner, String repo, String branch) {
+        System.out.println("[TRACE] GithubService.getTree called with owner: " + owner + ", repo: " + repo
+                + ", branch: " + branch);
         try {
-            String url = String.format("https://api.github.com/repos/%s/%s/git/trees/%s?recursive=1", owner, repo, branch);
+            String url = String.format("https://api.github.com/repos/%s/%s/git/trees/%s?recursive=1", owner, repo,
+                    branch);
             HttpEntity<String> entity = new HttpEntity<>(createHeaders());
             ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, entity, String.class);
             JsonNode jsonNode = objectMapper.readTree(response.getBody());
@@ -108,8 +114,9 @@ public class GithubService {
         }
     }
 
-
     public GithubFileDTO getFileContent(String owner, String repo, String path) {
+        System.out.println("[TRACE] GithubService.getFileContent called with owner: " + owner + ", repo: " + repo
+                + ", path: " + path);
         try {
             String url = String.format("https://api.github.com/repos/%s/%s/contents/%s",
                     owner, repo, path);
@@ -120,8 +127,7 @@ public class GithubService {
                     url,
                     HttpMethod.GET,
                     entity,
-                    String.class
-            );
+                    String.class);
 
             // JSON 파싱
             JsonNode jsonNode = objectMapper.readTree(response.getBody());
@@ -146,17 +152,18 @@ public class GithubService {
 
     /**
      * GitHub 파일 내용을 가져와서 DB에 저장
+     * 
      * @param request 파일 저장 요청 DTO
      * @return 저장된 파일 데이터의 fileId
      */
     public String saveFileContentToDB(FileSaveRequestDTO request) {
+        System.out.println("[TRACE] GithubService.saveFileContentToDB called with request: " + request);
         try {
             // 1. GitHub API로 파일 내용 가져오기
             GithubFileDTO fileData = getFileContent(
                     request.getOwner(),
                     request.getRepo(),
-                    request.getFilePath()
-            );
+                    request.getFilePath());
 
             // 2. DB 저장용 필드 설정
             fileData.setFileId(UUID.randomUUID().toString());

@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="kr.or.kosa.backend.algorithm.mapper.MonitoringMapper">
+
+    <!-- Result Map 정의 -->
+    <resultMap id="monitoringSessionResultMap" type="kr.or.kosa.backend.algorithm.dto.MonitoringSessionDto">
+        <id property="sessionId" column="SESSION_ID"/>
+        <result property="userId" column="USER_ID"/>
+        <result property="algoProblemId" column="ALGO_PROBLEM_ID"/>
+        <result property="algosubmissionId" column="ALGOSUBMISSION_ID"/>
+        <result property="sessionStatus" column="SESSION_STATUS"/>
+        <result property="startedAt" column="STARTED_AT"/>
+        <result property="endedAt" column="ENDED_AT"/>
+        <result property="timeLimitMinutes" column="TIME_LIMIT_MINUTES"/>
+        <result property="remainingSeconds" column="REMAINING_SECONDS"/>
+        <result property="autoSubmitted" column="AUTO_SUBMITTED"/>
+        <result property="gazeAwayCount" column="GAZE_AWAY_COUNT"/>
+        <result property="sleepingCount" column="SLEEPING_COUNT"/>
+        <result property="noFaceCount" column="NO_FACE_COUNT"/>
+        <result property="maskDetectedCount" column="MASK_DETECTED_COUNT"/>
+        <result property="multipleFacesCount" column="MULTIPLE_FACES_COUNT"/>
+        <result property="mouseLeaveCount" column="MOUSE_LEAVE_COUNT"/>
+        <result property="tabSwitchCount" column="TAB_SWITCH_COUNT"/>
+        <result property="fullscreenExitCount" column="FULLSCREEN_EXIT_COUNT"/>
+        <result property="totalViolations" column="TOTAL_VIOLATIONS"/>
+        <result property="warningShownCount" column="WARNING_SHOWN_COUNT"/>
+    </resultMap>
+
+    <!-- 세션 시작 -->
+    <insert id="startSession" parameterType="kr.or.kosa.backend.algorithm.dto.MonitoringSessionDto">
+        INSERT INTO MONITORING_SESSIONS (
+            SESSION_ID,
+            USER_ID,
+            ALGO_PROBLEM_ID,
+            SESSION_STATUS,
+            STARTED_AT,
+            TIME_LIMIT_MINUTES,
+            GAZE_AWAY_COUNT,
+            SLEEPING_COUNT,
+            NO_FACE_COUNT,
+            MASK_DETECTED_COUNT,
+            MULTIPLE_FACES_COUNT,
+            MOUSE_LEAVE_COUNT,
+            TAB_SWITCH_COUNT,
+            FULLSCREEN_EXIT_COUNT,
+            TOTAL_VIOLATIONS,
+            WARNING_SHOWN_COUNT,
+            AUTO_SUBMITTED
+        ) VALUES (
+            #{sessionId},
+            #{userId},
+            #{algoProblemId},
+            'ACTIVE',
+            NOW(),
+            #{timeLimitMinutes},
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+        )
+    </insert>
+
+    <!-- 세션 종료 업데이트 -->
+    <update id="updateSession" parameterType="kr.or.kosa.backend.algorithm.dto.MonitoringSessionDto">
+        UPDATE MONITORING_SESSIONS SET
+            SESSION_STATUS = #{sessionStatus},
+            ENDED_AT = NOW(),
+            REMAINING_SECONDS = #{remainingSeconds},
+            AUTO_SUBMITTED = #{autoSubmitted},
+            GAZE_AWAY_COUNT = #{gazeAwayCount},
+            SLEEPING_COUNT = #{sleepingCount},
+            NO_FACE_COUNT = #{noFaceCount},
+            MASK_DETECTED_COUNT = #{maskDetectedCount},
+            MULTIPLE_FACES_COUNT = #{multipleFacesCount},
+            MOUSE_LEAVE_COUNT = #{mouseLeaveCount},
+            TAB_SWITCH_COUNT = #{tabSwitchCount},
+            FULLSCREEN_EXIT_COUNT = #{fullscreenExitCount},
+            TOTAL_VIOLATIONS = #{totalViolations},
+            WARNING_SHOWN_COUNT = #{warningShownCount}
+        WHERE SESSION_ID = #{sessionId}
+    </update>
+
+    <!-- 특정 위반 카운트 증가 -->
+    <update id="incrementViolationCount">
+        UPDATE MONITORING_SESSIONS SET
+            <choose>
+                <when test="violationType == 'GAZE_AWAY'">GAZE_AWAY_COUNT = GAZE_AWAY_COUNT + 1</when>
+                <when test="violationType == 'SLEEPING'">SLEEPING_COUNT = SLEEPING_COUNT + 1</when>
+                <when test="violationType == 'NO_FACE'">NO_FACE_COUNT = NO_FACE_COUNT + 1</when>
+                <when test="violationType == 'MASK_DETECTED'">MASK_DETECTED_COUNT = MASK_DETECTED_COUNT + 1</when>
+                <when test="violationType == 'MULTIPLE_FACES'">MULTIPLE_FACES_COUNT = MULTIPLE_FACES_COUNT + 1</when>
+                <when test="violationType == 'MOUSE_LEAVE'">MOUSE_LEAVE_COUNT = MOUSE_LEAVE_COUNT + 1</when>
+                <when test="violationType == 'TAB_SWITCH'">TAB_SWITCH_COUNT = TAB_SWITCH_COUNT + 1</when>
+                <when test="violationType == 'FULLSCREEN_EXIT'">FULLSCREEN_EXIT_COUNT = FULLSCREEN_EXIT_COUNT + 1</when>
+            </choose>,
+            TOTAL_VIOLATIONS = TOTAL_VIOLATIONS + 1
+        WHERE SESSION_ID = #{sessionId}
+    </update>
+
+    <!-- 경고 표시 횟수 증가 -->
+    <update id="incrementWarningCount">
+        UPDATE MONITORING_SESSIONS SET
+            WARNING_SHOWN_COUNT = WARNING_SHOWN_COUNT + 1
+        WHERE SESSION_ID = #{sessionId}
+    </update>
+
+    <!-- 세션 ID로 조회 -->
+    <select id="findSessionById" resultMap="monitoringSessionResultMap">
+        SELECT *
+        FROM MONITORING_SESSIONS
+        WHERE SESSION_ID = #{sessionId}
+    </select>
+
+    <!-- 사용자의 활성 세션 조회 -->
+    <select id="findActiveSessionByUserId" resultMap="monitoringSessionResultMap">
+        SELECT *
+        FROM MONITORING_SESSIONS
+        WHERE USER_ID = #{userId}
+          AND ALGO_PROBLEM_ID = #{problemId}
+          AND SESSION_STATUS = 'ACTIVE'
+        LIMIT 1
+    </select>
+
+    <!-- 제출 ID로 세션 조회 -->
+    <select id="findSessionBySubmissionId" resultMap="monitoringSessionResultMap">
+        SELECT *
+        FROM MONITORING_SESSIONS
+        WHERE ALGOSUBMISSION_ID = #{submissionId}
+    </select>
+
+    <!-- 세션에 제출 ID 연결 -->
+    <update id="linkSubmission">
+        UPDATE MONITORING_SESSIONS SET
+            ALGOSUBMISSION_ID = #{submissionId}
+        WHERE SESSION_ID = #{sessionId}
+    </update>
+
+    <!-- 사용자의 세션 목록 조회 -->
+    <select id="findSessionsByUserId" resultMap="monitoringSessionResultMap">
+        SELECT *
+        FROM MONITORING_SESSIONS
+        WHERE USER_ID = #{userId}
+        ORDER BY STARTED_AT DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <!-- 세션 상태 변경 -->
+    <update id="updateSessionStatus">
+        UPDATE MONITORING_SESSIONS SET
+            SESSION_STATUS = #{status},
+            ENDED_AT = CASE WHEN #{status} != 'ACTIVE' THEN NOW() ELSE ENDED_AT END
+        WHERE SESSION_ID = #{sessionId}
+    </update>
+
+    <!-- 자동 제출 플래그 설정 -->
+    <update id="markAsAutoSubmitted">
+        UPDATE MONITORING_SESSIONS SET
+            AUTO_SUBMITTED = 1,
+            SESSION_STATUS = 'TIMEOUT',
+            ENDED_AT = NOW()
+        WHERE SESSION_ID = #{sessionId}
+    </update>
+
+</mapper>

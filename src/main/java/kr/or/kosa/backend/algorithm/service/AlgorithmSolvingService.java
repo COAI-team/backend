@@ -1,11 +1,16 @@
 package kr.or.kosa.backend.algorithm.service;
 
-import kr.or.kosa.backend.algorithm.domain.AlgoProblem;
-import kr.or.kosa.backend.algorithm.domain.AlgoSubmission;
-import kr.or.kosa.backend.algorithm.domain.AlgoTestcase;
-import kr.or.kosa.backend.algorithm.domain.LanguageConstant;
-import kr.or.kosa.backend.algorithm.domain.LanguageType;
-import kr.or.kosa.backend.algorithm.domain.ProblemType;
+import kr.or.kosa.backend.algorithm.dto.AlgoProblemDto;
+import kr.or.kosa.backend.algorithm.dto.AlgoSubmissionDto;
+import kr.or.kosa.backend.algorithm.dto.AlgoTestcaseDto;
+import kr.or.kosa.backend.algorithm.dto.LanguageConstantDto;
+import kr.or.kosa.backend.algorithm.dto.enums.AiFeedbackStatus;
+import kr.or.kosa.backend.algorithm.dto.enums.AiFeedbackType;
+import kr.or.kosa.backend.algorithm.dto.enums.GithubCommitStatus;
+import kr.or.kosa.backend.algorithm.dto.enums.JudgeResult;
+import kr.or.kosa.backend.algorithm.dto.enums.LanguageType;
+import kr.or.kosa.backend.algorithm.dto.enums.ProblemType;
+import kr.or.kosa.backend.algorithm.dto.enums.SolveMode;
 import kr.or.kosa.backend.algorithm.dto.*;
 import kr.or.kosa.backend.algorithm.mapper.AlgorithmProblemMapper;
 import kr.or.kosa.backend.algorithm.mapper.AlgorithmSubmissionMapper;
@@ -52,16 +57,16 @@ public class AlgorithmSolvingService {
         log.info("문제 풀이 시작 - problemId: {}, userId: {}", problemId, userId);
 
         // 1. 문제 정보 조회
-        AlgoProblem problem = problemMapper.selectProblemById(problemId);
+        AlgoProblemDto problem = problemMapper.selectProblemById(problemId);
         if (problem == null) {
             throw new IllegalArgumentException("존재하지 않는 문제입니다");
         }
 
         // 2. 샘플 테스트케이스 조회 (is_sample = true)
-        List<AlgoTestcase> sampleTestCases = problemMapper.selectSampleTestCasesByProblemId(problemId);
+        List<AlgoTestcaseDto> sampleTestCases = problemMapper.selectSampleTestCasesByProblemId(problemId);
 
         // 3. 이전 제출 정보 조회 (최고 점수)
-        AlgoSubmission previousSubmission = submissionMapper.selectBestSubmissionByUserAndProblem(userId, problemId);
+        AlgoSubmissionDto previousSubmission = submissionMapper.selectBestSubmissionByUserAndProblem(userId, problemId);
 
         // 4. Eye Tracking 세션 ID 생성
         String sessionId = UUID.randomUUID().toString();
@@ -72,7 +77,7 @@ public class AlgorithmSolvingService {
                 ? LanguageType.DB
                 : LanguageType.GENERAL;
 
-        List<LanguageConstant> constants = languageConstantService.getLanguagesByType(languageType);
+        List<LanguageConstantDto> constants = languageConstantService.getLanguagesByType(languageType);
 
         List<ProblemSolveResponseDto.LanguageOption> availableLanguages = constants.stream()
                 .map(lc -> ProblemSolveResponseDto.LanguageOption.builder()
@@ -155,13 +160,13 @@ public class AlgorithmSolvingService {
         request.validate();
 
         // 2. 문제 존재 확인
-        AlgoProblem problem = problemMapper.selectProblemById(request.getProblemId());
+        AlgoProblemDto problem = problemMapper.selectProblemById(request.getProblemId());
         if (problem == null) {
             throw new IllegalArgumentException("존재하지 않는 문제입니다");
         }
 
         // 3. 제출 엔티티 생성 및 저장
-        AlgoSubmission submission = createSubmission(request, userId, problem);
+        AlgoSubmissionDto submission = createSubmission(request, userId, problem);
         submissionMapper.insertSubmission(submission);
 
         log.info("제출 저장 완료 - submissionId: {}", submission.getAlgosubmissionId());
@@ -186,13 +191,13 @@ public class AlgorithmSolvingService {
                 request.getProblemId(), request.getLanguage());
 
         // 1. 문제 존재 확인
-        AlgoProblem problem = problemMapper.selectProblemById(request.getProblemId());
+        AlgoProblemDto problem = problemMapper.selectProblemById(request.getProblemId());
         if (problem == null) {
             throw new IllegalArgumentException("존재하지 않는 문제입니다. ID: " + request.getProblemId());
         }
 
         // 2. 샘플 테스트케이스 조회 (isSample = true)
-        List<AlgoTestcase> sampleTestcases = problemMapper.selectSampleTestCasesByProblemId(request.getProblemId());
+        List<AlgoTestcaseDto> sampleTestcases = problemMapper.selectSampleTestCasesByProblemId(request.getProblemId());
 
         if (sampleTestcases == null || sampleTestcases.isEmpty()) {
             throw new IllegalArgumentException("샘플 테스트케이스가 없습니다. 문제 ID: " + request.getProblemId());
@@ -202,7 +207,7 @@ public class AlgorithmSolvingService {
 
         // 3. 언어 검증 및 상수 조회 (Enum 변환 제거 - DB 언어명 직접 사용)
         String dbLanguageName = request.getLanguage(); // 예: "Python 3", "Java 17", "C++17"
-        LanguageConstant constant = languageConstantService.getByLanguageName(dbLanguageName);
+        LanguageConstantDto constant = languageConstantService.getByLanguageName(dbLanguageName);
 
         if (constant == null) {
             throw new IllegalArgumentException(
@@ -293,12 +298,12 @@ public class AlgorithmSolvingService {
     public SubmissionResponseDto getSubmissionResult(Long submissionId, Long userId) {
         log.info("제출 결과 조회 - submissionId: {}, userId: {}", submissionId, userId);
 
-        AlgoSubmission submission = submissionMapper.selectSubmissionById(submissionId);
+        AlgoSubmissionDto submission = submissionMapper.selectSubmissionById(submissionId);
         if (submission == null || !submission.getUserId().equals(userId)) {
             throw new IllegalArgumentException("해당 제출을 찾을 수 없습니다");
         }
 
-        AlgoProblem problem = problemMapper.selectProblemById(submission.getAlgoProblemId());
+        AlgoProblemDto problem = problemMapper.selectProblemById(submission.getAlgoProblemId());
         return convertToSubmissionResponse(submission, problem, null);
     }
 
@@ -310,7 +315,7 @@ public class AlgorithmSolvingService {
         log.info("공유 상태 업데이트 - submissionId: {}, isShared: {}, userId: {}",
                 submissionId, isShared, userId);
 
-        AlgoSubmission submission = submissionMapper.selectSubmissionById(submissionId);
+        AlgoSubmissionDto submission = submissionMapper.selectSubmissionById(submissionId);
         if (submission == null || !submission.getUserId().equals(userId)) {
             throw new IllegalArgumentException("해당 제출을 찾을 수 없습니다");
         }
@@ -329,20 +334,20 @@ public class AlgorithmSolvingService {
         log.info("사용자 제출 이력 조회 - userId: {}, page: {}, size: {}", userId, page, size);
 
         int offset = page * size;
-        List<AlgoSubmission> submissions = submissionMapper.selectSubmissionsByUserId(userId, offset, size);
+        List<AlgoSubmissionDto> submissions = submissionMapper.selectSubmissionsByUserId(userId, offset, size);
 
         return submissions.stream()
                 .map(submission -> {
-                    AlgoProblem problem = problemMapper.selectProblemById(submission.getAlgoProblemId());
+                    AlgoProblemDto problem = problemMapper.selectProblemById(submission.getAlgoProblemId());
                     return convertToSubmissionResponse(submission, problem, null);
                 })
                 .collect(Collectors.toList());
     }
 
     /**
-     * 제출 엔티티 생성
+     * 제출 DTO 생성
      */
-    private AlgoSubmission createSubmission(SubmissionRequestDto request, Long userId, AlgoProblem problem) {
+    private AlgoSubmissionDto createSubmission(SubmissionRequestDto request, Long userId, AlgoProblemDto problem) {
         LocalDateTime now = LocalDateTime.now();
 
         Integer solvingDuration = null;
@@ -350,29 +355,30 @@ public class AlgorithmSolvingService {
             solvingDuration = (int) Duration.between(request.getStartTime(), request.getEndTime()).getSeconds();
         }
 
-        return AlgoSubmission.builder()
+        return AlgoSubmissionDto.builder()
                 .algoProblemId(request.getProblemId())
                 .userId(userId)
                 .sourceCode(request.getSourceCode())
                 .language(request.getLanguage())
-                .judgeResult(AlgoSubmission.JudgeResult.PENDING)
-                .aiFeedbackStatus(AlgoSubmission.AiFeedbackStatus.PENDING)
+                .judgeResult(JudgeResult.PENDING)
+                .aiFeedbackStatus(AiFeedbackStatus.PENDING)
                 .aiFeedbackType(request.getFeedbackType() != null ? request.getFeedbackType()
-                        : AlgoSubmission.AiFeedbackType.COMPREHENSIVE)
+                        : AiFeedbackType.COMPREHENSIVE)
                 .startSolving(request.getStartTime())
                 .endSolving(request.getEndTime())
                 .solvingDurationSeconds(solvingDuration)
-                .focusSessionId(request.getFocusSessionId())
-                .eyetracked(request.getFocusSessionId() != null)
+                // 풀이 모드 및 모니터링 세션 (focusSessionId, eyetracked 제거됨)
+                .solveMode(request.getSolveMode() != null ? request.getSolveMode() : SolveMode.BASIC)
+                .monitoringSessionId(request.getMonitoringSessionId())
                 .githubCommitRequested(request.getRequestGithubCommit() != null && request.getRequestGithubCommit())
-                .githubCommitStatus(AlgoSubmission.GithubCommitStatus.NONE)
+                .githubCommitStatus(GithubCommitStatus.NONE)
                 .isShared(false)
                 .submittedAt(now)
                 .build();
     }
 
-    // DTO 변환 메소드들은 기존과 동일하게 유지
-    private List<ProblemSolveResponseDto.TestCaseDto> convertToTestCaseDtos(List<AlgoTestcase> testCases) {
+    // DTO 변환 메소드들
+    private List<ProblemSolveResponseDto.TestCaseDto> convertToTestCaseDtos(List<AlgoTestcaseDto> testCases) {
         return testCases.stream()
                 .map(tc -> ProblemSolveResponseDto.TestCaseDto.builder()
                         .input(tc.getInputData())
@@ -382,7 +388,7 @@ public class AlgorithmSolvingService {
                 .collect(Collectors.toList());
     }
 
-    private ProblemSolveResponseDto.SubmissionSummaryDto convertToPreviousSubmission(AlgoSubmission submission) {
+    private ProblemSolveResponseDto.SubmissionSummaryDto convertToPreviousSubmission(AlgoSubmissionDto submission) {
         if (submission == null) {
             return null;
         }
@@ -395,8 +401,8 @@ public class AlgorithmSolvingService {
                 .build();
     }
 
-    private SubmissionResponseDto convertToSubmissionResponse(AlgoSubmission submission,
-            AlgoProblem problem,
+    private SubmissionResponseDto convertToSubmissionResponse(AlgoSubmissionDto submission,
+            AlgoProblemDto problem,
             List<Judge0Service.TestCaseResultDto> testCaseResults) {
         return SubmissionResponseDto.builder()
                 .submissionId(submission.getAlgosubmissionId())
@@ -415,7 +421,9 @@ public class AlgorithmSolvingService {
                 .aiFeedbackStatus(
                         submission.getAiFeedbackStatus() != null ? submission.getAiFeedbackStatus().name() : "PENDING")
                 .aiScore(submission.getAiScore())
-                .focusScore(submission.getFocusScore())
+                // focusScore 제거됨 - 모니터링은 점수에 미반영
+                .solveMode(submission.getSolveMode() != null ? submission.getSolveMode().name() : "BASIC")
+                .monitoringSessionId(submission.getMonitoringSessionId())
                 .timeEfficiencyScore(submission.getTimeEfficiencyScore())
                 .finalScore(submission.getFinalScore())
                 .scoreBreakdown(createScoreBreakdown(submission))
@@ -428,26 +436,26 @@ public class AlgorithmSolvingService {
                 .build();
     }
 
-    private String determineJudgeStatus(AlgoSubmission submission) {
-        if (submission.getJudgeResult() == null || submission.getJudgeResult() == AlgoSubmission.JudgeResult.PENDING) {
+    private String determineJudgeStatus(AlgoSubmissionDto submission) {
+        if (submission.getJudgeResult() == null || submission.getJudgeResult() == JudgeResult.PENDING) {
             return "PENDING";
         }
         return "COMPLETED";
     }
 
-    private SubmissionResponseDto.ScoreBreakdownDto createScoreBreakdown(AlgoSubmission submission) {
+    private SubmissionResponseDto.ScoreBreakdownDto createScoreBreakdown(AlgoSubmissionDto submission) {
         return SubmissionResponseDto.ScoreBreakdownDto.builder()
                 .judgeScore(calculateJudgeScore(submission))
                 .aiScore(submission.getAiScore() != null ? submission.getAiScore() : BigDecimal.ZERO)
                 .timeScore(submission.getTimeEfficiencyScore() != null ? submission.getTimeEfficiencyScore()
                         : BigDecimal.ZERO)
-                .focusScore(submission.getFocusScore() != null ? submission.getFocusScore() : BigDecimal.ZERO)
+                // focusScore 제거됨 - 모니터링은 점수에 미반영
                 .scoreWeights("Judge(40%) + AI(30%) + Time(30%)")
                 .build();
     }
 
-    private BigDecimal calculateJudgeScore(AlgoSubmission submission) {
-        if (submission.getJudgeResult() == AlgoSubmission.JudgeResult.AC) {
+    private BigDecimal calculateJudgeScore(AlgoSubmissionDto submission) {
+        if (submission.getJudgeResult() == JudgeResult.AC) {
             return new BigDecimal("100");
         }
 

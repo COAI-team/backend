@@ -53,6 +53,78 @@
         LIMIT #{size} OFFSET #{offset}
     </select>
 
+    <!-- 검색/정렬 기능이 포함된 게시글 목록 조회 -->
+    <select id="findPosts" resultMap="FreeboardListResponseMap">
+        SELECT
+        f.FREEBOARD_ID,
+        f.USER_ID,
+        f.FREEBOARD_TITLE,
+        f.FREEBOARD_CONTENT,
+        SUBSTRING(f.FREEBOARD_PLAIN_TEXT, 1, 200) as FREEBOARD_SUMMARY,  -- 이 부분 확인
+        f.FREEBOARD_CLICK,
+        f.FREEBOARD_REPRESENT_IMAGE,
+        f.FREEBOARD_CREATED_AT,
+        t.TAG_NAME,
+        u.USER_NICKNAME,
+        COALESCE(f.LIKE_COUNT, 0) as LIKE_COUNT,
+        COALESCE(
+        (SELECT COUNT(*)
+        FROM COMMENT c
+        WHERE c.BOARD_ID = f.FREEBOARD_ID
+        AND c.BOARD_TYPE = 'FREEBOARD'
+        AND c.IS_DELETED = FALSE),
+        0
+        ) as COMMENT_COUNT
+        FROM FREEBOARD f
+        LEFT JOIN FREEBOARD_TAG ft ON f.FREEBOARD_ID = ft.FREEBOARD_ID
+        LEFT JOIN TAG t ON ft.TAG_ID = t.TAG_ID
+        LEFT JOIN USERS u ON f.USER_ID = u.USER_ID
+        WHERE f.FREEBOARD_DELETED_YN = 'N'
+        <if test="keyword != null and keyword != ''">
+            AND (
+            f.FREEBOARD_TITLE LIKE CONCAT('%', #{keyword}, '%')
+            OR f.FREEBOARD_PLAIN_TEXT LIKE CONCAT('%', #{keyword}, '%')
+            OR u.USER_NICKNAME LIKE CONCAT('%', #{keyword}, '%')
+            OR t.TAG_NAME LIKE CONCAT('%', #{keyword}, '%')
+            )
+        </if>
+        ORDER BY
+        <choose>
+            <when test="sortField == 'comment_count'">
+                COMMENT_COUNT ${sortDirection}, f.FREEBOARD_CREATED_AT DESC
+            </when>
+            <when test="sortField == 'like_count'">
+                f.LIKE_COUNT ${sortDirection}, f.FREEBOARD_CREATED_AT DESC
+            </when>
+            <when test="sortField == 'view_count'">
+                f.FREEBOARD_CLICK ${sortDirection}, f.FREEBOARD_CREATED_AT DESC
+            </when>
+            <otherwise>
+                f.FREEBOARD_CREATED_AT ${sortDirection}
+            </otherwise>
+        </choose>
+        LIMIT #{pageSize} OFFSET #{offset}
+    </select>
+
+    <!-- 검색 조건에 맞는 전체 게시글 수 조회 -->
+    <select id="countPosts" resultType="int">
+        SELECT COUNT(DISTINCT f.FREEBOARD_ID)
+        FROM FREEBOARD f
+        LEFT JOIN FREEBOARD_TAG ft ON f.FREEBOARD_ID = ft.FREEBOARD_ID
+        LEFT JOIN TAG t ON ft.TAG_ID = t.TAG_ID
+        LEFT JOIN USERS u ON f.USER_ID = u.USER_ID
+        WHERE f.FREEBOARD_DELETED_YN = 'N'
+        <if test="keyword != null and keyword != ''">
+            AND (
+            f.FREEBOARD_TITLE LIKE CONCAT('%', #{keyword}, '%')
+            OR f.FREEBOARD_CONTENT LIKE CONCAT('%', #{keyword}, '%')
+            OR f.FREEBOARD_PLAIN_TEXT LIKE CONCAT('%', #{keyword}, '%')
+            OR u.USER_NICKNAME LIKE CONCAT('%', #{keyword}, '%')
+            OR t.TAG_NAME LIKE CONCAT('%', #{keyword}, '%')
+            )
+        </if>
+    </select>
+
     <!-- 상세 조회용 resultMap -->
     <resultMap id="FreeboardDetailResponseMap" type="kr.or.kosa.backend.freeboard.dto.FreeboardDetailResponseDto">
         <id property="freeboardId" column="FREEBOARD_ID"/>
@@ -61,13 +133,14 @@
         <result property="freeboardTitle" column="FREEBOARD_TITLE"/>
         <result property="freeboardContent" column="FREEBOARD_CONTENT"/>
         <result property="freeboardClick" column="FREEBOARD_CLICK"/>
+        <result property="likeCount" column="LIKE_COUNT"/>
         <result property="freeboardImage" column="FREEBOARD_IMAGE"/>
         <result property="freeboardRepresentImage" column="FREEBOARD_REPRESENT_IMAGE"/>
         <result property="freeboardCreatedAt" column="FREEBOARD_CREATED_AT"/>
     </resultMap>
 
     <!-- 상세 조회 -->
-    <select id="selectById" parameterType="long" resultMap="FreeboardDetailResponseMap">
+    <select id="selectById" resultMap="FreeboardDetailResponseMap">
         SELECT
         f.FREEBOARD_ID,
         f.USER_ID,
@@ -77,10 +150,11 @@
         f.FREEBOARD_IMAGE,
         f.FREEBOARD_REPRESENT_IMAGE,
         f.FREEBOARD_CREATED_AT,
+        f.LIKE_COUNT,
         u.USER_NICKNAME
         FROM FREEBOARD f
         LEFT JOIN USERS u ON f.USER_ID = u.USER_ID
-        WHERE f.FREEBOARD_ID = #{id}
+        WHERE f.FREEBOARD_ID = #{freeboardId}
         AND f.FREEBOARD_DELETED_YN = 'N'
     </select>
 
@@ -142,19 +216,18 @@
         WHERE FREEBOARD_DELETED_YN = 'N'
     </select>
 
-    <!-- 좋아요 개수 증가 -->
+    <!-- 좋아요 수 증가 -->
     <update id="incrementLikeCount">
         UPDATE FREEBOARD
         SET LIKE_COUNT = LIKE_COUNT + 1
         WHERE FREEBOARD_ID = #{freeboardId}
     </update>
 
-    <!-- 좋아요 개수 감소 -->
+    <!-- 좋아요 수 감소 -->
     <update id="decrementLikeCount">
         UPDATE FREEBOARD
-        SET LIKE_COUNT = LIKE_COUNT - 1
+        SET LIKE_COUNT = GREATEST(LIKE_COUNT - 1, 0)
         WHERE FREEBOARD_ID = #{freeboardId}
-        AND LIKE_COUNT > 0
     </update>
 
 </mapper>

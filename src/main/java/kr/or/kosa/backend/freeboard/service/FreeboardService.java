@@ -8,9 +8,15 @@ import kr.or.kosa.backend.freeboard.dto.FreeboardDto;
 import kr.or.kosa.backend.freeboard.dto.FreeboardListResponseDto;
 import kr.or.kosa.backend.freeboard.exception.FreeboardErrorCode;
 import kr.or.kosa.backend.freeboard.mapper.FreeboardMapper;
+import kr.or.kosa.backend.like.domain.Like;
+import kr.or.kosa.backend.like.domain.ReferenceType;
+import kr.or.kosa.backend.like.mapper.LikeMapper;
 import kr.or.kosa.backend.tag.service.TagService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,6 +33,7 @@ public class FreeboardService {
     private final FreeboardMapper mapper;
     private final ObjectMapper objectMapper;
     private final TagService tagService;
+    private final LikeMapper likeMapper;
 
     public Map<String, Object> listPage(int page, int size) {
         int offset = (page - 1) * size;
@@ -44,8 +51,56 @@ public class FreeboardService {
         return result;
     }
 
+    public Page<FreeboardListResponseDto> getList(Pageable pageable, String keyword) {
+        int offset = (int) pageable.getOffset();
+        int pageSize = pageable.getPageSize();
+        String sortField = getSortField(pageable);
+        String sortDirection = getSortDirection(pageable);
+
+        int totalCount = mapper.countPosts(keyword);
+
+        List<FreeboardListResponseDto> posts = mapper.findPosts(
+                offset,
+                pageSize,
+                sortField,
+                sortDirection,
+                keyword
+        );
+
+        return new PageImpl<>(posts, pageable, totalCount);
+    }
+
+    private String getSortField(Pageable pageable) {
+        if (pageable.getSort().isEmpty()) {
+            return "created_at";
+        }
+
+        String property = pageable.getSort().iterator().next().getProperty();
+
+        switch (property) {
+            case "commentCount":
+                return "comment_count";
+            case "likeCount":
+                return "like_count";
+            case "viewCount":
+            case "click":
+                return "view_count";
+            case "createdAt":
+            default:
+                return "created_at";
+        }
+    }
+
+    private String getSortDirection(Pageable pageable) {
+        if (pageable.getSort().isEmpty()) {
+            return "DESC";
+        }
+
+        return pageable.getSort().iterator().next().getDirection().name();
+    }
+
     @Transactional
-    public FreeboardDetailResponseDto detail(Long id) {
+    public FreeboardDetailResponseDto detail(Long id, Long userId) {
         mapper.increaseClick(id);
 
         FreeboardDetailResponseDto freeboard = mapper.selectById(id);
@@ -54,8 +109,23 @@ public class FreeboardService {
         }
 
         List<String> tags = tagService.getFreeboardTags(id);
+        Like existingLike = likeMapper.selectLike(userId, ReferenceType.POST_FREEBOARD, id);
+        boolean isLiked = existingLike != null;
 
-        return freeboard.withTags(tags);
+        return FreeboardDetailResponseDto.builder()
+                .freeboardId(freeboard.getFreeboardId())
+                .userId(freeboard.getUserId())
+                .userNickname(freeboard.getUserNickname())
+                .freeboardTitle(freeboard.getFreeboardTitle())
+                .freeboardContent(freeboard.getFreeboardContent())
+                .freeboardClick(freeboard.getFreeboardClick())
+                .likeCount(freeboard.getLikeCount() != null ? freeboard.getLikeCount() : 0)
+                .freeboardImage(freeboard.getFreeboardImage())
+                .freeboardRepresentImage(freeboard.getFreeboardRepresentImage())
+                .freeboardCreatedAt(freeboard.getFreeboardCreatedAt())
+                .tags(tags)
+                .isLiked(isLiked)
+                .build();
     }
 
     @Transactional
@@ -96,7 +166,6 @@ public class FreeboardService {
 
     @Transactional
     public void edit(Long id, FreeboardDto dto, Long userId) {
-
         FreeboardDetailResponseDto existing = mapper.selectById(id);
         if (existing == null) {
             throw new CustomBusinessException(FreeboardErrorCode.NOT_FOUND);

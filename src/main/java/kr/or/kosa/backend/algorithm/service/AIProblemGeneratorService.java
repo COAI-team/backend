@@ -3,11 +3,11 @@ package kr.or.kosa.backend.algorithm.service;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import kr.or.kosa.backend.algorithm.domain.AlgoProblem;
-import kr.or.kosa.backend.algorithm.domain.AlgoTestcase;
-import kr.or.kosa.backend.algorithm.domain.ProblemDifficulty;
-import kr.or.kosa.backend.algorithm.domain.ProblemSource;
-import kr.or.kosa.backend.algorithm.domain.ProblemType;
+import kr.or.kosa.backend.algorithm.dto.AlgoProblemDto;
+import kr.or.kosa.backend.algorithm.dto.AlgoTestcaseDto;
+import kr.or.kosa.backend.algorithm.dto.enums.ProblemDifficulty;
+import kr.or.kosa.backend.algorithm.dto.enums.ProblemSource;
+import kr.or.kosa.backend.algorithm.dto.enums.ProblemType;
 import kr.or.kosa.backend.algorithm.dto.ProblemGenerationRequestDto;
 import kr.or.kosa.backend.algorithm.dto.ProblemGenerationResponseDto;
 import kr.or.kosa.backend.algorithm.mapper.AlgorithmProblemMapper;
@@ -18,10 +18,14 @@ import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.chat.prompt.PromptTemplate;
 import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
+import reactor.core.scheduler.Schedulers;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -48,8 +52,8 @@ public class AIProblemGeneratorService {
             String aiResponse = callOpenAI(prompt);
 
             // 3. 응답 파싱
-            AlgoProblem problem = parseAIProblemResponse(aiResponse, request);
-            List<AlgoTestcase> testCases = parseAITestCaseResponse(aiResponse);
+            AlgoProblemDto problem = parseAIProblemResponse(aiResponse, request);
+            List<AlgoTestcaseDto> testCases = parseAITestCaseResponse(aiResponse);
 
             double generationTime = (System.currentTimeMillis() - startTime) / 1000.0;
 
@@ -75,6 +79,117 @@ public class AIProblemGeneratorService {
                     .status(ProblemGenerationResponseDto.GenerationStatus.FAILED)
                     .errorMessage(e.getMessage())
                     .build();
+        }
+    }
+
+    /**
+     * AI 문제 생성 (스트리밍 버전)
+     * SSE를 통해 실시간으로 생성 과정을 클라이언트에 전송
+     */
+    public Flux<String> generateProblemStream(ProblemGenerationRequestDto request) {
+        return Flux.create(sink -> {
+            // 별도 스레드에서 실행
+            Schedulers.boundedElastic().schedule(() -> {
+                long startTime = System.currentTimeMillis();
+
+                try {
+                    // 1단계: 시작 알림
+                    emitStep(sink, "프롬프트 생성 중...");
+                    Thread.sleep(300); // 시각적 피드백을 위한 짧은 대기
+
+                    // 2단계: 프롬프트 생성
+                    String prompt = buildPrompt(request);
+                    emitStep(sink, "AI에게 문제 생성 요청 중...");
+
+                    // 3단계: OpenAI API 호출
+                    String aiResponse = callOpenAI(prompt);
+                    emitStep(sink, "응답 분석 중...");
+                    Thread.sleep(200);
+
+                    // 4단계: 파싱
+                    emitStep(sink, "문제 정보 파싱 중...");
+                    AlgoProblemDto problem = parseAIProblemResponse(aiResponse, request);
+                    List<AlgoTestcaseDto> testCases = parseAITestCaseResponse(aiResponse);
+
+                    // 5단계: DB 저장
+                    emitStep(sink, "데이터베이스에 저장 중...");
+
+                    // 문제 저장 (MyBatis useGeneratedKeys로 ID 자동 설정)
+                    algorithmProblemMapper.insertProblem(problem);
+                    Long problemId = problem.getAlgoProblemId();
+
+                    // 테스트케이스 저장
+                    for (AlgoTestcaseDto tc : testCases) {
+                        tc.setAlgoProblemId(problemId);
+                        algorithmProblemMapper.insertTestcase(tc);
+                    }
+
+                    double generationTime = (System.currentTimeMillis() - startTime) / 1000.0;
+
+                    // 6단계: 완료 이벤트 전송
+                    Map<String, Object> completeData = new HashMap<>();
+                    completeData.put("problemId", problemId);
+                    completeData.put("title", problem.getAlgoProblemTitle());
+                    completeData.put("description", problem.getAlgoProblemDescription());
+                    completeData.put("difficulty", problem.getAlgoProblemDifficulty());
+                    completeData.put("testCaseCount", testCases.size());
+                    completeData.put("generationTime", generationTime);
+
+                    emitComplete(sink, completeData);
+
+                    log.info("스트리밍 문제 생성 완료 - 문제 ID: {}, 소요시간: {}초", problemId, generationTime);
+
+                } catch (Exception e) {
+                    log.error("스트리밍 문제 생성 실패", e);
+                    emitError(sink, e.getMessage());
+                }
+            });
+        });
+    }
+
+    /**
+     * SSE 단계 이벤트 전송
+     */
+    private void emitStep(reactor.core.publisher.FluxSink<String> sink, String message) {
+        try {
+            Map<String, Object> event = new HashMap<>();
+            event.put("type", "STEP");
+            event.put("message", message);
+            sink.next(objectMapper.writeValueAsString(event));
+        } catch (JsonProcessingException e) {
+            log.error("이벤트 JSON 변환 실패", e);
+        }
+    }
+
+    /**
+     * SSE 완료 이벤트 전송
+     */
+    private void emitComplete(reactor.core.publisher.FluxSink<String> sink, Map<String, Object> data) {
+        try {
+            Map<String, Object> event = new HashMap<>();
+            event.put("type", "COMPLETE");
+            event.put("data", data);
+            sink.next(objectMapper.writeValueAsString(event));
+            sink.complete();
+        } catch (JsonProcessingException e) {
+            log.error("완료 이벤트 JSON 변환 실패", e);
+            sink.complete();
+        }
+    }
+
+    /**
+     * SSE 에러 이벤트 전송
+     */
+    private void emitError(reactor.core.publisher.FluxSink<String> sink, String message) {
+        try {
+            Map<String, Object> event = new HashMap<>();
+            event.put("type", "ERROR");
+            event.put("message", message);
+            sink.next(objectMapper.writeValueAsString(event));
+            sink.complete();
+        } catch (JsonProcessingException e) {
+            log.error("에러 이벤트 JSON 변환 실패", e);
+            sink.complete();
         }
     }
 
@@ -130,9 +245,9 @@ public class AIProblemGeneratorService {
      */
     private List<String> getExistingProblemTitles() {
         try {
-            List<AlgoProblem> problems = algorithmProblemMapper.selectProblems(0, 100); // 최근 100개 문제
+            List<AlgoProblemDto> problems = algorithmProblemMapper.selectProblems(0, 100); // 최근 100개 문제
             return problems.stream()
-                    .map(AlgoProblem::getAlgoProblemTitle)
+                    .map(AlgoProblemDto::getAlgoProblemTitle)
                     .filter(title -> title != null && !title.isEmpty())
                     .toList();
         } catch (Exception e) {
@@ -252,16 +367,97 @@ public class AIProblemGeneratorService {
     }
 
     /**
-     * 문제 정보 파싱
+     * AI 응답 JSON 정제
+     * - 마크다운 코드 블록 제거
+     * - 유효하지 않은 JSON 이스케이프 시퀀스 처리 (정규식 패턴 등)
      */
-    private AlgoProblem parseAIProblemResponse(String aiResponse, ProblemGenerationRequestDto request)
-            throws JsonProcessingException {
+    private String sanitizeJsonResponse(String aiResponse) {
+        // null 또는 빈 문자열 체크
+        if (aiResponse == null || aiResponse.trim().isEmpty()) {
+            log.warn("AI 응답이 null이거나 비어있습니다.");
+            return "{}";
+        }
 
-        // JSON 전처리 (```json ``` 제거)
+        // 1. 마크다운 코드 블록 제거
         String cleanedJson = aiResponse
                 .replaceAll("```json\\s*", "")
                 .replaceAll("```\\s*$", "")
+                .replaceAll("```", "")  // 추가: 남은 ``` 제거
                 .trim();
+
+        if (cleanedJson.isEmpty()) {
+            log.warn("마크다운 제거 후 JSON이 비어있습니다.");
+            return "{}";
+        }
+
+        // 2. 유효하지 않은 JSON 이스케이프 시퀀스를 이중 백슬래시로 변환
+        // JSON 유효 이스케이프: 큰따옴표, 백슬래시, 슬래시, b, f, n, r, t, 유니코드(u+4자리hex)
+        // 그 외 정규식 패턴(w, d, s 등)은 유효하지 않으므로 백슬래시를 이중으로 변환
+        StringBuilder result = new StringBuilder();
+        int i = 0;
+        int escapesFixed = 0;
+
+        while (i < cleanedJson.length()) {
+            char c = cleanedJson.charAt(i);
+
+            if (c == '\\') {
+                // 다음 문자가 있는지 확인
+                if (i + 1 < cleanedJson.length()) {
+                    char next = cleanedJson.charAt(i + 1);
+
+                    // 유효한 JSON 이스케이프 시퀀스 확인
+                    if (next == '"' || next == '\\' || next == '/' ||
+                        next == 'b' || next == 'f' || next == 'n' ||
+                        next == 'r' || next == 't') {
+                        // 유효한 이스케이프 - 그대로 유지
+                        result.append(c);
+                        result.append(next);
+                        i += 2;
+                    } else if (next == 'u' && i + 5 < cleanedJson.length()) {
+                        // \ uXXXX 유니코드 이스케이프 확인
+                        String hex = cleanedJson.substring(i + 2, i + 6);
+                        if (hex.matches("[0-9a-fA-F]{4}")) {
+                            result.append(cleanedJson, i, i + 6);
+                            i += 6;
+                        } else {
+                            // 유효하지 않은 유니코드 - 백슬래시 이스케이프
+                            result.append("\\\\");
+                            escapesFixed++;
+                            i += 1;
+                        }
+                    } else {
+                        // 유효하지 않은 이스케이프 - 백슬래시를 이중으로
+                        result.append("\\\\");
+                        escapesFixed++;
+                        i += 1;
+                    }
+                } else {
+                    // 문자열 끝에 단독 백슬래시 - 이스케이프 처리
+                    result.append("\\\\");
+                    escapesFixed++;
+                    i += 1;
+                }
+            } else {
+                result.append(c);
+                i += 1;
+            }
+        }
+
+        if (escapesFixed > 0) {
+            log.info("JSON 이스케이프 시퀀스 {} 개 수정됨", escapesFixed);
+        }
+
+        return result.toString();
+    }
+
+    /**
+     * 문제 정보 파싱
+     */
+    private AlgoProblemDto parseAIProblemResponse(String aiResponse, ProblemGenerationRequestDto request)
+            throws JsonProcessingException {
+
+        // JSON 전처리 (```json ``` 제거 + 유효하지 않은 이스케이프 시퀀스 처리)
+        String cleanedJson = sanitizeJsonResponse(aiResponse);
 
         JsonNode jsonNode = objectMapper.readTree(cleanedJson);
 
@@ -279,7 +475,7 @@ public class AIProblemGeneratorService {
             }
         }
 
-        return AlgoProblem.builder()
+        return AlgoProblemDto.builder()
                 .algoProblemTitle(jsonNode.get("title").asText())
                 .algoProblemDescription(buildFullDescription(jsonNode))
                 .algoProblemDifficulty(request.getDifficulty())
@@ -360,21 +556,18 @@ public class AIProblemGeneratorService {
     /**
      * 테스트케이스 파싱
      */
-    private List<AlgoTestcase> parseAITestCaseResponse(String aiResponse) throws JsonProcessingException {
+    private List<AlgoTestcaseDto> parseAITestCaseResponse(String aiResponse) throws JsonProcessingException {
 
-        // JSON 전처리
-        String cleanedJson = aiResponse
-                .replaceAll("```json\\s*", "")
-                .replaceAll("```\\s*$", "")
-                .trim();
+        // JSON 전처리 (유효하지 않은 이스케이프 시퀀스 처리 포함)
+        String cleanedJson = sanitizeJsonResponse(aiResponse);
 
         JsonNode jsonNode = objectMapper.readTree(cleanedJson);
         JsonNode testCasesNode = jsonNode.get("testCases");
 
-        List<AlgoTestcase> testCases = new ArrayList<>();
+        List<AlgoTestcaseDto> testCases = new ArrayList<>();
 
         // 샘플 테스트케이스 (첫 번째)
-        testCases.add(AlgoTestcase.builder()
+        testCases.add(AlgoTestcaseDto.builder()
                 .inputData(jsonNode.get("sampleInput").asText())
                 .expectedOutput(jsonNode.get("sampleOutput").asText())
                 .isSample(true)
@@ -384,7 +577,7 @@ public class AIProblemGeneratorService {
         if (testCasesNode != null && testCasesNode.isArray()) {
             for (JsonNode testCase : testCasesNode) {
                 testCases.add(
-                        AlgoTestcase.builder()
+                        AlgoTestcaseDto.builder()
                                 .inputData(testCase.get("input").asText())
                                 .expectedOutput(testCase.get("output").asText())
                                 .isSample(false)

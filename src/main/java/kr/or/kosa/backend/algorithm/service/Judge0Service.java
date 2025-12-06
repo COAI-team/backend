@@ -1,8 +1,8 @@
 package kr.or.kosa.backend.algorithm.service;
 
-import kr.or.kosa.backend.algorithm.domain.AlgoSubmission;
 import kr.or.kosa.backend.algorithm.dto.Judge0RequestDto;
 import kr.or.kosa.backend.algorithm.dto.Judge0ResponseDto;
+import kr.or.kosa.backend.algorithm.dto.enums.JudgeResult;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -356,7 +356,7 @@ public class Judge0Service {
         }
 
         // Judge0 상태 확인
-        AlgoSubmission.JudgeResult judgeResult = response.toJudgeResult();
+        JudgeResult judgeResult = response.toJudgeResult();
 
         switch (judgeResult) {
             case AC:

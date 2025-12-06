@@ -51,7 +51,7 @@ public class GitHubLoginController {
         GitHubUserResponse gitHubUser = gitHubOAuthService.getUserInfo(code);
 
         boolean linkMode = "link".equals(mode);  // ← 🔥 이 줄이 반드시 필요
-
+        
         // 🔥 연동 모드 처리
         if (linkMode) {
             return ResponseEntity.ok(
