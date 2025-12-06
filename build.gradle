@@ -2,6 +2,7 @@ plugins {
     id 'java'
     id 'org.springframework.boot' version '3.5.7'
     id 'io.spring.dependency-management' version '1.1.7'
+    id 'antlr'
 }
 
 ext {
@@ -15,6 +16,14 @@ description = 'backend'
 java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(17)
+    }
+}
+
+sourceSets {
+    main {
+        java {
+            srcDirs 'build/generated/sources/antlr/main'
+        }
     }
 }
 
@@ -53,6 +62,20 @@ dependencies {
     implementation 'org.springframework.ai:spring-ai-starter-model-openai'
     implementation 'org.springframework.ai:spring-ai-starter-vector-store-qdrant'
 
+    /* LangChain4j */
+    implementation 'dev.langchain4j:langchain4j-spring-boot-starter:0.35.0'
+    implementation 'dev.langchain4j:langchain4j-open-ai-spring-boot-starter:0.35.0'
+
+    /* ANTLR */
+    antlr "org.antlr:antlr4:4.13.1"
+    implementation 'org.antlr:antlr4-runtime:4.13.1'
+
+    /* Spring Integration */
+    implementation 'org.springframework.boot:spring-boot-starter-integration'
+
+    /* Mustache */
+    implementation 'org.springframework.boot:spring-boot-starter-mustache'
+
     /* DB */
     runtimeOnly 'com.mysql:mysql-connector-j'
     implementation 'com.mysql:mysql-connector-j:9.3.0'
@@ -82,6 +105,10 @@ dependencies {
 
     /* Jsoup */
     implementation 'org.jsoup:jsoup:1.17.2'
+
+    /* Kumo (Word Cloud) */
+    implementation 'com.kennycason:kumo-core:1.28'
+    implementation 'com.kennycason:kumo-tokenizers:1.28'
 
     /* Test */
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
