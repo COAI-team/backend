@@ -1,119 +1,149 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE mapper
-        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
 <mapper namespace="kr.or.kosa.backend.codeboard.mapper.CodeboardMapper">
 
-    <!-- 게시글 목록 (페이징) -->
-    <select id="selectPage" resultType="kr.or.kosa.backend.codeboard.domain.Codeboard">
-        SELECT
-        codeboard_id,
-        user_id,
-        codeboard_title,
-        codeboard_content,
-        codeboard_click,
-        codeboard_image,
-        codeboard_represent_image,
-        codeboard_created_at,
-        codeboard_deleted_yn,
-        like_count
-        FROM codeboard
-        WHERE codeboard_deleted_yn = 'N'
-        ORDER BY codeboard_id DESC
-        LIMIT #{size} OFFSET #{offset}
-    </select>
-
-    <!-- 상세 조회 -->
-    <select id="selectById" parameterType="long" resultType="kr.or.kosa.backend.codeboard.domain.Codeboard">
-        SELECT
-        codeboard_id,
-        user_id,
-        codeboard_title,
-        codeboard_content,
-        codeboard_click,
-        codeboard_image,
-        codeboard_represent_image,
-        codeboard_created_at,
-        codeboard_deleted_yn,
-        like_count
-        FROM codeboard
-        WHERE codeboard_id = #{id}
-        AND codeboard_deleted_yn = 'N'
-    </select>
-
-    <!-- 등록 -->
+    <!-- 게시글 등록 -->
     <insert id="insert" parameterType="kr.or.kosa.backend.codeboard.domain.Codeboard"
             useGeneratedKeys="true" keyProperty="codeboardId">
-        INSERT INTO codeboard (
-        user_id,
-        codeboard_title,
-        codeboard_content,
-        codeboard_click,
-        codeboard_image,
-        codeboard_represent_image,
-        codeboard_created_at,
-        codeboard_deleted_yn,
-        like_count
+        INSERT INTO CODEBOARD (
+        USER_ID,
+        ANALYSIS_ID,
+        CODEBOARD_TITLE,
+        CODEBOARD_BLOCKS,
+        CODEBOARD_PLAIN_TEXT,
+        CODEBOARD_CLICK,
+        CODEBOARD_CREATED_AT,
+        CODEBOARD_DELETED_YN
         ) VALUES (
         #{userId},
+        #{analysisId},
         #{codeboardTitle},
-        #{codeboardContent},
+        #{codeboardBlocks},
+        #{codeboardPlainText},
         0,
-        #{codeboardImage},
-        #{codeboardRepresentImage},
         NOW(),
-        'N',
-        0
+        #{codeboardDeletedYn}
         )
     </insert>
 
-    <!-- 수정 -->
+    <!-- 게시글 수정 -->
     <update id="update" parameterType="kr.or.kosa.backend.codeboard.domain.Codeboard">
-        UPDATE codeboard
-        SET
-        codeboard_title = #{codeboardTitle},
-        codeboard_content = #{codeboardContent},
-        codeboard_image = #{codeboardImage},
-        codeboard_represent_image = #{codeboardRepresentImage}
-        WHERE codeboard_id = #{codeboardId}
-        AND codeboard_deleted_yn = 'N'
+        UPDATE CODEBOARD
+        SET ANALYSIS_ID = #{analysisId},
+        CODEBOARD_TITLE = #{codeboardTitle},
+        CODEBOARD_BLOCKS = #{codeboardBlocks},
+        CODEBOARD_PLAIN_TEXT = #{codeboardPlainText}
+        WHERE CODEBOARD_ID = #{codeboardId}
+        AND CODEBOARD_DELETED_YN = 'N'
     </update>
 
-    <!-- 삭제 -->
-    <update id="delete" parameterType="long">
-        UPDATE codeboard
-        SET codeboard_deleted_yn = 'Y'
-        WHERE codeboard_id = #{id}
+    <!-- 게시글 삭제 (소프트 삭제) -->
+    <update id="delete">
+        UPDATE CODEBOARD
+        SET CODEBOARD_DELETED_YN = 'Y'
+        WHERE CODEBOARD_ID = #{codeboardId}
     </update>
 
-    <!-- 조회수 증가 -->
-    <update id="increaseClick" parameterType="long">
-        UPDATE codeboard
-        SET codeboard_click = codeboard_click + 1
-        WHERE codeboard_id = #{id}
-    </update>
-
-    <!-- 전체 게시글 수 -->
-    <select id="countAll" resultType="int">
-        SELECT COUNT(*)
-        FROM codeboard
-        WHERE codeboard_deleted_yn = 'N'
+    <!-- 게시글 상세 조회 -->
+    <select id="selectById" resultType="kr.or.kosa.backend.codeboard.dto.CodeboardDetailResponseDto">
+        SELECT
+        C.CODEBOARD_ID AS codeboardId,
+        C.USER_ID AS userId,
+        U.USER_NICKNAME AS userNickname,
+        C.ANALYSIS_ID AS analysisId,
+        C.CODEBOARD_TITLE AS codeboardTitle,
+        C.CODEBOARD_BLOCKS AS codeboardContent,
+        C.CODEBOARD_CLICK AS codeboardClick,
+        C.CODEBOARD_CREATED_AT AS codeboardCreatedAt,
+        COALESCE(L.LIKE_COUNT, 0) AS likeCount
+        FROM CODEBOARD C
+        INNER JOIN USERS U ON C.USER_ID = U.USER_ID
+        LEFT JOIN (
+        SELECT REFERENCE_ID, COUNT(*) AS LIKE_COUNT
+        FROM `LIKE`
+        WHERE REFERENCE_TYPE = 'POST_CODEBOARD'
+        GROUP BY REFERENCE_ID
+        ) L ON C.CODEBOARD_ID = L.REFERENCE_ID
+        WHERE C.CODEBOARD_ID = #{codeboardId}
+        AND C.CODEBOARD_DELETED_YN = 'N'
     </select>
 
-    <!-- 좋아요 개수 증가 -->
-    <update id="incrementLikeCount">
-        UPDATE codeboard
-        SET like_count = like_count + 1
-        WHERE codeboard_id = #{codeboardId}
+    <!-- 조회수 증가 -->
+    <update id="increaseClick">
+        UPDATE CODEBOARD
+        SET CODEBOARD_CLICK = CODEBOARD_CLICK + 1
+        WHERE CODEBOARD_ID = #{codeboardId}
+        AND CODEBOARD_DELETED_YN = 'N'
     </update>
 
-    <!-- 좋아요 개수 감소 -->
+    <!-- 게시글 총 개수 조회 -->
+    <select id="countPosts" resultType="int">
+        SELECT COUNT(*)
+        FROM CODEBOARD C
+        WHERE C.CODEBOARD_DELETED_YN = 'N'
+        <if test="keyword != null and keyword != ''">
+            AND (
+            C.CODEBOARD_TITLE LIKE CONCAT('%', #{keyword}, '%')
+            OR C.CODEBOARD_PLAIN_TEXT LIKE CONCAT('%', #{keyword}, '%')
+            )
+        </if>
+    </select>
+
+    <!-- 게시글 목록 조회 -->
+    <select id="findPosts" resultType="kr.or.kosa.backend.codeboard.dto.CodeboardListResponseDto">
+        SELECT
+        C.CODEBOARD_ID AS codeboardId,
+        C.USER_ID AS userId,
+        U.USER_NICKNAME AS userNickname,
+        C.ANALYSIS_ID AS analysisId,
+        C.CODEBOARD_TITLE AS codeboardTitle,
+        C.CODEBOARD_PLAIN_TEXT AS codeboardPlainText,
+        C.CODEBOARD_CLICK AS codeboardClick,
+        C.CODEBOARD_CREATED_AT AS codeboardCreatedAt,
+        COALESCE(L.LIKE_COUNT, 0) AS likeCount,
+        COALESCE(CM.COMMENT_COUNT, 0) AS commentCount
+        FROM CODEBOARD C
+        INNER JOIN USERS U ON C.USER_ID = U.USER_ID
+        LEFT JOIN (
+        SELECT REFERENCE_ID, COUNT(*) AS LIKE_COUNT
+        FROM `LIKE`
+        WHERE REFERENCE_TYPE = 'POST_CODEBOARD'
+        GROUP BY REFERENCE_ID
+        ) L ON C.CODEBOARD_ID = L.REFERENCE_ID
+        LEFT JOIN (
+        SELECT REFERENCE_ID, COUNT(*) AS COMMENT_COUNT
+        FROM COMMENT
+        WHERE REFERENCE_TYPE = 'POST_CODEBOARD'
+        AND COMMENT_DELETED_YN = 'N'
+        GROUP BY REFERENCE_ID
+        ) CM ON C.CODEBOARD_ID = CM.REFERENCE_ID
+        WHERE C.CODEBOARD_DELETED_YN = 'N'
+        <if test="keyword != null and keyword != ''">
+            AND (
+            C.CODEBOARD_TITLE LIKE CONCAT('%', #{keyword}, '%')
+            OR C.CODEBOARD_PLAIN_TEXT LIKE CONCAT('%', #{keyword}, '%')
+            )
+        </if>
+        ORDER BY ${sortField} ${sortDirection}
+        LIMIT #{pageSize} OFFSET #{offset}
+    </select>
+
+    <!-- 좋아요 수 증가 -->
+    <update id="incrementLikeCount">
+        UPDATE CODEBOARD
+        SET CODEBOARD_LIKE_COUNT = CODEBOARD_LIKE_COUNT + 1
+        WHERE CODEBOARD_ID = #{codeboardId}
+        AND CODEBOARD_DELETED_YN = 'N'
+    </update>
+
+    <!-- 좋아요 수 감소 -->
     <update id="decrementLikeCount">
-        UPDATE codeboard
-        SET like_count = like_count - 1
-        WHERE codeboard_id = #{codeboardId}
-        AND like_count > 0
+        UPDATE CODEBOARD
+        SET CODEBOARD_LIKE_COUNT = GREATEST(0, CODEBOARD_LIKE_COUNT - 1)
+        WHERE CODEBOARD_ID = #{codeboardId}
+        AND CODEBOARD_DELETED_YN = 'N'
     </update>
 
 </mapper>

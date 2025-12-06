@@ -21,7 +21,7 @@ public class Freeboard {
     private LocalDateTime freeboardCreatedAt;
     private String freeboardDeletedYn;
 
-    @Setter // tags에만 Setter 추가
+    @Setter
     private List<String> tags;
 
 }

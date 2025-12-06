@@ -1,4 +1,4 @@
-package kr.or.kosa.backend.toobar.dto;
+package kr.or.kosa.backend.toolbar.link.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
