@@ -1,8 +1,8 @@
-package kr.or.kosa.backend.toobar.controller;
+package kr.or.kosa.backend.toolbar.link.controller;
 
-import kr.or.kosa.backend.toobar.dto.LinkPreviewRequest;
-import kr.or.kosa.backend.toobar.dto.LinkPreviewResponse;
-import kr.or.kosa.backend.toobar.service.LinkPreviewService;
+import kr.or.kosa.backend.toolbar.link.dto.LinkPreviewRequest;
+import kr.or.kosa.backend.toolbar.link.dto.LinkPreviewResponse;
+import kr.or.kosa.backend.toolbar.link.service.LinkPreviewService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 

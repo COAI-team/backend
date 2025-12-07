@@ -1,8 +1,8 @@
-package kr.or.kosa.backend.toobar.service;
+package kr.or.kosa.backend.toolbar.link.service;
 
 import java.net.URI;
 
-import kr.or.kosa.backend.toobar.dto.LinkPreviewResponse;
+import kr.or.kosa.backend.toolbar.link.dto.LinkPreviewResponse;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;

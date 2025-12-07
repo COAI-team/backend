@@ -32,4 +32,10 @@
         AND REFERENCE_ID = #{referenceId}
     </delete>
 
+    <delete id="deleteByReference">
+        DELETE FROM `LIKE`
+        WHERE REFERENCE_TYPE = #{referenceType}
+        AND REFERENCE_ID = #{referenceId}
+    </delete>
+
 </mapper>

@@ -2,6 +2,7 @@ plugins {
     id 'java'
     id 'org.springframework.boot' version '3.5.7'
     id 'io.spring.dependency-management' version '1.1.7'
+    id 'antlr'
 }
 
 ext {
@@ -15,6 +16,14 @@ description = 'backend'
 java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(17)
+    }
+}
+
+sourceSets {
+    main {
+        java {
+            srcDirs 'build/generated/sources/antlr/main'
+        }
     }
 }
 
@@ -52,6 +61,20 @@ dependencies {
     /* AI */
     implementation 'org.springframework.ai:spring-ai-starter-model-openai'
     implementation 'org.springframework.ai:spring-ai-starter-vector-store-qdrant'
+
+    /* LangChain4j */
+    implementation 'dev.langchain4j:langchain4j-spring-boot-starter:0.35.0'
+    implementation 'dev.langchain4j:langchain4j-open-ai-spring-boot-starter:0.35.0'
+
+    /* ANTLR */
+    antlr "org.antlr:antlr4:4.13.1"
+    implementation 'org.antlr:antlr4-runtime:4.13.1'
+
+    /* Spring Integration */
+    implementation 'org.springframework.boot:spring-boot-starter-integration'
+
+    /* Mustache */
+    implementation 'org.springframework.boot:spring-boot-starter-mustache'
 
     /* DB */
     runtimeOnly 'com.mysql:mysql-connector-j'
