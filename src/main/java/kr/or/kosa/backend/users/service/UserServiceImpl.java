@@ -440,11 +440,15 @@ public class UserServiceImpl implements UserService {
         // 3) 이메일로 기존 일반 계정이 존재 → 연동 필요
         Users existingUser = userMapper.findByEmail(email);
         if (existingUser != null) {
+
+            // 기존 계정 자동 로그인 처리 (토큰 발급)
+            Map<String, String> tokens = issueTokens(existingUser);
+
             return GithubLoginResult.builder()
                     .user(existingUser)
                     .needLink(true)
-                    .accessToken(null)
-                    .refreshToken(null)
+                    .accessToken(tokens.get(KEY_ACCESS_TOKEN))
+                    .refreshToken(tokens.get(KEY_REFRESH_TOKEN))
                     .build();
         }
 

@@ -70,6 +70,18 @@ public class GitHubLoginController {
         // 🔥 3) 기존 이메일 계정 존재 → 계정 통합 필요
         if (result.isNeedLink()) {
 
+            // 기존 일반 계정 기준으로 토큰 발급
+            String accessToken = jwtProvider.createAccessToken(user.getUserId(), user.getUserEmail());
+            String refreshToken = jwtProvider.createRefreshToken(user.getUserId(), user.getUserEmail());
+
+            // refreshToken 저장
+            redisTemplate.opsForValue().set(
+                    REFRESH_KEY_PREFIX + user.getUserId(),
+                    refreshToken,
+                    REFRESH_TOKEN_EXPIRE_DAYS,
+                    TimeUnit.DAYS
+            );
+
             return ResponseEntity.ok(
                     GitHubCallbackResponse.builder()
                             .linkMode(false)
@@ -77,6 +89,11 @@ public class GitHubLoginController {
                             .userId(user.getUserId())
                             .message("기존 일반 계정이 존재합니다. GitHub 계정을 연동하시겠습니까?")
                             .gitHubUser(gitHubUser)
+
+                            // FE가 인증 상태를 유지할 수 있도록 토큰 전달
+                            .accessToken(accessToken)
+                            .refreshToken(refreshToken)
+
                             .build()
             );
         }

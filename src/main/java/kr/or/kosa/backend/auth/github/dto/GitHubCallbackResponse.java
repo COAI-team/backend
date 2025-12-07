@@ -3,9 +3,13 @@ package kr.or.kosa.backend.auth.github.dto;
 import kr.or.kosa.backend.users.dto.UserLoginResponseDto;
 import lombok.Builder;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
 
 @Getter
 @Builder
+@AllArgsConstructor
+@NoArgsConstructor
 public class GitHubCallbackResponse {
 
     private boolean linkMode;               // 프론트에서 "연동 화면" 띄울지 여부
@@ -14,5 +18,8 @@ public class GitHubCallbackResponse {
     private String message;                 // 모달에 표시할 메시지
 
     private GitHubUserResponse gitHubUser;  // GitHub 사용자 정보
-    private UserLoginResponseDto loginResponse; // 토큰 + user 정보 (로그인 성공 시)
+    private UserLoginResponseDto loginResponse; // OAuth 로그인 성공 시 (토큰 + user)
+
+    private String accessToken;
+    private String refreshToken;
 }
