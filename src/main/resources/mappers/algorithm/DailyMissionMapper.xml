@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="kr.or.kosa.backend.algorithm.mapper.DailyMissionMapper">
+
+    <!-- ===== 데일리 미션 ===== -->
+
+    <!-- 미션 생성 -->
+    <insert id="insertMission" parameterType="kr.or.kosa.backend.algorithm.dto.DailyMissionDto"
+            useGeneratedKeys="true" keyProperty="missionId">
+        INSERT INTO DAILY_MISSIONS (USER_ID, MISSION_DATE, MISSION_TYPE, PROBLEM_ID, REWARD_POINTS)
+        VALUES (#{userId}, #{missionDate}, #{missionType}, #{problemId}, #{rewardPoints})
+    </insert>
+
+    <!-- 오늘 미션 조회 -->
+    <select id="findTodayMissions" resultType="kr.or.kosa.backend.algorithm.dto.DailyMissionDto">
+        SELECT
+            dm.MISSION_ID as missionId,
+            dm.USER_ID as userId,
+            dm.MISSION_DATE as missionDate,
+            dm.MISSION_TYPE as missionType,
+            dm.PROBLEM_ID as problemId,
+            dm.IS_COMPLETED as isCompleted,
+            dm.REWARD_POINTS as rewardPoints,
+            dm.COMPLETED_AT as completedAt,
+            dm.CREATED_AT as createdAt,
+            ap.ALGO_PROBLEM_TITLE as problemTitle,
+            ap.ALGO_PROBLEM_DIFFICULTY as problemDifficulty
+        FROM DAILY_MISSIONS dm
+        LEFT JOIN ALGO_PROBLEMS ap ON dm.PROBLEM_ID = ap.ALGO_PROBLEM_ID
+        WHERE dm.USER_ID = #{userId}
+          AND dm.MISSION_DATE = #{date}
+        ORDER BY dm.MISSION_TYPE
+    </select>
+
+    <!-- 특정 미션 조회 -->
+    <select id="findMission" resultType="kr.or.kosa.backend.algorithm.dto.DailyMissionDto">
+        SELECT
+            MISSION_ID as missionId,
+            USER_ID as userId,
+            MISSION_DATE as missionDate,
+            MISSION_TYPE as missionType,
+            PROBLEM_ID as problemId,
+            IS_COMPLETED as isCompleted,
+            REWARD_POINTS as rewardPoints,
+            COMPLETED_AT as completedAt,
+            CREATED_AT as createdAt
+        FROM DAILY_MISSIONS
+        WHERE USER_ID = #{userId}
+          AND MISSION_DATE = #{date}
+          AND MISSION_TYPE = #{missionType}
+    </select>
+
+    <!-- 미션 완료 처리 -->
+    <update id="completeMission">
+        UPDATE DAILY_MISSIONS
+        SET IS_COMPLETED = 1,
+            COMPLETED_AT = NOW()
+        WHERE MISSION_ID = #{missionId}
+          AND IS_COMPLETED = 0
+    </update>
+
+    <!-- 모든 활성 사용자 ID 조회 -->
+    <select id="findAllActiveUserIds" resultType="Long">
+        SELECT USER_ID
+        FROM USERS
+        WHERE USER_ISDELETED = 0
+          AND USER_ENABLED = 1
+    </select>
+
+    <!-- 난이도별 랜덤 문제 ID 조회 -->
+    <select id="findRandomProblemIdByDifficulty" resultType="Long">
+        SELECT ALGO_PROBLEM_ID
+        FROM ALGO_PROBLEMS
+        WHERE ALGO_PROBLEM_DIFFICULTY = #{difficulty}
+          AND ALGO_PROBLEM_STATUS = 1
+          AND PROBLEM_TYPE = 'ALGORITHM'
+        ORDER BY RAND()
+        LIMIT 1
+    </select>
+
+    <!-- ===== 사용자 레벨 ===== -->
+
+    <!-- 사용자 레벨 조회 -->
+    <select id="findUserLevel" resultType="kr.or.kosa.backend.algorithm.dto.UserAlgoLevelDto">
+        SELECT
+            LEVEL_ID as levelId,
+            USER_ID as userId,
+            ALGO_LEVEL as algoLevel,
+            TOTAL_SOLVED as totalSolved,
+            CURRENT_STREAK as currentStreak,
+            MAX_STREAK as maxStreak,
+            LAST_SOLVED_AT as lastSolvedAt,
+            CREATED_AT as createdAt,
+            UPDATED_AT as updatedAt
+        FROM USER_ALGO_LEVELS
+        WHERE USER_ID = #{userId}
+    </select>
+
+    <!-- 사용자 레벨 생성 -->
+    <insert id="insertUserLevel" parameterType="kr.or.kosa.backend.algorithm.dto.UserAlgoLevelDto"
+            useGeneratedKeys="true" keyProperty="levelId">
+        INSERT INTO USER_ALGO_LEVELS (USER_ID, ALGO_LEVEL, TOTAL_SOLVED, CURRENT_STREAK, MAX_STREAK)
+        VALUES (#{userId}, #{algoLevel}, #{totalSolved}, #{currentStreak}, #{maxStreak})
+    </insert>
+
+    <!-- 사용자 레벨 업데이트 -->
+    <update id="updateUserLevel" parameterType="kr.or.kosa.backend.algorithm.dto.UserAlgoLevelDto">
+        UPDATE USER_ALGO_LEVELS
+        SET ALGO_LEVEL = #{algoLevel},
+            TOTAL_SOLVED = #{totalSolved},
+            CURRENT_STREAK = #{currentStreak},
+            MAX_STREAK = #{maxStreak},
+            LAST_SOLVED_AT = #{lastSolvedAt}
+        WHERE USER_ID = #{userId}
+    </update>
+
+    <!-- 문제 풀이 완료 시 통계 업데이트 -->
+    <update id="incrementSolvedCount">
+        UPDATE USER_ALGO_LEVELS
+        SET TOTAL_SOLVED = TOTAL_SOLVED + 1,
+            LAST_SOLVED_AT = NOW()
+        WHERE USER_ID = #{userId}
+    </update>
+
+    <!-- ===== 일일 사용량 (DB 백업용) ===== -->
+
+    <!-- 일일 사용량 UPSERT -->
+    <insert id="upsertDailyUsage">
+        INSERT INTO USER_DAILY_USAGE (USER_ID, USAGE_DATE, GENERATE_COUNT, SOLVE_COUNT)
+        VALUES (#{userId}, #{date}, #{generateCount}, #{solveCount})
+        ON DUPLICATE KEY UPDATE
+            GENERATE_COUNT = GENERATE_COUNT + #{generateCount},
+            SOLVE_COUNT = SOLVE_COUNT + #{solveCount}
+    </insert>
+
+    <!-- 일일 사용량 조회 -->
+    <select id="getTotalDailyUsage" resultType="Integer">
+        SELECT COALESCE(GENERATE_COUNT + SOLVE_COUNT, 0)
+        FROM USER_DAILY_USAGE
+        WHERE USER_ID = #{userId}
+          AND USAGE_DATE = #{date}
+    </select>
+
+</mapper>
