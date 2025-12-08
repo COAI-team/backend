@@ -8,6 +8,7 @@ public enum UserErrorCode implements ErrorCode {
     EMAIL_SEND_FAIL("U503", "이메일 전송에 실패했습니다."),
     NICKNAME_DUPLICATE("USER002", "이미 사용 중인 닉네임입니다."),
     USER_NOT_FOUND("USER003", "등록되지 않은 이메일입니다."),
+    NOT_FOUND("USER003", "사용자를 찾을 수 없습니다."),
     INVALID_PASSWORD("USER004", "비밀번호가 일치하지 않습니다."),
     EMAIL_NOT_VERIFIED("USER005", "이메일 인증이 완료되지 않았습니다."),
     USER_CREATE_FAIL("USER501", "사용자 생성에 실패했습니다."),

@@ -5,10 +5,8 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-/**
- * 조회(응답) 시에 사용되는 블록 DTO
- * tiptap / code 블록 공통 구조
- */
+// 조회(응답) 시에 사용되는 블록 DTO
+// tiptap / code 블록 공통 구조
 @Getter
 @NoArgsConstructor
 @AllArgsConstructor
@@ -19,5 +17,5 @@ public class FreeboardBlockResponse {
     private String type;     // "tiptap" or "code"
     private Object content;  // tiptap JSON or code string
     private String language; // code block일 때 사용
-    private Integer order;
+    private Integer order;   // 순서
 }

@@ -60,8 +60,7 @@ public class GitHubOAuthServiceImpl implements GitHubOAuthService {
                 url,
                 HttpMethod.POST,
                 entity,
-                JsonNode.class
-        );
+                JsonNode.class);
 
         log.info("GitHub token response = {}", response.getBody());
 
@@ -78,8 +77,8 @@ public class GitHubOAuthServiceImpl implements GitHubOAuthService {
 
         HttpEntity<Void> entity = new HttpEntity<>(headers);
 
-        ResponseEntity<GitHubUserResponse> response =
-                restTemplate.exchange(url, HttpMethod.GET, entity, GitHubUserResponse.class);
+        ResponseEntity<GitHubUserResponse> response = restTemplate.exchange(url, HttpMethod.GET, entity,
+                GitHubUserResponse.class);
 
         return response.getBody();
     }

@@ -19,7 +19,8 @@ public class GithubController {
 
     @GetMapping("/repos")
     public ResponseEntity<List<GithubRepositoryDTO>> getRepositories(
-            @RequestParam String owner) {  // 또는 owner로 이름 맞추기
+            @RequestParam String owner) { // 또는 owner로 이름 맞추기
+        System.out.println("[TRACE] GithubController.getRepositories called with owner: " + owner);
         List<GithubRepositoryDTO> repositories = githubService.listRepositories(owner);
         return ResponseEntity.ok(repositories);
     }
@@ -28,6 +29,7 @@ public class GithubController {
     public ResponseEntity<List<GithubBranchDTO>> getBranches(
             @PathVariable String owner,
             @PathVariable String repo) {
+        System.out.println("[TRACE] GithubController.getBranches called with owner: " + owner + ", repo: " + repo);
         List<GithubBranchDTO> branches = githubService.listBranches(owner, repo);
         return ResponseEntity.ok(branches);
     }
@@ -37,6 +39,8 @@ public class GithubController {
             @PathVariable String owner,
             @PathVariable String repo,
             @RequestParam String branch) {
+        System.out.println("[TRACE] GithubController.getTree called with owner: " + owner + ", repo: " + repo
+                + ", branch: " + branch);
         List<GithubTreeEntryDTO> tree = githubService.getTree(owner, repo, branch);
         return ResponseEntity.ok(tree);
     }
@@ -46,6 +50,8 @@ public class GithubController {
             @PathVariable String owner,
             @PathVariable String repo,
             @RequestParam String path) {
+        System.out.println("[TRACE] GithubController.getFileContent called with owner: " + owner + ", repo: " + repo
+                + ", path: " + path);
         GithubFileDTO response = githubService.getFileContent(owner, repo, path);
         return ResponseEntity.ok(response);
     }
@@ -53,11 +59,13 @@ public class GithubController {
     /**
      * GitHub 파일 내용을 DB에 저장 (1단계: 파일 저장)
      * POST /api/github/save-file
-     * Body: { "repositoryUrl": "...", "owner": "...", "repo": "...", "filePath": "...", "userId": 1 }
+     * Body: { "repositoryUrl": "...", "owner": "...", "repo": "...", "filePath":
+     * "...", "userId": 1 }
      */
     @PostMapping("/save-file")
     public ResponseEntity<ApiResponse<Map<String, String>>> saveFileContent(
             @RequestBody FileSaveRequestDTO request) {
+        System.out.println("[TRACE] GithubController.saveFileContent called with request: " + request);
 
         Long userId = 1L; // TODO: SecurityContext에서 가져오기
         request.setUserId(userId);
@@ -66,9 +74,7 @@ public class GithubController {
 
         return ResponseEntity.ok(
                 ApiResponse.success(Map.of(
-                        "fileId", fileId,  // analysisId -> fileId로 변경
-                        "message", "파일 내용이 성공적으로 저장되었습니다."
-                ))
-        );
+                        "fileId", fileId, // analysisId -> fileId로 변경
+                        "message", "파일 내용이 성공적으로 저장되었습니다.")));
     }
 }

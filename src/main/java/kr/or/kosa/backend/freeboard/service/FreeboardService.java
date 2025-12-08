@@ -3,12 +3,20 @@ package kr.or.kosa.backend.freeboard.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import kr.or.kosa.backend.commons.exception.custom.CustomBusinessException;
 import kr.or.kosa.backend.freeboard.domain.Freeboard;
+import kr.or.kosa.backend.freeboard.dto.FreeboardDetailResponseDto;
 import kr.or.kosa.backend.freeboard.dto.FreeboardDto;
+import kr.or.kosa.backend.freeboard.dto.FreeboardListResponseDto;
 import kr.or.kosa.backend.freeboard.exception.FreeboardErrorCode;
 import kr.or.kosa.backend.freeboard.mapper.FreeboardMapper;
+import kr.or.kosa.backend.like.domain.Like;
+import kr.or.kosa.backend.like.domain.ReferenceType;
+import kr.or.kosa.backend.like.mapper.LikeMapper;
 import kr.or.kosa.backend.tag.service.TagService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,11 +33,12 @@ public class FreeboardService {
     private final FreeboardMapper mapper;
     private final ObjectMapper objectMapper;
     private final TagService tagService;
+    private final LikeMapper likeMapper;
 
     public Map<String, Object> listPage(int page, int size) {
         int offset = (page - 1) * size;
 
-        List<Freeboard> boards = mapper.selectPage(offset, size);
+        List<FreeboardListResponseDto> boards = mapper.selectPage(offset, size);
         int totalCount = mapper.countAll();
 
         Map<String, Object> result = new HashMap<>();
@@ -42,19 +51,81 @@ public class FreeboardService {
         return result;
     }
 
+    public Page<FreeboardListResponseDto> getList(Pageable pageable, String keyword) {
+        int offset = (int) pageable.getOffset();
+        int pageSize = pageable.getPageSize();
+        String sortField = getSortField(pageable);
+        String sortDirection = getSortDirection(pageable);
+
+        int totalCount = mapper.countPosts(keyword);
+
+        List<FreeboardListResponseDto> posts = mapper.findPosts(
+                offset,
+                pageSize,
+                sortField,
+                sortDirection,
+                keyword
+        );
+
+        return new PageImpl<>(posts, pageable, totalCount);
+    }
+
+    private String getSortField(Pageable pageable) {
+        if (pageable.getSort().isEmpty()) {
+            return "created_at";
+        }
+
+        String property = pageable.getSort().iterator().next().getProperty();
+
+        switch (property) {
+            case "commentCount":
+                return "comment_count";
+            case "likeCount":
+                return "like_count";
+            case "viewCount":
+            case "click":
+                return "view_count";
+            case "createdAt":
+            default:
+                return "created_at";
+        }
+    }
+
+    private String getSortDirection(Pageable pageable) {
+        if (pageable.getSort().isEmpty()) {
+            return "DESC";
+        }
+
+        return pageable.getSort().iterator().next().getDirection().name();
+    }
+
     @Transactional
-    public Freeboard detail(Long id) {
+    public FreeboardDetailResponseDto detail(Long id, Long userId) {
         mapper.increaseClick(id);
 
-        Freeboard freeboard = mapper.selectById(id);
+        FreeboardDetailResponseDto freeboard = mapper.selectById(id);
         if (freeboard == null) {
             throw new CustomBusinessException(FreeboardErrorCode.NOT_FOUND);
         }
 
         List<String> tags = tagService.getFreeboardTags(id);
-        freeboard.setTags(tags);
+        Like existingLike = likeMapper.selectLike(userId, ReferenceType.POST_FREEBOARD, id);
+        boolean isLiked = existingLike != null;
 
-        return freeboard;
+        return FreeboardDetailResponseDto.builder()
+                .freeboardId(freeboard.getFreeboardId())
+                .userId(freeboard.getUserId())
+                .userNickname(freeboard.getUserNickname())
+                .freeboardTitle(freeboard.getFreeboardTitle())
+                .freeboardContent(freeboard.getFreeboardContent())
+                .freeboardClick(freeboard.getFreeboardClick())
+                .likeCount(freeboard.getLikeCount() != null ? freeboard.getLikeCount() : 0)
+                .freeboardImage(freeboard.getFreeboardImage())
+                .freeboardRepresentImage(freeboard.getFreeboardRepresentImage())
+                .freeboardCreatedAt(freeboard.getFreeboardCreatedAt())
+                .tags(tags)
+                .isLiked(isLiked)
+                .build();
     }
 
     @Transactional
@@ -95,8 +166,7 @@ public class FreeboardService {
 
     @Transactional
     public void edit(Long id, FreeboardDto dto, Long userId) {
-
-        Freeboard existing = mapper.selectById(id);
+        FreeboardDetailResponseDto existing = mapper.selectById(id);
         if (existing == null) {
             throw new CustomBusinessException(FreeboardErrorCode.NOT_FOUND);
         }
@@ -134,7 +204,7 @@ public class FreeboardService {
 
     @Transactional
     public void delete(Long id, Long userId) {
-        Freeboard existing = mapper.selectById(id);
+        FreeboardDetailResponseDto existing = mapper.selectById(id);
         if (existing == null) {
             throw new CustomBusinessException(FreeboardErrorCode.NOT_FOUND);
         }

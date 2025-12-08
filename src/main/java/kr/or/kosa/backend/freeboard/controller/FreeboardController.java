@@ -2,13 +2,14 @@ package kr.or.kosa.backend.freeboard.controller;
 
 import jakarta.validation.Valid;
 import kr.or.kosa.backend.commons.response.ApiResponse;
-import kr.or.kosa.backend.freeboard.domain.Freeboard;
-import kr.or.kosa.backend.freeboard.dto.FreeboardCreateRequest;
-import kr.or.kosa.backend.freeboard.dto.FreeboardDto;
-import kr.or.kosa.backend.freeboard.dto.FreeboardUpdateRequest;
+import kr.or.kosa.backend.freeboard.dto.*;
 import kr.or.kosa.backend.freeboard.service.FreeboardService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -38,18 +39,53 @@ public class FreeboardController {
     }
 
     @GetMapping("/{freeboardId}")
-    public ResponseEntity<Freeboard> get(@PathVariable Long freeboardId) {
-        Freeboard freeboard = freeboardService.detail(freeboardId);
+    public ResponseEntity<FreeboardDetailResponseDto> get(
+            @PathVariable Long freeboardId,
+            @RequestAttribute(value = "userId", required = false) Long userId
+    ) {
+        Long actualUserId = (userId != null) ? userId : 1L;
+        FreeboardDetailResponseDto freeboard = freeboardService.detail(freeboardId, actualUserId);
         return ResponseEntity.ok(freeboard);
     }
 
-    @GetMapping
-    public ResponseEntity<Map<String, Object>> list(
+    // 자유게시판 목록 조회 (검색/정렬 기능 포함)
+    @GetMapping("/list")
+    public ResponseEntity<Page<FreeboardListResponseDto>> getList(
             @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "10") int size
-    ) {
-        Map<String, Object> result = freeboardService.listPage(page, size);
-        return ResponseEntity.ok(result);
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "latest") String sort,
+            @RequestParam(required = false) String keyword) {
+
+        Pageable pageable = createPageable(page - 1, size, sort);
+        Page<FreeboardListResponseDto> posts = freeboardService.getList(pageable, keyword);
+
+        return ResponseEntity.ok(posts);
+    }
+
+    // 정렬 조건에 따른 Pageable 생성
+    private Pageable createPageable(int page, int size, String sort) {
+        Sort sortOrder;
+
+        switch (sort) {
+            case "comments":
+                sortOrder = Sort.by(Sort.Direction.DESC, "commentCount")
+                        .and(Sort.by(Sort.Direction.DESC, "createdAt"));
+                break;
+            case "likes":
+                sortOrder = Sort.by(Sort.Direction.DESC, "likeCount")
+                        .and(Sort.by(Sort.Direction.DESC, "createdAt"));
+                break;
+            case "views":
+                sortOrder = Sort.by(Sort.Direction.DESC, "click")
+                        .and(Sort.by(Sort.Direction.DESC, "createdAt"));
+                break;
+            case "latest":
+            default:
+                sortOrder = Sort.by(Sort.Direction.DESC, "createdAt");
+                break;
+        }
+
+        return PageRequest.of(page, size, sortOrder);
     }
 
     @PutMapping("/{freeboardId}")
@@ -58,18 +94,9 @@ public class FreeboardController {
             @Valid @RequestBody FreeboardUpdateRequest request,
             @RequestAttribute(value = "userId", required = false) Long userId
     ) {
-        log.info("=== update 컨트롤러 시작 ===");
-        log.info("freeboardId: {}", freeboardId);
-        log.info("request: {}", request);
-        log.info("request.getTags(): {}", request.getTags());
-
         Long actualUserId = (userId != null) ? userId : 1L;
-
         FreeboardDto dto = request.toDto();
-        log.info("dto.getTags(): {}", dto.getTags());
-
         freeboardService.edit(freeboardId, dto, actualUserId);
-        log.info("=== update 컨트롤러 완료 ===");
 
         return ResponseEntity.ok().build();
     }

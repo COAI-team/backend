@@ -1,6 +1,7 @@
 package kr.or.kosa.backend.comment.service;
 
 import kr.or.kosa.backend.codeboard.domain.Codeboard;
+import kr.or.kosa.backend.codeboard.dto.CodeboardDetailResponseDto;
 import kr.or.kosa.backend.codeboard.mapper.CodeboardMapper;
 import kr.or.kosa.backend.comment.domain.Comment;
 import kr.or.kosa.backend.comment.dto.CommentCreateRequest;
@@ -11,6 +12,7 @@ import kr.or.kosa.backend.comment.exception.CommentErrorCode;
 import kr.or.kosa.backend.comment.mapper.CommentMapper;
 import kr.or.kosa.backend.commons.exception.custom.CustomBusinessException;
 import kr.or.kosa.backend.freeboard.domain.Freeboard;
+import kr.or.kosa.backend.freeboard.dto.FreeboardDetailResponseDto;
 import kr.or.kosa.backend.freeboard.mapper.FreeboardMapper;
 import kr.or.kosa.backend.like.service.LikeService;
 import kr.or.kosa.backend.like.domain.ReferenceType;
@@ -125,45 +127,37 @@ public class CommentService {
     }
 
     public List<CommentWithRepliesResponse> getCommentsByBoard(Long boardId, String boardType, Long currentUserId) {
-        // 1. 댓글만 조회
-        List<Comment> comments = commentMapper.selectCommentsByBoard(boardId, boardType);
+        // 댓글만 조회 (이미 userNickname 포함)
+        List<CommentResponse> comments = commentMapper.selectCommentsByBoard(boardId, boardType);
 
         if (comments.isEmpty()) {
             return Collections.emptyList();
         }
 
-        // 2. 모든 댓글 ID 수집
+        // 모든 댓글 ID 수집
         List<Long> commentIds = comments.stream()
-                .map(Comment::getCommentId)
+                .map(CommentResponse::getCommentId)
                 .collect(Collectors.toList());
 
-        // 3. 대댓글 한 번에 조회
-        List<Comment> replies = commentMapper.selectRepliesByParentIds(commentIds);
+        // 대댓글 한 번에 조회 (이미 userNickname 포함)
+        List<CommentResponse> replies = commentMapper.selectRepliesByParentIds(commentIds);
 
-        // 4. 댓글별로 대댓글 그룹핑
-        Map<Long, List<Comment>> repliesByParentId = replies.stream()
-                .collect(Collectors.groupingBy(Comment::getParentCommentId));
+        // 댓글별로 대댓글 그룹핑
+        Map<Long, List<CommentResponse>> repliesByParentId = replies.stream()
+                .collect(Collectors.groupingBy(CommentResponse::getParentCommentId));
 
-        // 5. 모든 사용자 ID 수집
-        Set<Long> allUserIds = new HashSet<>();
-        comments.forEach(c -> allUserIds.add(c.getUserId()));
-        replies.forEach(r -> allUserIds.add(r.getUserId()));
-
-        // 6. 사용자 정보 한 번에 조회
-        Map<Long, String> userNicknameMap = getUserNicknameMap(new ArrayList<>(allUserIds));
-
-        // 7. 현재 사용자가 좋아요 누른 댓글 ID 목록 조회
+        // 현재 사용자가 좋아요 누른 댓글 ID 목록 조회
         List<Long> allCommentIds = new ArrayList<>(commentIds);
-        allCommentIds.addAll(replies.stream().map(Comment::getCommentId).collect(Collectors.toList()));
+        allCommentIds.addAll(replies.stream().map(CommentResponse::getCommentId).collect(Collectors.toList()));
 
         Set<Long> likedCommentIds = currentUserId != null
                 ? new HashSet<>(likeService.getLikedIds(currentUserId, ReferenceType.COMMENT, allCommentIds))
                 : Collections.emptySet();
 
-        // 8. 게시글 작성자 ID 조회
+        // 게시글 작성자 ID 조회
         Long boardAuthorId = getBoardAuthorId(boardType, boardId);
 
-        // 9. 응답 조립
+        // 응답 조립
         return comments.stream()
                 .map(comment -> {
                     List<CommentResponse> replyResponses = repliesByParentId
@@ -175,7 +169,7 @@ public class CommentService {
                                     .boardType(reply.getBoardType())
                                     .parentCommentId(reply.getParentCommentId())
                                     .userId(reply.getUserId())
-                                    .userNickname(userNicknameMap.get(reply.getUserId()))
+                                    .userNickname(reply.getUserNickname())
                                     .content(reply.getContent())
                                     .likeCount(reply.getLikeCount())
                                     .isLiked(likedCommentIds.contains(reply.getCommentId()))
@@ -191,7 +185,7 @@ public class CommentService {
                             .boardId(comment.getBoardId())
                             .boardType(comment.getBoardType())
                             .userId(comment.getUserId())
-                            .userNickname(userNicknameMap.get(comment.getUserId()))
+                            .userNickname(comment.getUserNickname())
                             .content(comment.getContent())
                             .likeCount(comment.getLikeCount())
                             .isLiked(likedCommentIds.contains(comment.getCommentId()))
@@ -257,14 +251,14 @@ public class CommentService {
     private Long getBoardAuthorId(String boardType, Long boardId) {
         return switch (boardType) {
             case "CODEBOARD" -> {
-                Codeboard codeBoard = codeBoardMapper.selectById(boardId);
+                CodeboardDetailResponseDto codeBoard = codeBoardMapper.selectById(boardId);
                 if (codeBoard == null) {
                     throw new CustomBusinessException(CommentErrorCode.BOARD_NOT_FOUND);
                 }
                 yield codeBoard.getUserId();
             }
             case "FREEBOARD" -> {
-                Freeboard freeBoard = freeboardMapper.selectById(boardId);
+                FreeboardDetailResponseDto freeBoard = freeboardMapper.selectById(boardId);
                 if (freeBoard == null) {
                     throw new CustomBusinessException(CommentErrorCode.BOARD_NOT_FOUND);
                 }
@@ -272,18 +266,5 @@ public class CommentService {
             }
             default -> throw new CustomBusinessException(CommentErrorCode.INVALID_BOARD_TYPE);
         };
-    }
-
-    private Map<Long, String> getUserNicknameMap(List<Long> userIds) {
-        if (userIds.isEmpty()) {
-            return Collections.emptyMap();
-        }
-
-        List<Users> users = userMapper.selectUsersByIds(userIds);
-        return users.stream()
-                .collect(Collectors.toMap(
-                        Users::getUserId,
-                        Users::getUserNickname
-                ));
     }
 }

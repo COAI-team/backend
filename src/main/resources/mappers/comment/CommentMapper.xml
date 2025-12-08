@@ -4,6 +4,7 @@
 
 <mapper namespace="kr.or.kosa.backend.comment.mapper.CommentMapper">
 
+    <!-- Comment 도메인용 resultMap (기존 유지) -->
     <resultMap id="commentResultMap" type="kr.or.kosa.backend.comment.domain.Comment">
         <id property="commentId" column="COMMENT_ID"/>
         <result property="boardId" column="BOARD_ID"/>
@@ -17,12 +18,27 @@
         <result property="updatedAt" column="UPDATED_AT"/>
     </resultMap>
 
+    <!-- CommentResponse DTO용 resultMap (새로 추가) -->
+    <resultMap id="commentResponseResultMap" type="kr.or.kosa.backend.comment.dto.CommentResponse">
+        <id property="commentId" column="COMMENT_ID"/>
+        <result property="boardId" column="BOARD_ID"/>
+        <result property="boardType" column="BOARD_TYPE"/>
+        <result property="parentCommentId" column="PARENT_COMMENT_ID"/>
+        <result property="userId" column="USER_ID"/>
+        <result property="userNickname" column="USER_NICKNAME"/>
+        <result property="content" column="CONTENT"/>
+        <result property="likeCount" column="LIKE_COUNT"/>
+        <result property="isDeleted" column="IS_DELETED"/>
+        <result property="createdAt" column="CREATED_AT"/>
+        <result property="updatedAt" column="UPDATED_AT"/>
+    </resultMap>
+
     <!-- 댓글 생성 -->
     <insert id="insertComment"
             parameterType="kr.or.kosa.backend.comment.domain.Comment"
             useGeneratedKeys="true"
             keyProperty="commentId">
-        INSERT INTO COMMENT (
+        INSERT INTO `COMMENT` (
         BOARD_ID,
         BOARD_TYPE,
         PARENT_COMMENT_ID,
@@ -58,46 +74,50 @@
         IS_DELETED,
         CREATED_AT,
         UPDATED_AT
-        FROM COMMENT
+        FROM `COMMENT`
         WHERE COMMENT_ID = #{commentId}
     </select>
 
     <!-- 게시글의 댓글 목록 조회 -->
-    <select id="selectCommentsByBoard" resultMap="commentResultMap">
+    <select id="selectCommentsByBoard" resultMap="commentResponseResultMap">
         SELECT
-        COMMENT_ID,
-        BOARD_ID,
-        BOARD_TYPE,
-        PARENT_COMMENT_ID,
-        USER_ID,
-        CONTENT,
-        LIKE_COUNT,
-        IS_DELETED,
-        CREATED_AT,
-        UPDATED_AT
-        FROM COMMENT
-        WHERE BOARD_ID = #{boardId}
-        AND BOARD_TYPE = #{boardType}
-        AND PARENT_COMMENT_ID IS NULL
-        AND IS_DELETED = FALSE
-        ORDER BY CREATED_AT ASC
+        c.COMMENT_ID,
+        c.BOARD_ID,
+        c.BOARD_TYPE,
+        c.PARENT_COMMENT_ID,
+        c.USER_ID,
+        c.CONTENT,
+        c.LIKE_COUNT,
+        c.IS_DELETED,
+        c.CREATED_AT,
+        c.UPDATED_AT,
+        u.USER_NICKNAME
+        FROM `COMMENT` c
+        LEFT JOIN USERS u ON c.USER_ID = u.USER_ID
+        WHERE c.BOARD_ID = #{boardId}
+        AND c.BOARD_TYPE = #{boardType}
+        AND c.PARENT_COMMENT_ID IS NULL
+        AND c.IS_DELETED = FALSE
+        ORDER BY c.CREATED_AT ASC
     </select>
 
     <!-- 대댓글 목록 조회 -->
-    <select id="selectRepliesByParentIds" resultMap="commentResultMap">
+    <select id="selectRepliesByParentIds" resultMap="commentResponseResultMap">
         SELECT
-        COMMENT_ID,
-        BOARD_ID,
-        BOARD_TYPE,
-        PARENT_COMMENT_ID,
-        USER_ID,
-        CONTENT,
-        LIKE_COUNT,
-        IS_DELETED,
-        CREATED_AT,
-        UPDATED_AT
-        FROM COMMENT
-        WHERE PARENT_COMMENT_ID IN
+        c.COMMENT_ID,
+        c.BOARD_ID,
+        c.BOARD_TYPE,
+        c.PARENT_COMMENT_ID,
+        c.USER_ID,
+        c.CONTENT,
+        c.LIKE_COUNT,
+        c.IS_DELETED,
+        c.CREATED_AT,
+        c.UPDATED_AT,
+        u.USER_NICKNAME
+        FROM `COMMENT` c
+        LEFT JOIN USERS u ON c.USER_ID = u.USER_ID
+        WHERE c.PARENT_COMMENT_ID IN
         <foreach collection="parentCommentIds"
                  item="parentId"
                  open="("
@@ -105,14 +125,14 @@
                  close=")">
             #{parentId}
         </foreach>
-        AND IS_DELETED = FALSE
-        ORDER BY CREATED_AT ASC
+        AND c.IS_DELETED = FALSE
+        ORDER BY c.CREATED_AT ASC
     </select>
 
     <!-- 댓글 수정 -->
     <update id="updateComment"
             parameterType="kr.or.kosa.backend.comment.domain.Comment">
-        UPDATE COMMENT
+        UPDATE `COMMENT`
         SET CONTENT   = #{content},
         UPDATED_AT = NOW()
         WHERE COMMENT_ID = #{commentId}
@@ -120,7 +140,7 @@
 
     <!-- 댓글 소프트 삭제 -->
     <update id="deleteComment">
-        UPDATE COMMENT
+        UPDATE `COMMENT`
         SET IS_DELETED = TRUE,
         UPDATED_AT = NOW()
         WHERE COMMENT_ID = #{commentId}
@@ -128,14 +148,14 @@
 
     <!-- 좋아요 개수 증가 -->
     <update id="incrementLikeCount">
-        UPDATE COMMENT
+        UPDATE `COMMENT`
         SET LIKE_COUNT = LIKE_COUNT + 1
         WHERE COMMENT_ID = #{commentId}
     </update>
 
     <!-- 좋아요 개수 감소 -->
     <update id="decrementLikeCount">
-        UPDATE COMMENT
+        UPDATE `COMMENT`
         SET LIKE_COUNT = LIKE_COUNT - 1
         WHERE COMMENT_ID = #{commentId}
         AND LIKE_COUNT > 0
@@ -145,7 +165,7 @@
     <select id="existsByCommentIdAndUserId" resultType="boolean">
         SELECT EXISTS(
         SELECT 1
-        FROM COMMENT
+        FROM `COMMENT`
         WHERE COMMENT_ID = #{commentId}
         AND USER_ID = #{userId}
         )

@@ -18,12 +18,14 @@ public class RagController {
 
     @PostMapping("/ingest")
     public ResponseEntity<Void> ingest(@RequestBody RagDto.IngestRequest request) {
+        System.out.println("[TRACE] RagController.ingest called with request: " + request);
         ragService.ingestCode(request);
         return ResponseEntity.ok().build();
     }
 
     @PostMapping("/feedback")
     public ResponseEntity<RagDto.FeedbackResponse> getFeedback(@RequestBody RagDto.FeedbackRequest request) {
+        System.out.println("[TRACE] RagController.getFeedback called with request: " + request);
         String answer = ragService.getPersonalizedFeedback(request);
         return ResponseEntity.ok(new RagDto.FeedbackResponse(answer));
     }

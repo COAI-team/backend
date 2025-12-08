@@ -7,7 +7,13 @@ import kr.or.kosa.backend.codenose.dto.dtoReal.AnalysisRequestDTO;
 import kr.or.kosa.backend.codenose.dto.dtoReal.CodeResultDTO;
 import kr.or.kosa.backend.codenose.dto.dtoReal.GithubFileDTO;
 import kr.or.kosa.backend.codenose.dto.dtoReal.UserCodePatternDTO;
+import kr.or.kosa.backend.codenose.dto.dtoReal.UserCodePatternDTO;
 import kr.or.kosa.backend.codenose.mapper.AnalysisMapper;
+import kr.or.kosa.backend.codenose.service.agent.AgenticWorkflowService;
+
+import kr.or.kosa.backend.codenose.service.pipeline.PipelineContext;
+import kr.or.kosa.backend.codenose.service.pipeline.StyleExtractorModule;
+import kr.or.kosa.backend.codenose.service.search.HybridSearchService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
@@ -34,18 +40,28 @@ public class AnalysisService {
     private final AnalysisMapper analysisMapper;
     private final ObjectMapper objectMapper;
     private final ChatClient chatClient;
-    private final RagService ragService; // Injected
+    private final RagService ragService;
+    private final kr.or.kosa.backend.codenose.service.search.HybridSearchService hybridSearchService;
+    private final kr.or.kosa.backend.codenose.service.agent.AgenticWorkflowService agenticWorkflowService;
+    private final StyleExtractorModule styleExtractorModule;
 
     @Autowired
     public AnalysisService(
             ChatClient.Builder chatClientBuilder,
             AnalysisMapper analysisMapper,
             ObjectMapper objectMapper,
-            RagService ragService) {
+            RagService ragService,
+            kr.or.kosa.backend.codenose.service.search.HybridSearchService hybridSearchService,
+            kr.or.kosa.backend.codenose.service.agent.AgenticWorkflowService agenticWorkflowService,
+            StyleExtractorModule styleExtractorModule) {
         this.chatClient = chatClientBuilder.build();
         this.analysisMapper = analysisMapper;
         this.objectMapper = objectMapper;
         this.ragService = ragService;
+        this.hybridSearchService = hybridSearchService;
+
+        this.agenticWorkflowService = agenticWorkflowService;
+        this.styleExtractorModule = styleExtractorModule;
     }
 
     private final String systemPrompt = """
@@ -122,11 +138,23 @@ public class AnalysisService {
                     storedFile.getFileName(),
                     storedFile.getFileContent().length());
 
-            // 2. 사용자 컨텍스트 조회 (RAG)
-            String userContext = ragService.retrieveUserContext(String.valueOf(requestDto.getUserId()));
-            log.info("Retrieved users context for analysis: {}",
+            // 2. 사용자 컨텍스트 조회 (Hybrid Search)
+            // Using Hybrid Search to get relevant context documents
+            List<org.springframework.ai.document.Document> contextDocs = hybridSearchService.search(
+                    "mistakes patterns errors improvement",
+                    storedFile.getFileContent(),
+                    3);
+
+            String userContext = contextDocs.stream()
+                    .map(org.springframework.ai.document.Document::getText)
+                    .collect(java.util.stream.Collectors.joining("\n\n---\n\n"));
+
+            if (userContext.isEmpty()) {
+                userContext = "No prior history available.";
+            }
+
+            log.info("Retrieved users context for analysis (Hybrid): {}",
                     userContext.substring(0, Math.min(userContext.length(), 100)) + "...");
-            System.out.println("Retrieved user context for analysis: " + userContext.substring(0, Math.min(userContext.length(), 100)) + "...");
 
             // 3. 프롬프트 생성 (toneLevel에 따른 시스템 프롬프트 + Users Context)
             String systemPromptWithTone = PromptGenerator.createSystemPrompt(
@@ -135,15 +163,10 @@ public class AnalysisService {
                     requestDto.getCustomRequirements(),
                     userContext);
 
-            // 4. AI 메시지 구성 (저장된 파일 내용 사용)
-            List<Message> messages = new ArrayList<>();
-            messages.add(new SystemMessage(systemPromptWithTone));
-            messages.add(new UserMessage("다음 코드를 분석해주세요:\n\n" + storedFile.getFileContent()));
-
-            // 5. AI 호출
-            Prompt prompt = new Prompt(messages);
-            ChatResponse response = chatClient.prompt(prompt).call().chatResponse();
-            String aiResponseContent = response.getResult().getOutput().getText();
+            // 4. Agentic Workflow 실행
+            // Instead of direct ChatClient call, we use the Agentic Workflow
+            String aiResponseContent = agenticWorkflowService.executeWorkflow(storedFile.getFileContent(),
+                    systemPromptWithTone);
 
             String cleanedResponse = cleanMarkdownCodeBlock(aiResponseContent);
             System.out.println(aiResponseContent);
@@ -324,86 +347,86 @@ public class AnalysisService {
      * @return AI 분석 결과 스트림 (Flux<String>)
      */
     public reactor.core.publisher.Flux<String> analyzeStoredFileStream(AnalysisRequestDTO requestDto) {
-        try {
-            // 1. DB에서 저장된 GitHub 파일 내용 조회
-            GithubFileDTO storedFile = analysisMapper.findFileById(requestDto.getAnalysisId());
+        System.out.println("[TRACE] AnalysisService.analyzeStoredFileStream called with requestDto: " + requestDto);
+        return reactor.core.publisher.Mono.fromCallable(() -> {
+            try {
+                // 1. DB에서 저장된 GitHub 파일 내용 조회
+                GithubFileDTO storedFile = analysisMapper.findFileById(requestDto.getAnalysisId());
 
-            if (storedFile == null) {
-                throw new RuntimeException("저장된 파일을 찾을 수 없습니다. repositoryUrl: "
-                        + ", filePath: " + requestDto.getFilePath() + ", analysisId: " + requestDto.getAnalysisId());
+                if (storedFile == null) {
+                    throw new RuntimeException("저장된 파일을 찾을 수 없습니다. repositoryUrl: "
+                            + ", filePath: " + requestDto.getFilePath() + ", analysisId: "
+                            + requestDto.getAnalysisId());
+                }
+
+                log.info("파일 조회 완료 (스트림) - fileId: {}, fileName: {}, contentLength: {}",
+                        storedFile.getFileId(),
+                        storedFile.getFileName(),
+                        storedFile.getFileContent().length());
+
+                // 2. 사용자 컨텍스트 조회 (Hybrid Search)
+                // Using Hybrid Search to get relevant context documents
+                List<org.springframework.ai.document.Document> contextDocs = hybridSearchService.search(
+                        "mistakes patterns errors improvement",
+                        storedFile.getFileContent(),
+                        3);
+
+                String userContext = contextDocs.stream()
+                        .map(org.springframework.ai.document.Document::getText)
+                        .collect(java.util.stream.Collectors.joining("\n\n---\n\n"));
+
+                if (userContext.isEmpty()) {
+                    userContext = "No prior history available.";
+                }
+
+                // 3. 스타일 추출 (Pipeline)
+                PipelineContext pipelineContext = PipelineContext.builder()
+                        .userContext(userContext)
+                        .build();
+                pipelineContext = styleExtractorModule.extractStyle(pipelineContext);
+                String styleRules = pipelineContext.getStyleRules();
+                log.info("Extracted Style Rules: {}", styleRules);
+
+                // 4. 프롬프트 생성 (Style Rules 포함)
+                String customReqWithStyle = requestDto.getCustomRequirements() + "\n\n[Style Rules]\n" + styleRules;
+                String systemPromptWithTone = PromptGenerator.createSystemPrompt(
+                        requestDto.getAnalysisTypes(),
+                        requestDto.getToneLevel(),
+                        customReqWithStyle,
+                        userContext);
+
+                // 5. Agentic Workflow 실행
+                log.info("Starting Agentic Workflow for Stream...");
+                String aiResponseContent = agenticWorkflowService.executeWorkflow(storedFile.getFileContent(),
+                        systemPromptWithTone);
+
+                // 6. 결과 저장 및 후처리
+                String cleanedResponse = cleanMarkdownCodeBlock(aiResponseContent);
+
+                // DB 저장
+                String analysisId = saveAnalysisResult(storedFile, requestDto, cleanedResponse);
+
+                // 패턴 업데이트
+                updateUserPatterns(requestDto.getUserId(), objectMapper.readTree(cleanedResponse).path("codeSmells"));
+
+                // RAG 저장
+                RagDto.IngestRequest ingestRequest = new RagDto.IngestRequest(
+                        String.valueOf(requestDto.getUserId()),
+                        storedFile.getFileContent(),
+                        cleanedResponse,
+                        storedFile.getFileName().substring(storedFile.getFileName().lastIndexOf(".") + 1),
+                        storedFile.getFilePath(),
+                        "Stored File Analysis (Agentic Stream)",
+                        requestDto.getCustomRequirements());
+                ragService.ingestCode(ingestRequest);
+
+                return aiResponseContent;
+
+            } catch (Exception e) {
+                log.error("Error in Agentic Workflow Stream", e);
+                throw new RuntimeException(e);
             }
-
-            log.info("파일 조회 완료 (스트림) - fileId: {}, fileName: {}, contentLength: {}",
-                    storedFile.getFileId(),
-                    storedFile.getFileName(),
-                    storedFile.getFileContent().length());
-
-            // 2. 사용자 컨텍스트 조회 (RAG)
-            String userContext = ragService.retrieveUserContext(String.valueOf(requestDto.getUserId()));
-
-            // 3. 프롬프트 생성
-            String systemPromptWithTone = PromptGenerator.createSystemPrompt(
-                    requestDto.getAnalysisTypes(),
-                    requestDto.getToneLevel(),
-                    requestDto.getCustomRequirements(),
-                    userContext);
-
-            // 4. AI 메시지 구성
-            List<Message> messages = new ArrayList<>();
-            messages.add(new SystemMessage(systemPromptWithTone));
-            messages.add(new UserMessage("다음 코드를 분석해주세요:\n\n" + storedFile.getFileContent()));
-
-            // 5. AI 호출 및 스트리밍
-            Prompt prompt = new Prompt(messages);
-            StringBuilder accumulatedContent = new StringBuilder();
-
-            return chatClient.prompt(prompt)
-                    .stream()
-                    .chatResponse()
-                    .map(response -> {
-                        String content = response.getResult().getOutput().getText();
-                        if (content != null) {
-                            accumulatedContent.append(content);
-                            return content;
-                        }
-                        return "";
-                    })
-                    .doOnComplete(() -> {
-                        // 스트림 완료 후 DB 저장 및 후처리
-                        String fullContent = accumulatedContent.toString();
-                        String cleanedResponse = cleanMarkdownCodeBlock(fullContent);
-                        log.info("스트림 분석 완료. 결과 저장 시작.");
-
-                        try {
-                            // 5. 분석 결과를 CODE_ANALYSIS_HISTORY 테이블에 저장
-                            String analysisId = saveAnalysisResult(storedFile, requestDto, cleanedResponse);
-
-                            // 6. 사용자 코드 패턴 업데이트
-                            updateUserPatterns(requestDto.getUserId(), objectMapper.readTree(cleanedResponse).path("codeSmells"));
-
-                            // 7. RAG VectorDB에 저장
-                            RagDto.IngestRequest ingestRequest = new RagDto.IngestRequest(
-                                    String.valueOf(requestDto.getUserId()),
-                                    storedFile.getFileContent(),
-                                    cleanedResponse,
-                                    storedFile.getFileName().substring(storedFile.getFileName().lastIndexOf(".") + 1),
-                                    storedFile.getFilePath(),
-                                    "Stored File Analysis (Stream)",
-                                    requestDto.getCustomRequirements());
-                            ragService.ingestCode(ingestRequest);
-
-                            log.info("스트림 분석 결과 저장 완료 - analysisId: {}", analysisId);
-
-                        } catch (Exception e) {
-                            log.error("스트림 분석 결과 저장 실패", e);
-                        }
-                    })
-                    .doOnError(e -> log.error("스트림 분석 중 오류 발생", e));
-
-        } catch (Exception e) {
-            log.error("파일 분석 스트림 시작 실패: {}", e.getMessage(), e);
-            throw new RuntimeException("파일 분석 스트림 시작에 실패했습니다: " + e.getMessage());
-        }
+        }).flatMapMany(result -> reactor.core.publisher.Flux.just(result));
     }
 
     /**

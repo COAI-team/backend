@@ -48,8 +48,7 @@ public class GitHubLoginController {
                     REFRESH_KEY_PREFIX + user.getUserId(),
                     refreshToken,
                     REFRESH_TOKEN_EXPIRE_DAYS,
-                    TimeUnit.DAYS
-            );
+                    TimeUnit.DAYS);
 
             // 5) 성공 응답
             return ResponseEntity.ok(
@@ -57,8 +56,7 @@ public class GitHubLoginController {
                             .accessToken(accessToken)
                             .refreshToken(refreshToken)
                             .user(user.toDto())
-                            .build()
-            );
+                            .build());
 
         } catch (Exception e) {
             log.error("GitHub login failed: {}", e.getMessage());

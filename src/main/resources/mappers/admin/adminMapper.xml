@@ -5,6 +5,7 @@
 
 <mapper namespace="kr.or.kosa.backend.admin.mapper.AdminMapper">
 
+<!--                 유저 검색                -->
     <resultMap id="findCondition"
                type="kr.or.kosa.backend.admin.dto.response.UserFindResponseDto">
         <id     column="USER_ID"            property="userId"/>
@@ -19,14 +20,21 @@
         SELECT USER_ID, USER_EMAIL, USER_NICKNAME, USER_GRADE, USER_ROLE
         FROM USERS
         <where>
-            <if test="userRole != null and userRole != ''">
-                USER_ROLE = #{userRole}
-            </if>
+            <choose>
+                <when test="filter instanceof java.lang.Integer">
+                    USER_ISDELETED = #{filter}
+                </when>
+                <when test="filter instanceof java.lang.String and filter != ''">
+                    USER_ROLE = #{filter}
+                </when>
+            </choose>
+
+
             <if test="userEmail != null and userEmail != ''">
                 AND USER_EMAIL LIKE CONCAT('%', #{userEmail}, '%')
             </if>
         </where>
-        ORDER BY USER_ID DESC
+        ORDER BY ${sortField} ${sortOrder}
         LIMIT #{limit} OFFSET #{offset}
     </select>
 
@@ -37,13 +45,73 @@
         FROM
         USERS
         <where>
-            <if test="userRole != null and userRole != ''">
-                USER_ROLE = #{userRole}
-            </if>
+            <choose>
+                <when test="filter instanceof java.lang.Integer">
+                    USER_ISDELETED = #{filter}
+                </when>
+                <when test="filter instanceof java.lang.String and filter != ''">
+                    USER_ROLE = #{filter}
+                </when>
+            </choose>
+
             <if test="userEmail != null and userEmail != ''">
                 AND USER_EMAIL LIKE CONCAT('%', #{userEmail}, '%')
             </if>
         </where>
     </select>
+
+    <!--                 유저 상세 정보                 -->
+    <resultMap id="findOneUserByUserId"
+               type="kr.or.kosa.backend.admin.dto.response.AdminUserDetailResponseDto">
+        <!-- 기본 키 -->
+        <id     column="USER_ID"             property="userId"/>
+        <!-- 기본 정보 -->
+        <result column="USER_EMAIL"          property="userEmail"/>
+        <result column="USER_NAME"           property="userName"/>
+        <result column="USER_NICKNAME"       property="userNickName"/>
+        <result column="USER_ROLE"           property="userRole"/>
+        <result column="USER_GRADE"          property="userGrade"/>
+        <!-- 날짜/시간 정보 -->
+        <result column="USER_CREATEDAT"      property="userCreateAt"/>
+        <result column="USER_DELETEDAT"      property="userDeleteAt"/>
+        <!-- 기타 상태 정보 -->
+        <result column="balance"          property="userPoint"/>
+        <result column="start_date" property="userSubscribeStart"/>
+        <result column="end_date"   property="userSubscribeEnd"/>
+    </resultMap>
+
+    <select id="findOneUserByUseerId" resultType="kr.or.kosa.backend.admin.dto.response.AdminUserDetailResponseDto">
+        SELECT
+        u.USER_ID,
+        u.USER_EMAIL,
+        u.USER_NAME,
+        u.USER_NICKNAME,
+        u.USER_ROLE,
+        u.USER_GRADE,
+        u.USER_CREATEDAT,
+        u.USER_DELETEDAT,
+        up.balance,
+        MAX(s.start_date) AS start_date,
+        MAX(s.end_date) AS end_date,
+        CASE
+        WHEN MAX(s.end_date) > NOW() THEN 'ACTIVE'
+        WHEN MAX(s.end_date) IS NULL THEN 'NONE'
+        ELSE 'EXPIRED'
+        END AS subscription_status
+        FROM USERS u
+        LEFT JOIN user_points up ON up.user_id = u.USER_ID
+        LEFT JOIN subscriptions s ON s.user_id = u.USER_ID AND s.status = 'ACTIVE'
+        WHERE u.USER_ID = #{userId}
+        GROUP BY
+        u.USER_ID, u.USER_EMAIL, u.USER_NAME, u.USER_NICKNAME,
+        u.USER_ROLE, u.USER_GRADE, u.USER_CREATEDAT, u.USER_DELETEDAT, up.balance;
+
+    </select>
+
+
+<!--    <select id="">-->
+<!--        select user_id, plan_code, amount, approved_at from payments-->
+<!--        where user_id = #{userId} and status = 'DONE'-->
+<!--    </select>-->
 
 </mapper>

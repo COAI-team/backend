@@ -1,7 +1,5 @@
 package kr.or.kosa.backend.algorithm.dto;
 
-import kr.or.kosa.backend.algorithm.domain.AlgoProblem;
-import kr.or.kosa.backend.algorithm.domain.AlgoTestcase;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -28,12 +26,12 @@ public class ProblemGenerationResponseDto {
     /**
      * 생성된 문제 정보
      */
-    private AlgoProblem problem;
+    private AlgoProblemDto problem;
 
     /**
      * 생성된 테스트케이스 목록
      */
-    private List<AlgoTestcase> testCases;
+    private List<AlgoTestcaseDto> testCases;
 
     /**
      * AI 생성 소요 시간 (초)

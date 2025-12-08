@@ -1,6 +1,6 @@
 package kr.or.kosa.backend.algorithm.mapper;
 
-import kr.or.kosa.backend.algorithm.domain.LanguageConstant;
+import kr.or.kosa.backend.algorithm.dto.LanguageConstantDto;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -19,7 +19,7 @@ public interface LanguageConstantMapper {
      * 
      * @return 전체 언어 상수 리스트
      */
-    List<LanguageConstant> selectAll();
+    List<LanguageConstantDto> selectAll();
 
     /**
      * 언어명으로 조회
@@ -28,7 +28,7 @@ public interface LanguageConstantMapper {
      * @param languageName 언어명 (예: "Java 17", "Python 3")
      * @return 해당 언어의 상수 정보, 없으면 null
      */
-    LanguageConstant selectByLanguageName(@Param("languageName") String languageName);
+    LanguageConstantDto selectByLanguageName(@Param("languageName") String languageName);
 
     /**
      * 언어 유형별 조회
@@ -37,7 +37,7 @@ public interface LanguageConstantMapper {
      * @param languageType 언어 유형 ("GENERAL" 또는 "DB")
      * @return 해당 유형의 언어 상수 리스트
      */
-    List<LanguageConstant> selectByLanguageType(@Param("languageType") String languageType);
+    List<LanguageConstantDto> selectByLanguageType(@Param("languageType") String languageType);
 
     /**
      * 언어 상수 삽입
@@ -46,7 +46,7 @@ public interface LanguageConstantMapper {
      * @param languageConstant 삽입할 언어 상수
      * @return 삽입된 행 수
      */
-    int insert(LanguageConstant languageConstant);
+    int insert(LanguageConstantDto languageConstant);
 
     /**
      * 언어 상수 업데이트
@@ -55,7 +55,7 @@ public interface LanguageConstantMapper {
      * @param languageConstant 업데이트할 언어 상수
      * @return 업데이트된 행 수
      */
-    int update(LanguageConstant languageConstant);
+    int update(LanguageConstantDto languageConstant);
 
     /**
      * 언어 상수 삭제

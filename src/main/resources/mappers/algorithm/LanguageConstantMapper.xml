@@ -5,10 +5,10 @@
 <mapper namespace="kr.or.kosa.backend.algorithm.mapper.LanguageConstantMapper">
 
     <!-- ResultMap: LanguageConstant 매핑 -->
-    <resultMap id="LanguageConstantResultMap" type="kr.or.kosa.backend.algorithm.domain.LanguageConstant">
+    <resultMap id="LanguageConstantResultMap" type="kr.or.kosa.backend.algorithm.dto.LanguageConstantDto">
         <id property="languageName" column="LANGUAGE_NAME"/>
-        <result property="languageType" column="LANGUAGE_TYPE" 
-                javaType="kr.or.kosa.backend.algorithm.domain.LanguageType"/>
+        <result property="languageType" column="LANGUAGE_TYPE"
+                javaType="kr.or.kosa.backend.algorithm.dto.enums.LanguageType"/>
         <result property="timeFactor" column="TIME_FACTOR"/>
         <result property="timeAddition" column="TIME_ADDITION"/>
         <result property="memoryFactor" column="MEMORY_FACTOR"/>
@@ -18,11 +18,11 @@
     <!-- 전체 언어 상수 조회 (캐싱용) -->
     <select id="selectAll" resultMap="LanguageConstantResultMap">
         SELECT LANGUAGE_NAME,
-               LANGUAGE_TYPE,
-               TIME_FACTOR,
-               TIME_ADDITION,
-               MEMORY_FACTOR,
-               MEMORY_ADDITION
+        LANGUAGE_TYPE,
+        TIME_FACTOR,
+        TIME_ADDITION,
+        MEMORY_FACTOR,
+        MEMORY_ADDITION
         FROM LANGUAGE_CONSTANTS
         ORDER BY LANGUAGE_NAME
     </select>
@@ -30,11 +30,11 @@
     <!-- 언어명으로 조회 -->
     <select id="selectByLanguageName" resultMap="LanguageConstantResultMap">
         SELECT LANGUAGE_NAME,
-               LANGUAGE_TYPE,
-               TIME_FACTOR,
-               TIME_ADDITION,
-               MEMORY_FACTOR,
-               MEMORY_ADDITION
+        LANGUAGE_TYPE,
+        TIME_FACTOR,
+        TIME_ADDITION,
+        MEMORY_FACTOR,
+        MEMORY_ADDITION
         FROM LANGUAGE_CONSTANTS
         WHERE LANGUAGE_NAME = #{languageName}
     </select>
@@ -42,11 +42,11 @@
     <!-- 언어 유형별 조회 -->
     <select id="selectByLanguageType" resultMap="LanguageConstantResultMap">
         SELECT LANGUAGE_NAME,
-               LANGUAGE_TYPE,
-               TIME_FACTOR,
-               TIME_ADDITION,
-               MEMORY_FACTOR,
-               MEMORY_ADDITION
+        LANGUAGE_TYPE,
+        TIME_FACTOR,
+        TIME_ADDITION,
+        MEMORY_FACTOR,
+        MEMORY_ADDITION
         FROM LANGUAGE_CONSTANTS
         WHERE LANGUAGE_TYPE = #{languageType}
         ORDER BY LANGUAGE_NAME
@@ -55,19 +55,19 @@
     <!-- 언어 상수 삽입 -->
     <insert id="insert">
         INSERT INTO LANGUAGE_CONSTANTS (
-            LANGUAGE_NAME,
-            LANGUAGE_TYPE,
-            TIME_FACTOR,
-            TIME_ADDITION,
-            MEMORY_FACTOR,
-            MEMORY_ADDITION
+        LANGUAGE_NAME,
+        LANGUAGE_TYPE,
+        TIME_FACTOR,
+        TIME_ADDITION,
+        MEMORY_FACTOR,
+        MEMORY_ADDITION
         ) VALUES (
-            #{languageName},
-            #{languageType},
-            #{timeFactor},
-            #{timeAddition},
-            #{memoryFactor},
-            #{memoryAddition}
+        #{languageName},
+        #{languageType},
+        #{timeFactor},
+        #{timeAddition},
+        #{memoryFactor},
+        #{memoryAddition}
         )
     </insert>
 
@@ -75,10 +75,10 @@
     <update id="update">
         UPDATE LANGUAGE_CONSTANTS
         SET LANGUAGE_TYPE = #{languageType},
-            TIME_FACTOR = #{timeFactor},
-            TIME_ADDITION = #{timeAddition},
-            MEMORY_FACTOR = #{memoryFactor},
-            MEMORY_ADDITION = #{memoryAddition}
+        TIME_FACTOR = #{timeFactor},
+        TIME_ADDITION = #{timeAddition},
+        MEMORY_FACTOR = #{memoryFactor},
+        MEMORY_ADDITION = #{memoryAddition}
         WHERE LANGUAGE_NAME = #{languageName}
     </update>
 
@@ -89,4 +89,3 @@
     </delete>
 
 </mapper>
-

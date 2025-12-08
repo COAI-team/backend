@@ -24,6 +24,7 @@ public class RagService {
         private final ChatClient.Builder chatClientBuilder;
 
         public void ingestCode(RagDto.IngestRequest request) {
+                System.out.println("[TRACE] RagService.ingestCode called with request: " + request);
                 log.info("Ingesting code for users: {}", request.getUserId());
 
                 String timestamp = LocalDateTime.now().format(DateTimeFormatter.ISO_DATE_TIME);
@@ -54,6 +55,7 @@ public class RagService {
         }
 
         public String getPersonalizedFeedback(RagDto.FeedbackRequest request) {
+                System.out.println("[TRACE] RagService.getPersonalizedFeedback called with request: " + request);
                 log.info("Generating feedback for users: {}", request.getUserId());
 
                 ChatClient chatClient = chatClientBuilder.build();
@@ -110,6 +112,7 @@ public class RagService {
          * Retrieves users context (past mistakes, patterns) for RAG-enhanced analysis.
          */
         public String retrieveUserContext(String userId) {
+                System.out.println("[TRACE] RagService.retrieveUserContext called with userId: " + userId);
                 try {
                         System.out.println("*****Attempting to retrieve context for userId: {}*****" + userId);
                         String filterExpression = String.format("userId == '%s'", userId);

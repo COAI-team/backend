@@ -1,7 +1,7 @@
 package kr.or.kosa.backend.algorithm.service;
 
-import kr.or.kosa.backend.algorithm.domain.AlgoProblem;
-import kr.or.kosa.backend.algorithm.domain.AlgoTestcase;
+import kr.or.kosa.backend.algorithm.dto.AlgoProblemDto;
+import kr.or.kosa.backend.algorithm.dto.AlgoTestcaseDto;
 import kr.or.kosa.backend.algorithm.dto.*;
 import kr.or.kosa.backend.algorithm.mapper.AlgorithmProblemMapper;
 import lombok.RequiredArgsConstructor;
@@ -53,13 +53,13 @@ public class AlgorithmProblemService {
      * @param topic      주제 필터 (nullable)
      * @return 문제 목록
      */
-    public List<AlgoProblem> getProblemsWithFilter(int offset, int limit, String difficulty, String source,
+    public List<AlgoProblemDto> getProblemsWithFilter(int offset, int limit, String difficulty, String source,
             String keyword, String topic) {
         log.debug("문제 목록 조회 (필터) - offset: {}, limit: {}, difficulty: {}, source: {}, keyword: {}, topic: {}",
                 offset, limit, difficulty, source, keyword, topic);
 
         try {
-            List<AlgoProblem> problems = algorithmProblemMapper.selectProblemsWithFilter(offset, limit, difficulty,
+            List<AlgoProblemDto> problems = algorithmProblemMapper.selectProblemsWithFilter(offset, limit, difficulty,
                     source, keyword);
             log.debug("문제 목록 조회 완료 - 조회된 문제 수: {}", problems.size());
 
@@ -109,7 +109,7 @@ public class AlgorithmProblemService {
 
         try {
             // 문제 목록 조회
-            List<AlgoProblem> problems = getProblemsWithFilter(
+            List<AlgoProblemDto> problems = getProblemsWithFilter(
                     request.getOffset(),
                     request.getLimit(),
                     request.getDifficulty(),
@@ -183,7 +183,7 @@ public class AlgorithmProblemService {
      * @param problemId 문제 ID
      * @return 문제 정보
      */
-    public AlgoProblem getProblemDetail(Long problemId) {
+    public AlgoProblemDto getProblemDetail(Long problemId) {
         log.debug("문제 상세 조회 - problemId: {}", problemId);
 
         if (problemId == null || problemId <= 0) {
@@ -191,14 +191,14 @@ public class AlgorithmProblemService {
         }
 
         try {
-            AlgoProblem problem = algorithmProblemMapper.selectProblemById(problemId);
+            AlgoProblemDto problem = algorithmProblemMapper.selectProblemById(problemId);
 
             if (problem == null) {
                 throw new RuntimeException("존재하지 않는 문제입니다. ID: " + problemId);
             }
 
             // 테스트케이스 조회 및 설정
-            List<AlgoTestcase> testcases = algorithmProblemMapper.selectTestCasesByProblemId(problemId);
+            List<AlgoTestcaseDto> testcases = algorithmProblemMapper.selectTestCasesByProblemId(problemId);
             problem.setTestcases(testcases);
 
             log.debug("문제 상세 조회 완료 - problemId: {}, title: {}, testcases: {}",
@@ -296,7 +296,7 @@ public class AlgorithmProblemService {
             log.info("AI 생성 문제 저장 시작 - 제목: {}", responseDto.getProblem().getAlgoProblemTitle());
 
             // 1. 문제 엔티티 준비
-            AlgoProblem problem = responseDto.getProblem();
+            AlgoProblemDto problem = responseDto.getProblem();
             problem.setAlgoCreater(userId); // 생성자 ID 설정
 
             // 2. 문제 저장 (AUTO_INCREMENT로 ID 자동 생성)
@@ -329,11 +329,11 @@ public class AlgorithmProblemService {
      * 테스트케이스 일괄 저장
      */
     @Transactional
-    private void saveTestcases(Long problemId, List<AlgoTestcase> testcases) {
+    private void saveTestcases(Long problemId, List<AlgoTestcaseDto> testcases) {
         try {
             int savedCount = 0;
 
-            for (AlgoTestcase testcase : testcases) {
+            for (AlgoTestcaseDto testcase : testcases) {
                 testcase.setAlgoProblemId(problemId);
 
                 int result = algorithmProblemMapper.insertTestcase(testcase);

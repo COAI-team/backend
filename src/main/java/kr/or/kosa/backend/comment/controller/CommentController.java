@@ -27,7 +27,7 @@ public class CommentController {
     @PostMapping
     public ResponseEntity<ApiResponse<Map<String, Object>>> create(
             @Valid @RequestBody CommentCreateRequest request,
-            @RequestAttribute(value = "userId", required = false) Integer userId
+            @RequestAttribute(value = "userId", required = false) Long userId
     ) {
         Long actualUserId = (userId != null) ? userId : 1L;
         CommentResponse response = commentService.createComment(request, actualUserId);
