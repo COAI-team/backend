@@ -1,9 +1,10 @@
 package kr.or.kosa.backend.users.service;
 
-import kr.or.kosa.backend.auth.github.dto.GitHubUserResponse;
-import kr.or.kosa.backend.users.domain.Users;
+import kr.or.kosa.backend.auth.github.dto.*;
 import kr.or.kosa.backend.users.dto.*;
 import org.springframework.web.multipart.MultipartFile;
+
+import java.util.Map;
 
 public interface UserService {
 
@@ -21,8 +22,6 @@ public interface UserService {
 
     boolean resetPassword(String token, String newPassword);
 
-    boolean updatePassword(Long userId, PasswordUpdateRequestDto dto);
-
     UserResponseDto updateUserInfo(Long userId, UserUpdateRequestDto dto, MultipartFile image);
 
     UserResponseDto getUserInfo(Long userId);
@@ -31,5 +30,13 @@ public interface UserService {
 
     boolean restoreUser(Long userId);
 
-    Users githubLogin(GitHubUserResponse gitHubUser);
+    GithubLoginResult githubLogin(GitHubUserResponse gitHubUser, boolean linkMode);
+
+    boolean disconnectGithub(Long userId);
+
+    boolean isGithubLinked(Long userId);
+
+    Map<String, Object> getGithubUserInfo(Long userId);
+
+    boolean linkGithubAccount(Long currentUserId, GitHubUserResponse gitHubUser);
 }

@@ -37,11 +37,13 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/",
                                 "/auth/github/**",
-                                "/users/login",
+                                "/oauth2/**",
                                 "/users/register",
-                                "/users/password/**",
+                                "/users/login",
+                                "/users/github/link",
                                 "/email/**",
-                                "/swagger-ui/**", "/v3/api-docs/**"
+                                "/algo/**",
+                                "/users/password/**"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )
@@ -53,25 +55,28 @@ public class SecurityConfig {
         return http.build();
     }
 
-    /**
-     * CORS 설정
-     */
-    @Bean
-    public CorsConfigurationSource corsConfigurationSource() {
-        CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(List.of(
-                "http://localhost:5173",
-                "https://localhost:5173"
-        ));
-        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        config.setAllowedHeaders(List.of("*"));
-        config.setAllowCredentials(true);
-
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", config);
-        return source;
-    }
-
+//    @Bean
+//    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+//
+//        http
+//                .cors(Customizer.withDefaults())
+//                .csrf(AbstractHttpConfigurer::disable)
+//                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+//
+//                .authorizeHttpRequests(auth -> auth
+//                        // .requestMatchers(
+//                        // "/**"
+//                        // )
+//                        // .permitAll()
+//                        .anyRequest().permitAll());
+//
+//        // .addFilterBefore(
+//        // new JwtAuthenticationFilter(jwtProvider),
+//        // UsernamePasswordAuthenticationFilter.class
+//        // );
+//
+//        return http.build();
+//    }
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();

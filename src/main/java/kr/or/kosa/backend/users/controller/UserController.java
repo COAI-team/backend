@@ -1,6 +1,7 @@
 package kr.or.kosa.backend.users.controller;
 
 import jakarta.validation.Valid;
+import kr.or.kosa.backend.auth.github.dto.GitHubUserResponse;
 import kr.or.kosa.backend.security.jwt.JwtUserDetails;
 import kr.or.kosa.backend.users.dto.*;
 import kr.or.kosa.backend.users.service.UserService;
@@ -77,10 +78,6 @@ public class UserController {
         ));
     }
 
-    // ============================================================================
-    // 비밀번호 재설정 (토큰 기반)
-    // ============================================================================
-
     /**
      * 비밀번호 재설정 이메일 요청
      */
@@ -127,26 +124,8 @@ public class UserController {
     }
 
     /**
-     * 로그인 상태에서 비밀번호 변경
+     * 내 정보 조회
      */
-    @PutMapping("/password/update")
-    public ResponseEntity<Map<String, Object>> updatePassword(
-            @AuthenticationPrincipal JwtUserDetails user,
-            @RequestBody PasswordUpdateRequestDto dto
-    ) {
-
-        boolean result = userService.updatePassword(user.id(), dto);
-
-        return ResponseEntity.ok(Map.of(
-                KEY_SUCCESS, result,
-                KEY_MESSAGE, result ? "비밀번호가 성공적으로 변경되었습니다."
-                        : "현재 비밀번호가 일치하지 않습니다."
-        ));
-    }
-
-    // ============================================================================
-    // 내 정보 조회
-    // ============================================================================
     @GetMapping("/me")
     public ResponseEntity<UserResponseDto> getMyInfo(
             @AuthenticationPrincipal JwtUserDetails user
@@ -158,9 +137,9 @@ public class UserController {
         return ResponseEntity.ok(dto);
     }
 
-    // ============================================================================
-    // 일반 정보 수정 (이름 / 닉네임 / 프로필 사진)
-    // ============================================================================
+    /**
+     * 일반 정보 수정 (이름 / 닉네임 / 프로필 사진)
+     */
     @PutMapping(value = "/me", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<Map<String, Object>> updateMyInfo(
             @AuthenticationPrincipal JwtUserDetails user,
@@ -181,15 +160,14 @@ public class UserController {
         ));
     }
 
-    // ============================================================================
-    // 탈퇴 신청 (90일 뒤 삭제)
-    // ============================================================================
-
+    /**
+     * 탈퇴 신청 (90일 뒤 삭제)
+     */
     @DeleteMapping("/me")
     public ResponseEntity<Map<String, Object>> requestDelete(
             @AuthenticationPrincipal JwtUserDetails user
     ) {
-        boolean result = userService.requestDelete(Long.valueOf(user.id()));
+        boolean result = userService.requestDelete(user.id());
 
         return ResponseEntity.ok(Map.of(
                 KEY_SUCCESS, result,
@@ -199,14 +177,14 @@ public class UserController {
         ));
     }
 
-    // ============================================================================
-    // 탈퇴 복구
-    // ============================================================================
+    /**
+     * 탈퇴 복구
+     */
     @PutMapping("/me/restore")
     public ResponseEntity<Map<String, Object>> restoreUser(
             @AuthenticationPrincipal JwtUserDetails user
     ) {
-        boolean result = userService.restoreUser(Long.valueOf(user.id()));
+        boolean result = userService.restoreUser(user.id());
 
         return ResponseEntity.ok(Map.of(
                 KEY_SUCCESS, result,
@@ -214,5 +192,23 @@ public class UserController {
                         ? "계정 복구가 완료되었습니다."
                         : "복구할 수 없는 계정이거나 이미 삭제 처리되었습니다."
         ));
+    }
+
+    /**
+     * GitHub 계정을 현재 사용자 계정에 연동
+     */
+    @PostMapping("/github/link")
+    public ResponseEntity<Map<String, Object>> linkGithub(
+            @AuthenticationPrincipal JwtUserDetails user,
+            @RequestBody GitHubUserResponse gitHubUser
+    ) {
+        boolean result = userService.linkGithubAccount(user.id(), gitHubUser);
+
+        return ResponseEntity.ok(
+                Map.of(
+                        KEY_SUCCESS, result,
+                        KEY_MESSAGE, result ? "GitHub 계정이 연동되었습니다." : "GitHub 연동에 실패했습니다."
+                )
+        );
     }
 }

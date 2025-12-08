@@ -25,6 +25,8 @@ public class Users {
     private Boolean userEnabled;
     private Boolean userIssubscribed;
 
+    private Boolean needLink = false;
+
     public UserResponseDto toDto() {
         return UserResponseDto.builder()
                 .userId(this.userId)
