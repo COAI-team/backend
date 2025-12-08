@@ -38,12 +38,9 @@ public class SecurityConfig {
                                 "/",
                                 "/auth/github/**",
                                 "/oauth2/**",
-                                "/users/register",
-                                "/users/login",
-                                "/users/github/link",
+                                "/users/**",
                                 "/email/**",
-                                "/algo/**",
-                                "/users/password/**"
+                                "/algo/**"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )
@@ -77,6 +74,7 @@ public class SecurityConfig {
 //
 //        return http.build();
 //    }
+
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
