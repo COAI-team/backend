@@ -1,12 +1,14 @@
 package kr.or.kosa.backend.algorithm.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import kr.or.kosa.backend.algorithm.dto.*;
+import kr.or.kosa.backend.algorithm.dto.AlgoProblemDto;
+import kr.or.kosa.backend.algorithm.dto.AlgoTestcaseDto;
+import kr.or.kosa.backend.algorithm.dto.LLMResponseDto;
+import kr.or.kosa.backend.algorithm.dto.ProblemGenerationRequestDto;
+import kr.or.kosa.backend.algorithm.dto.ProblemGenerationResponseDto;
+import kr.or.kosa.backend.algorithm.dto.ProblemValidationLogDto;
 import kr.or.kosa.backend.algorithm.dto.enums.ProblemDifficulty;
-import kr.or.kosa.backend.algorithm.dto.enums.ProblemSource;
-import kr.or.kosa.backend.algorithm.dto.enums.ProblemType;
 import kr.or.kosa.backend.algorithm.mapper.AlgorithmProblemMapper;
 import kr.or.kosa.backend.algorithm.mapper.ProblemValidationLogMapper;
 import lombok.RequiredArgsConstructor;
@@ -18,7 +20,6 @@ import reactor.core.publisher.Flux;
 import reactor.core.scheduler.Schedulers;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -34,6 +35,7 @@ public class AIProblemGeneratorService {
     private final ProblemGenerationPromptBuilder promptBuilder;
     private final AlgorithmSynonymDictionary synonymDictionary;
     private final ProblemVectorStoreService vectorStoreService;
+    private final LLMResponseParser responseParser;
 
     // === 기존 의존성 ===
     private final ObjectMapper objectMapper;
@@ -97,8 +99,8 @@ public class AIProblemGeneratorService {
             log.info("LLM 응답 완료 - 토큰: {}, 응답시간: {}ms",
                     llmResponse.getTotalTokens(), llmResponse.getResponseTimeMs());
 
-            // 5. 응답 파싱 및 DTO 생성
-            GeneratedProblemData parsedData = parseEnhancedResponse(aiResponse, request);
+            // 5. 응답 파싱 및 DTO 생성 (LLMResponseParser 사용)
+            LLMResponseParser.ParsedResult parsedData = responseParser.parse(aiResponse, request);
             AlgoProblemDto problem = parsedData.problem();
             List<AlgoTestcaseDto> testCases = parsedData.testCases();
 
@@ -141,96 +143,6 @@ public class AIProblemGeneratorService {
         // ALGORITHM 문제인 경우
         return promptBuilder.buildUserPromptWithoutRag(request);
     }
-
-    /**
-     * 향상된 응답 파싱 (검증 코드 포함)
-     */
-    private GeneratedProblemData parseEnhancedResponse(String aiResponse, ProblemGenerationRequestDto request)
-            throws JsonProcessingException {
-
-        String cleanedJson = sanitizeJsonResponse(aiResponse);
-        JsonNode jsonNode = objectMapper.readTree(cleanedJson);
-
-        // 문제 DTO 생성
-        AlgoProblemDto problem = parseAIProblemResponse(aiResponse, request);
-
-        // 테스트케이스 파싱
-        List<AlgoTestcaseDto> testCases = parseEnhancedTestCases(jsonNode);
-
-        // 검증용 데이터 추출 (optimalCode, naiveCode)
-        String optimalCode = getJsonText(jsonNode, "optimalCode");
-        String naiveCode = getJsonText(jsonNode, "naiveCode");
-        String expectedTimeComplexity = getJsonText(jsonNode, "expectedTimeComplexity");
-
-        return new GeneratedProblemData(problem, testCases, optimalCode, naiveCode, expectedTimeComplexity);
-    }
-
-    /**
-     * 향상된 테스트케이스 파싱
-     */
-    private List<AlgoTestcaseDto> parseEnhancedTestCases(JsonNode jsonNode) {
-        List<AlgoTestcaseDto> testCases = new ArrayList<>();
-
-        // 샘플 테스트케이스 (기존 sampleInput/sampleOutput 방식 지원)
-        String sampleInput = getJsonText(jsonNode, "sampleInput");
-        String sampleOutput = getJsonText(jsonNode, "sampleOutput");
-
-        if (sampleInput != null && sampleOutput != null) {
-            testCases.add(AlgoTestcaseDto.builder()
-                    .inputData(sampleInput)
-                    .expectedOutput(sampleOutput)
-                    .isSample(true)
-                    .build());
-        }
-
-        // testCases 배열 파싱
-        JsonNode testCasesNode = jsonNode.get("testCases");
-        if (testCasesNode != null && testCasesNode.isArray()) {
-            for (JsonNode tc : testCasesNode) {
-                boolean isSample = tc.has("isSample") && tc.get("isSample").asBoolean(false);
-
-                // 이미 샘플이 추가된 경우 중복 방지
-                if (isSample && !testCases.isEmpty()) {
-                    continue;
-                }
-
-                String input = getJsonText(tc, "input");
-                String output = getJsonText(tc, "output");
-
-                if (input != null && output != null) {
-                    testCases.add(AlgoTestcaseDto.builder()
-                            .inputData(input)
-                            .expectedOutput(output)
-                            .isSample(isSample)
-                            .build());
-                }
-            }
-        }
-
-        return testCases;
-    }
-
-    /**
-     * JSON 노드에서 텍스트 안전하게 추출
-     */
-    private String getJsonText(JsonNode node, String fieldName) {
-        JsonNode field = node.get(fieldName);
-        if (field == null || field.isNull()) {
-            return null;
-        }
-        return field.asText();
-    }
-
-    /**
-     * 생성된 문제 데이터 레코드 (검증 정보 포함)
-     */
-    private record GeneratedProblemData(
-            AlgoProblemDto problem,
-            List<AlgoTestcaseDto> testCases,
-            String optimalCode,
-            String naiveCode,
-            String expectedTimeComplexity
-    ) {}
 
     /**
      * AI 문제 생성 (스트리밍 버전 - Phase 2 통합)
@@ -283,9 +195,9 @@ public class AIProblemGeneratorService {
                     log.info("LLM 응답 완료 - 토큰: {}, 응답시간: {}ms",
                             llmResponse.getTotalTokens(), llmResponse.getResponseTimeMs());
 
-                    // 5단계: 파싱
+                    // 5단계: 파싱 (LLMResponseParser 사용)
                     emitStep(sink, "문제 정보 파싱 중...");
-                    GeneratedProblemData parsedData = parseEnhancedResponse(aiResponse, request);
+                    LLMResponseParser.ParsedResult parsedData = responseParser.parse(aiResponse, request);
                     AlgoProblemDto problem = parsedData.problem();
                     List<AlgoTestcaseDto> testCases = parsedData.testCases();
 
@@ -335,7 +247,7 @@ public class AIProblemGeneratorService {
     /**
      * 검증 로그 저장
      */
-    private void saveValidationLog(Long problemId, GeneratedProblemData data) {
+    private void saveValidationLog(Long problemId, LLMResponseParser.ParsedResult data) {
         try {
             ProblemValidationLogDto validationLog = ProblemValidationLogDto.builder()
                     .algoProblemId(problemId)
@@ -462,205 +374,6 @@ public class AIProblemGeneratorService {
             case SILVER -> "초중급 (기본 알고리즘, 자료구조)";
             case GOLD -> "중급 (고급 알고리즘, 최적화)";
             case PLATINUM -> "고급 (복잡한 알고리즘, 수학적 사고)";
-        };
-    }
-
-    /**
-     * AI 응답 JSON 정제
-     * - 마크다운 코드 블록 제거
-     * - 유효하지 않은 JSON 이스케이프 시퀀스 처리 (정규식 패턴 등)
-     */
-    private String sanitizeJsonResponse(String aiResponse) {
-        // null 또는 빈 문자열 체크
-        if (aiResponse == null || aiResponse.trim().isEmpty()) {
-            log.warn("AI 응답이 null이거나 비어있습니다.");
-            return "{}";
-        }
-
-        // 1. 마크다운 코드 블록 제거
-        String cleanedJson = aiResponse
-                .replaceAll("```json\\s*", "")
-                .replaceAll("```\\s*$", "")
-                .replaceAll("```", "")  // 추가: 남은 ``` 제거
-                .trim();
-
-        if (cleanedJson.isEmpty()) {
-            log.warn("마크다운 제거 후 JSON이 비어있습니다.");
-            return "{}";
-        }
-
-        // 2. 유효하지 않은 JSON 이스케이프 시퀀스를 이중 백슬래시로 변환
-        // JSON 유효 이스케이프: 큰따옴표, 백슬래시, 슬래시, b, f, n, r, t, 유니코드(u+4자리hex)
-        // 그 외 정규식 패턴(w, d, s 등)은 유효하지 않으므로 백슬래시를 이중으로 변환
-        StringBuilder result = new StringBuilder();
-        int i = 0;
-        int escapesFixed = 0;
-
-        while (i < cleanedJson.length()) {
-            char c = cleanedJson.charAt(i);
-
-            if (c == '\\') {
-                // 다음 문자가 있는지 확인
-                if (i + 1 < cleanedJson.length()) {
-                    char next = cleanedJson.charAt(i + 1);
-
-                    // 유효한 JSON 이스케이프 시퀀스 확인
-                    if (next == '"' || next == '\\' || next == '/' ||
-                        next == 'b' || next == 'f' || next == 'n' ||
-                        next == 'r' || next == 't') {
-                        // 유효한 이스케이프 - 그대로 유지
-                        result.append(c);
-                        result.append(next);
-                        i += 2;
-                    } else if (next == 'u' && i + 5 < cleanedJson.length()) {
-                        // \ uXXXX 유니코드 이스케이프 확인
-                        String hex = cleanedJson.substring(i + 2, i + 6);
-                        if (hex.matches("[0-9a-fA-F]{4}")) {
-                            result.append(cleanedJson, i, i + 6);
-                            i += 6;
-                        } else {
-                            // 유효하지 않은 유니코드 - 백슬래시 이스케이프
-                            result.append("\\\\");
-                            escapesFixed++;
-                            i += 1;
-                        }
-                    } else {
-                        // 유효하지 않은 이스케이프 - 백슬래시를 이중으로
-                        result.append("\\\\");
-                        escapesFixed++;
-                        i += 1;
-                    }
-                } else {
-                    // 문자열 끝에 단독 백슬래시 - 이스케이프 처리
-                    result.append("\\\\");
-                    escapesFixed++;
-                    i += 1;
-                }
-            } else {
-                result.append(c);
-                i += 1;
-            }
-        }
-
-        if (escapesFixed > 0) {
-            log.info("JSON 이스케이프 시퀀스 {} 개 수정됨", escapesFixed);
-        }
-
-        return result.toString();
-    }
-
-    /**
-     * 문제 정보 파싱
-     */
-    private AlgoProblemDto parseAIProblemResponse(String aiResponse, ProblemGenerationRequestDto request)
-            throws JsonProcessingException {
-
-        // JSON 전처리 (```json ``` 제거 + 유효하지 않은 이스케이프 시퀀스 처리)
-        String cleanedJson = sanitizeJsonResponse(aiResponse);
-
-        JsonNode jsonNode = objectMapper.readTree(cleanedJson);
-
-        // problemType 결정
-        ProblemType problemType = "SQL".equalsIgnoreCase(request.getProblemType())
-                ? ProblemType.SQL
-                : ProblemType.ALGORITHM;
-
-        // initScript 파싱 (DATABASE 문제인 경우)
-        String initScript = null;
-        if (problemType == ProblemType.SQL) {
-            JsonNode initScriptNode = jsonNode.get("initScript");
-            if (initScriptNode != null && !initScriptNode.isNull()) {
-                initScript = initScriptNode.asText();
-            }
-        }
-
-        return AlgoProblemDto.builder()
-                .algoProblemTitle(jsonNode.get("title").asText())
-                .algoProblemDescription(buildFullDescription(jsonNode))
-                .algoProblemDifficulty(request.getDifficulty())
-                .algoProblemSource(ProblemSource.AI_GENERATED)
-                .problemType(problemType)
-                .initScript(initScript) // DATABASE 문제인 경우 초기화 스크립트 설정
-                .timelimit(request.getTimeLimit() != null
-                        ? request.getTimeLimit()
-                        : getDefaultTimeLimit(request.getDifficulty()))
-                .memorylimit(request.getMemoryLimit())
-                .algoProblemTags(buildTagsJson(request.getTopic()))
-                .algoProblemStatus(true)
-                .algoCreatedAt(LocalDateTime.now())
-                .algoUpdatedAt(LocalDateTime.now())
-                .build();
-    }
-
-    /**
-     * 태그를 JSON 배열 형식으로 변환
-     */
-    private String buildTagsJson(String topic) {
-        if (topic == null || topic.trim().isEmpty()) {
-            return "[]"; // 빈 JSON 배열
-        }
-
-        try {
-            // 쉼표로 구분된 태그를 JSON 배열로 변환
-            String[] tags = topic.split(",");
-            List<String> tagList = new ArrayList<>();
-
-            for (String tag : tags) {
-                String trimmed = tag.trim();
-                if (!trimmed.isEmpty()) {
-                    tagList.add(trimmed);
-                }
-            }
-
-            // ObjectMapper로 JSON 배열 생성
-            return objectMapper.writeValueAsString(tagList);
-
-        } catch (Exception e) {
-            log.error("태그 JSON 변환 실패, 기본값 사용: {}", topic, e);
-            // 실패 시 단일 태그로 JSON 배열 생성
-            return "[\"" + topic.replace("\"", "\\\"") + "\"]";
-        }
-    }
-
-    /**
-     * 문제 설명 전체 구성
-     */
-    private String buildFullDescription(JsonNode jsonNode) {
-        return String.format("""
-                %s
-
-                **입력**
-                %s
-
-                **출력**
-                %s
-
-                **제한 사항**
-                %s
-
-                **예제 입력**
-                %s
-
-                **예제 출력**
-                %s
-                """,
-                jsonNode.get("description").asText(),
-                jsonNode.get("inputFormat").asText(),
-                jsonNode.get("outputFormat").asText(),
-                jsonNode.get("constraints").asText(),
-                jsonNode.get("sampleInput").asText(),
-                jsonNode.get("sampleOutput").asText());
-    }
-
-    /**
-     * 기본 시간 제한
-     */
-    private Integer getDefaultTimeLimit(ProblemDifficulty difficulty) {
-        return switch (difficulty) {
-            case BRONZE -> 1000;
-            case SILVER -> 2000;
-            case GOLD -> 3000;
-            case PLATINUM -> 5000;
         };
     }
 }
