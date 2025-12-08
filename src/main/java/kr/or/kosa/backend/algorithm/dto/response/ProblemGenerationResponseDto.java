@@ -2,9 +2,11 @@ package kr.or.kosa.backend.algorithm.dto.response;
 
 import kr.or.kosa.backend.algorithm.dto.AlgoProblemDto;
 import kr.or.kosa.backend.algorithm.dto.AlgoTestcaseDto;
+import kr.or.kosa.backend.algorithm.dto.ValidationResultDto;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.time.LocalDateTime;
@@ -17,6 +19,7 @@ import java.util.List;
 @Getter
 @Setter
 @Builder
+@NoArgsConstructor
 @AllArgsConstructor
 public class ProblemGenerationResponseDto {
 
@@ -34,6 +37,26 @@ public class ProblemGenerationResponseDto {
      * 생성된 테스트케이스 목록
      */
     private List<AlgoTestcaseDto> testCases;
+
+    /**
+     * 최적 풀이 코드
+     */
+    private String optimalCode;
+
+    /**
+     * 비효율적 풀이 코드 (시간 초과용)
+     */
+    private String naiveCode;
+
+    /**
+     * 프로그래밍 언어
+     */
+    private String language;
+
+    /**
+     * 검증 결과 목록
+     */
+    private List<ValidationResultDto> validationResults;
 
     /**
      * AI 생성 소요 시간 (초)
