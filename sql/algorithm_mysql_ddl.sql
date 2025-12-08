@@ -479,6 +479,54 @@ CREATE TABLE `CODERESULT` (
     FOREIGN KEY (`USER_ID`) REFERENCES `USERS`(`USER_ID`) ON DELETE CASCADE
 );
 -- =============================================
+-- LLM 문제 생성 관련 테이블 확장
+-- =============================================
+
+-- ALGO_PROBLEMS 테이블에 LLM 생성 문제 전용 컬럼 추가
+ALTER TABLE `ALGO_PROBLEMS`
+ADD COLUMN `CONSTRAINTS` TEXT NULL COMMENT '제약 조건 (LLM 생성)' AFTER `ALGO_PROBLEM_STATUS`,
+ADD COLUMN `INPUT_FORMAT` TEXT NULL COMMENT '입력 형식 설명 (LLM 생성)' AFTER `CONSTRAINTS`,
+ADD COLUMN `OUTPUT_FORMAT` TEXT NULL COMMENT '출력 형식 설명 (LLM 생성)' AFTER `INPUT_FORMAT`;
+
+-- 문제 생성 검증 로그 테이블 (개발자 품질 검사용)
+CREATE TABLE `PROBLEM_VALIDATION_LOGS` (
+    `VALIDATION_ID` BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '검증 로그 고유 식별자',
+    `ALGO_PROBLEM_ID` BIGINT NOT NULL COMMENT '연관된 문제 ID',
+
+    -- LLM이 생성한 코드 (품질 검증용)
+    `OPTIMAL_CODE` TEXT NULL COMMENT '최적 정답 코드',
+    `NAIVE_CODE` TEXT NULL COMMENT '비효율적 코드 (시간 복잡도 비교용)',
+    `EXPECTED_TIME_COMPLEXITY` VARCHAR(50) NULL COMMENT '예상 시간 복잡도 (예: O(n log n))',
+
+    -- 코드 실행 검증 결과
+    `OPTIMAL_CODE_RESULT` ENUM('PASS', 'FAIL', 'ERROR', 'TIMEOUT') NULL COMMENT '최적 코드 실행 결과',
+    `NAIVE_CODE_RESULT` ENUM('PASS', 'FAIL', 'ERROR', 'TIMEOUT') NULL COMMENT '비효율 코드 실행 결과',
+    `OPTIMAL_EXECUTION_TIME` INT NULL COMMENT '최적 코드 실행 시간(ms)',
+    `NAIVE_EXECUTION_TIME` INT NULL COMMENT '비효율 코드 실행 시간(ms)',
+    `TIME_RATIO` DECIMAL(10, 2) NULL COMMENT '시간 비율 (naive / optimal)',
+    `TIME_RATIO_VALID` TINYINT(1) DEFAULT NULL COMMENT '시간 비율 검증 통과 여부',
+
+    -- 유사도 검사 결과
+    `SIMILARITY_SCORE` DECIMAL(5, 2) NULL COMMENT '기존 문제와의 유사도 점수 (0-100)',
+    `SIMILARITY_VALID` TINYINT(1) DEFAULT NULL COMMENT '유사도 검증 통과 여부 (80% 이하)',
+
+    -- 검증 상태 및 Self-Correction
+    `VALIDATION_STATUS` ENUM('PENDING', 'PASSED', 'FAILED', 'CORRECTED') DEFAULT 'PENDING' COMMENT '검증 상태',
+    `CORRECTION_ATTEMPTS` INT DEFAULT 0 COMMENT 'Self-Correction 시도 횟수',
+    `FAILURE_REASONS` JSON NULL COMMENT '검증 실패 원인들',
+
+    -- 타임스탬프
+    `CREATED_AT` TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '검증 생성 일시',
+    `COMPLETED_AT` TIMESTAMP NULL COMMENT '검증 완료 일시',
+
+    -- 외래키 및 인덱스
+    FOREIGN KEY (`ALGO_PROBLEM_ID`) REFERENCES `ALGO_PROBLEMS`(`ALGO_PROBLEM_ID`) ON DELETE CASCADE,
+    INDEX `idx_problem_id` (`ALGO_PROBLEM_ID`),
+    INDEX `idx_validation_status` (`VALIDATION_STATUS`),
+    INDEX `idx_created_at` (`CREATED_AT` DESC)
+) ENGINE = InnoDB AUTO_INCREMENT = 1 DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '문제 생성 검증 로그 (개발자용)';
+
+-- =============================================
 -- 성능 최적화 설정
 -- =============================================
 SET GLOBAL innodb_buffer_pool_size = 1073741824;
