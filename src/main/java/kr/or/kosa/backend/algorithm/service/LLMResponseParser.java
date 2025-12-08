@@ -74,6 +74,19 @@ public class LLMResponseParser {
             String naiveCode = getText(root, "naiveCode");
             String expectedTimeComplexity = getText(root, "expectedTimeComplexity");
 
+            // 검증 코드 파싱 결과 로그 (디버그용)
+            log.info("검증 코드 파싱 - optimalCode: {}, naiveCode: {}, timeComplexity: {}",
+                    optimalCode != null ? optimalCode.length() + "자" : "null",
+                    naiveCode != null ? naiveCode.length() + "자" : "null",
+                    expectedTimeComplexity);
+
+            // 검증 코드가 없는 경우 JSON 필드 존재 여부 추가 확인
+            if (optimalCode == null && naiveCode == null) {
+                log.warn("검증 코드 필드 없음 - JSON에 optimalCode 키 존재: {}, naiveCode 키 존재: {}",
+                        root.has("optimalCode"),
+                        root.has("naiveCode"));
+            }
+
             log.info("JSON 파싱 완료 - 제목: {}, 테스트케이스: {}개",
                     problem.getAlgoProblemTitle(), testCases.size());
 
@@ -111,7 +124,12 @@ public class LLMResponseParser {
         }
 
         // Python 코드 표현식이 포함된 테스트케이스 제거
+        String beforePythonRemoval = cleaned;
         cleaned = removePythonExpressions(cleaned);
+        if (!beforePythonRemoval.equals(cleaned)) {
+            log.warn("Python 표현식 제거로 JSON 변경됨 - 변경 전 길이: {}, 변경 후 길이: {}",
+                    beforePythonRemoval.length(), cleaned.length());
+        }
         log.debug("Python 표현식 제거 후 (처음 300자): {}",
                 cleaned.length() > 300 ? cleaned.substring(0, 300) + "..." : cleaned);
 

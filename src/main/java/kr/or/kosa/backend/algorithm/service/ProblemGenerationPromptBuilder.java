@@ -142,13 +142,15 @@ public class ProblemGenerationPromptBuilder {
                 }
                 ```
 
-                **중요:**
+                **중요 (필수 사항):**
                 - JSON만 출력하고 다른 설명은 절대 포함하지 마세요.
+                - **optimalCode와 naiveCode는 반드시 포함해야 합니다! 이 두 필드는 필수입니다.**
                 - optimalCode와 naiveCode는 완전한 Python 코드여야 합니다 (입력 받기부터 출력까지).
                 - 코드는 반드시 실행 가능해야 합니다. 함수를 정의했다면 마지막에 반드시 호출하세요!
                 - 올바른 예시: def solve(): ...코드... \\n\\nsolve()  (마지막에 solve() 호출)
                 - 잘못된 예시: def solve(): ...코드...  (함수 정의만 하고 호출 안함)
                 - testCases의 input/output은 실제 프로그램 입출력 형식과 일치해야 합니다.
+                - expectedTimeComplexity도 반드시 포함하세요.
 
                 **JSON 형식 필수 규칙:**
                 - 모든 문자열 값은 하나의 연속된 문자열이어야 합니다.

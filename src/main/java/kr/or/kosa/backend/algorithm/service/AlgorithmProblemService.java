@@ -322,8 +322,11 @@ public class AlgorithmProblemService {
                 saveTestcases(problem.getAlgoProblemId(), responseDto.getTestCases());
             }
 
-            // 4. 검증 로그 저장
-            if (responseDto.getValidationResults() != null && !responseDto.getValidationResults().isEmpty()) {
+            // 4. 검증 로그 저장 (검증 결과가 있거나 검증 코드가 있는 경우)
+            boolean hasValidationResults = responseDto.getValidationResults() != null && !responseDto.getValidationResults().isEmpty();
+            boolean hasValidationCode = responseDto.getOptimalCode() != null || responseDto.getNaiveCode() != null;
+
+            if (hasValidationResults || hasValidationCode) {
                 saveValidationLog(problem.getAlgoProblemId(), responseDto);
             }
 
@@ -377,11 +380,8 @@ public class AlgorithmProblemService {
         try {
             List<ValidationResultDto> validationResults = responseDto.getValidationResults();
 
-            // 검증 결과 분석
-            boolean allPassed = validationResults.stream().allMatch(ValidationResultDto::isPassed);
-            String validationStatus = allPassed ? "PASSED" : "FAILED";
-
-            // 메타데이터에서 유사도 점수 추출
+            // 검증 결과 분석 (null-safe)
+            String validationStatus;
             Double similarityScore = null;
             Boolean similarityValid = null;
             Integer optimalExecutionTime = null;
@@ -390,38 +390,50 @@ public class AlgorithmProblemService {
             Boolean timeRatioValid = null;
             String optimalCodeResult = null;
             String naiveCodeResult = null;
+            String failureReasons = null;
 
-            for (ValidationResultDto result : validationResults) {
-                Map<String, Object> metadata = result.getMetadata();
+            if (validationResults != null && !validationResults.isEmpty()) {
+                // 검증 결과가 있는 경우
+                boolean allPassed = validationResults.stream().allMatch(ValidationResultDto::isPassed);
+                validationStatus = allPassed ? "PASSED" : "FAILED";
 
-                if ("SimilarityChecker".equals(result.getValidatorName())) {
-                    if (metadata.containsKey("maxSimilarity")) {
-                        similarityScore = ((Number) metadata.get("maxSimilarity")).doubleValue();
+                // 메타데이터에서 유사도 점수 추출
+                for (ValidationResultDto result : validationResults) {
+                    Map<String, Object> metadata = result.getMetadata();
+
+                    if ("SimilarityChecker".equals(result.getValidatorName())) {
+                        if (metadata != null && metadata.containsKey("maxSimilarity")) {
+                            similarityScore = ((Number) metadata.get("maxSimilarity")).doubleValue();
+                        }
+                        similarityValid = result.isPassed();
                     }
-                    similarityValid = result.isPassed();
+
+                    if ("CodeExecutionValidator".equals(result.getValidatorName())) {
+                        if (metadata != null && metadata.containsKey("optimalExecutionTime")) {
+                            optimalExecutionTime = ((Number) metadata.get("optimalExecutionTime")).intValue();
+                        }
+                        optimalCodeResult = result.isPassed() ? "PASS" : "FAIL";
+                    }
+
+                    if ("TimeRatioValidator".equals(result.getValidatorName())) {
+                        if (metadata != null && metadata.containsKey("naiveExecutionTime")) {
+                            naiveExecutionTime = ((Number) metadata.get("naiveExecutionTime")).intValue();
+                        }
+                        if (metadata != null && metadata.containsKey("timeRatio")) {
+                            timeRatio = ((Number) metadata.get("timeRatio")).doubleValue();
+                        }
+                        timeRatioValid = result.isPassed();
+                        naiveCodeResult = result.isPassed() ? "PASS" : "FAIL";
+                    }
                 }
 
-                if ("CodeExecutionValidator".equals(result.getValidatorName())) {
-                    if (metadata.containsKey("optimalExecutionTime")) {
-                        optimalExecutionTime = ((Number) metadata.get("optimalExecutionTime")).intValue();
-                    }
-                    optimalCodeResult = result.isPassed() ? "PASS" : "FAIL";
-                }
-
-                if ("TimeRatioValidator".equals(result.getValidatorName())) {
-                    if (metadata.containsKey("naiveExecutionTime")) {
-                        naiveExecutionTime = ((Number) metadata.get("naiveExecutionTime")).intValue();
-                    }
-                    if (metadata.containsKey("timeRatio")) {
-                        timeRatio = ((Number) metadata.get("timeRatio")).doubleValue();
-                    }
-                    timeRatioValid = result.isPassed();
-                    naiveCodeResult = result.isPassed() ? "PASS" : "FAIL";
-                }
+                // 실패 원인 수집 (JSON 형태)
+                failureReasons = collectFailureReasons(validationResults);
+            } else {
+                // 검증 결과 없이 코드만 있는 경우 (PENDING 상태로 저장)
+                validationStatus = "PENDING";
+                log.info("검증 결과 없음 - PENDING 상태로 저장 (문제 ID: {})", problemId);
             }
-
-            // 실패 원인 수집 (JSON 형태)
-            String failureReasons = collectFailureReasons(validationResults);
 
             // 검증 로그 DTO 생성
             ProblemValidationLogDto validationLog = ProblemValidationLogDto.builder()

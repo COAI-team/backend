@@ -112,6 +112,8 @@ public class AIProblemGeneratorService {
             return ProblemGenerationResponseDto.builder()
                     .problem(problem)
                     .testCases(testCases)
+                    .optimalCode(parsedData.optimalCode())
+                    .naiveCode(parsedData.naiveCode())
                     .generationTime(generationTime)
                     .generatedAt(LocalDateTime.now())
                     .status(ProblemGenerationResponseDto.GenerationStatus.SUCCESS)
@@ -215,9 +217,15 @@ public class AIProblemGeneratorService {
                     }
 
                     // 7단계: 검증 로그 저장 (검증 코드가 있는 경우)
+                    log.info("검증 로그 저장 조건 확인 - optimalCode: {}, naiveCode: {}",
+                            parsedData.optimalCode() != null ? "있음(" + parsedData.optimalCode().length() + "자)" : "null",
+                            parsedData.naiveCode() != null ? "있음(" + parsedData.naiveCode().length() + "자)" : "null");
+
                     if (parsedData.optimalCode() != null || parsedData.naiveCode() != null) {
                         emitStep(sink, "검증 로그 저장 중...");
                         saveValidationLog(problemId, parsedData);
+                    } else {
+                        log.warn("검증 코드가 없어 검증 로그를 저장하지 않습니다. 문제 ID: {}", problemId);
                     }
 
                     double generationTime = (System.currentTimeMillis() - startTime) / 1000.0;
