@@ -6,6 +6,7 @@ import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
 import java.util.Optional;
+import java.time.LocalDateTime;
 
 @Mapper
 public interface PaymentsMapper {
@@ -22,6 +23,11 @@ public interface PaymentsMapper {
     // 승인 시 상태/키/카드 정보 업데이트
     int updatePaymentStatus(Payments payments);
 
+    // 상태만 조건부 변경 (동시 승인 방지용)
+    int updatePaymentStatusIfMatch(@Param("orderId") String orderId,
+                                   @Param("fromStatus") String fromStatus,
+                                   @Param("toStatus") String toStatus);
+
     // 취소 시 상태/canceled_at 갱신
     int updatePaymentStatusToCanceled(@Param("orderId") String orderId,
                                       @Param("status") String status);
@@ -32,4 +38,9 @@ public interface PaymentsMapper {
     // 최근 결제 N건 (환불 남용 체크)
     List<Payments> findRecentPaymentsByUser(@Param("userId") Long userId,
                                             @Param("limit") int limit);
+
+    List<Payments> findPaymentsInRange(@Param("userId") Long userId,
+                                       @Param("from") LocalDateTime from,
+                                       @Param("to") LocalDateTime to,
+                                       @Param("status") String status);
 }

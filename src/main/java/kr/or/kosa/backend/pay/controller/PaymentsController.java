@@ -5,6 +5,7 @@ import kr.or.kosa.backend.pay.entity.Payments;
 import kr.or.kosa.backend.pay.entity.Subscription;
 import kr.or.kosa.backend.pay.service.PaymentsService;
 import kr.or.kosa.backend.security.jwt.JwtUserDetails;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -14,10 +15,11 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.time.LocalDate;
 
 @RestController
 @RequestMapping("/payments")
-@CrossOrigin(origins = "http://localhost:5173")
+@CrossOrigin(origins = {"http://localhost:5173", "https://localhost:5173"})
 public class PaymentsController {
 
     private final PaymentsService paymentsService;
@@ -41,7 +43,6 @@ public class PaymentsController {
      *   "amount": 34800
      * }
      */
-
     @PostMapping("/ready")
     public ResponseEntity<Object> createPaymentReady(@AuthenticationPrincipal JwtUserDetails user,
                                                      @RequestBody Payments payments) {
@@ -97,8 +98,13 @@ public class PaymentsController {
      *    - Toss 예제처럼 JSON body 로 { paymentKey, orderId, amount } 받음
      */
     @PostMapping("/confirm")
-    public ResponseEntity<Object> confirmPayment(@RequestBody Map<String, Object> request) {
+    public ResponseEntity<Object> confirmPayment(@AuthenticationPrincipal JwtUserDetails user,
+                                                 @RequestBody Map<String, Object> request) {
         try {
+            if (user == null) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of("code", "UNAUTHORIZED", "message", "로그인이 필요합니다."));
+            }
             String paymentKey = (String) request.get("paymentKey");
             String orderId = (String) request.get("orderId");
 
@@ -117,7 +123,7 @@ public class PaymentsController {
             }
 
             Payments confirmedPayment =
-                    paymentsService.confirmAndSavePayment(paymentKey, orderId, amount);
+                    paymentsService.confirmAndSavePayment(user.id(), paymentKey, orderId, amount);
             return ResponseEntity.ok(confirmedPayment);
 
         } catch (IllegalStateException | IllegalArgumentException e) {
@@ -169,6 +175,24 @@ public class PaymentsController {
         }
     }
 
+    /**
+     * 3-1. 결제/취소 내역 조회 (기간/상태 필터)
+     */
+    @GetMapping("/history")
+    public ResponseEntity<?> getPaymentHistory(
+            @AuthenticationPrincipal JwtUserDetails user,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) String status
+    ) {
+        if (user == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("code", "UNAUTHORIZED", "message", "로그인이 필요합니다."));
+        }
+        List<Payments> history = paymentsService.getPaymentHistory(user.id(), from, to, status);
+        return ResponseEntity.ok(history);
+    }
+
 
     /**
      * 4. 결제 취소(환불)
@@ -176,11 +200,16 @@ public class PaymentsController {
      */
     @PostMapping("/cancel")
     public ResponseEntity<Object> cancelPayment(
+            @AuthenticationPrincipal JwtUserDetails user,
             @RequestParam String paymentKey,
             @RequestParam String cancelReason) {
 
         try {
-            Payments canceledPayment = paymentsService.cancelPayment(paymentKey, cancelReason);
+            if (user == null) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of("code", "UNAUTHORIZED", "message", "로그인이 필요합니다."));
+            }
+            Payments canceledPayment = paymentsService.cancelPayment(user.id(), paymentKey, cancelReason);
             return ResponseEntity.ok(canceledPayment);
 
         } catch (IllegalStateException | IllegalArgumentException e) {

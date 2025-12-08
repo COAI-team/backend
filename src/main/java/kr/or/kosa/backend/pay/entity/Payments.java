@@ -59,4 +59,9 @@ public class Payments {
     private String cardCompany;        // 예: "KB", "HYUNDAI" 등 (issuerCode 기준)
     private String cardApprovalNo;     // approveNo
     private LocalDateTime approvedAt;  // 승인 시각
+
+    // 구독 정보 (조인 전용 필드)
+    private String subscriptionStatus;      // ACTIVE / EXPIRED / CANCELED 등
+    private LocalDateTime subscriptionStartAt;
+    private LocalDateTime subscriptionEndAt;
 }

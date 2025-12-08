@@ -8,6 +8,7 @@ import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.client.HttpServerErrorException;
 
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
@@ -94,6 +95,15 @@ public class TossPaymentsClient {
 
         } catch (HttpClientErrorException e) {
             throw new IllegalStateException("토스페이먼츠 승인 거부: " + e.getResponseBodyAsString(), e);
+        } catch (HttpServerErrorException e) {
+            String responseBody = e.getResponseBodyAsString();
+            if (responseBody != null &&
+                    (responseBody.contains("FAILED_PAYMENT_INTERNAL_SYSTEM_PROCESSING")
+                            || responseBody.contains("S008")
+                            || responseBody.contains("기존 요청"))) {
+                throw new IllegalStateException("결제 승인 처리 중입니다. 잠시 후 다시 시도해 주세요.", e);
+            }
+            throw new RuntimeException("토스페이먼츠 승인 중 서버 오류가 발생했습니다: " + e.getMessage(), e);
         } catch (Exception e) {
             throw new RuntimeException("결제 승인 중 알 수 없는 오류 발생: " + e.getMessage(), e);
         }
