@@ -1,5 +1,6 @@
 package kr.or.kosa.backend.users.service;
 
+import kr.or.kosa.backend.auth.github.dto.GithubLoginResult;
 import kr.or.kosa.backend.commons.exception.custom.CustomBusinessException;
 import kr.or.kosa.backend.infra.s3.S3Uploader;
 import kr.or.kosa.backend.security.jwt.JwtProvider;
@@ -19,6 +20,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -38,6 +40,30 @@ public class UserServiceImpl implements UserService {
     private static final long REFRESH_TOKEN_EXPIRE_DAYS = 14;
     private static final String REFRESH_KEY_PREFIX = "auth:refresh:";
     private static final String BLACKLIST_KEY_PREFIX = "auth:blacklist:";
+    private static final String PROVIDER_GITHUB = "github";
+
+    private static final String KEY_ACCESS_TOKEN = "accessToken";
+    private static final String KEY_REFRESH_TOKEN = "refreshToken";
+
+
+    private Map<String, String> issueTokens(Users user) {
+
+        String accessToken = jwtProvider.createAccessToken(user.getUserId(), user.getUserEmail());
+        String refreshToken = jwtProvider.createRefreshToken(user.getUserId(), user.getUserEmail());
+
+        // Redis 저장
+        redisTemplate.opsForValue().set(
+                REFRESH_KEY_PREFIX + user.getUserId(),
+                refreshToken,
+                REFRESH_TOKEN_EXPIRE_DAYS,
+                TimeUnit.DAYS
+        );
+
+        return Map.of(
+                KEY_ACCESS_TOKEN, accessToken,
+                KEY_REFRESH_TOKEN, refreshToken
+        );
+    }
 
     // ---------------------------------------------------------
     // 회원가입
@@ -246,26 +272,6 @@ public class UserServiceImpl implements UserService {
     }
 
     // ---------------------------------------------------------
-    // 로그인 상태에서 비밀번호 변경
-    // ---------------------------------------------------------
-    @Override
-    public boolean updatePassword(Long userId, PasswordUpdateRequestDto dto) {
-
-        Users users = userMapper.findById(userId);
-        if (users == null) {
-            throw new CustomBusinessException(UserErrorCode.USER_NOT_FOUND);
-        }
-
-        // 🔥 수정된 부분 — DTO 필드명에 맞게 변경
-        if (!passwordEncoder.matches(dto.getCurrentUserPw(), users.getUserPw())) {
-            return false;
-        }
-
-        int result = userMapper.updatePassword(userId, passwordEncoder.encode(dto.getNewUserPw()));
-        return result > 0;
-    }
-
-    // ---------------------------------------------------------
     // 사용자 정보 수정
     // ---------------------------------------------------------
     @Override
@@ -401,68 +407,167 @@ public class UserServiceImpl implements UserService {
         return result > 0;
     }
 
+    @Override
+    public GithubLoginResult githubLogin(GitHubUserResponse gitHubUser, boolean linkMode) {
+
+        String providerId = String.valueOf(gitHubUser.getId());
+        String email = gitHubUser.getEmail();
+
+        // 1) link 모드일 경우 계정 생성 X, 토큰 발급 X
+        if (linkMode) {
+            return GithubLoginResult.builder()
+                    .user(null)
+                    .needLink(false)
+                    .accessToken(null)
+                    .refreshToken(null)
+                    .build();
+        }
+
+        // 2) 이미 GitHub provider 연동된 계정 → 바로 로그인
+        Users linkedUser = userMapper.findBySocialProvider(PROVIDER_GITHUB, providerId);
+        if (linkedUser != null) {
+
+            Map<String, String> tokens = issueTokens(linkedUser);
+
+            return GithubLoginResult.builder()
+                    .user(linkedUser)
+                    .needLink(false)
+                    .accessToken(tokens.get(KEY_ACCESS_TOKEN))
+                    .refreshToken(tokens.get(KEY_REFRESH_TOKEN))
+                    .build();
+        }
+
+        // 3) 이메일로 기존 일반 계정이 존재 → 연동 필요
+        Users existingUser = userMapper.findByEmail(email);
+        if (existingUser != null) {
+
+            // 기존 계정 자동 로그인 처리 (토큰 발급)
+            Map<String, String> tokens = issueTokens(existingUser);
+
+            return GithubLoginResult.builder()
+                    .user(existingUser)
+                    .needLink(true)
+                    .accessToken(tokens.get(KEY_ACCESS_TOKEN))
+                    .refreshToken(tokens.get(KEY_REFRESH_TOKEN))
+                    .build();
+        }
+
+        // 4) 신규 GitHub 계정 생성
+        Users newUser = createNewGithubUser(gitHubUser);
+        Map<String, String> tokens = issueTokens(newUser);
+
+        return GithubLoginResult.builder()
+                .user(newUser)
+                .needLink(false)
+                .accessToken(tokens.get(KEY_ACCESS_TOKEN))
+                .refreshToken(tokens.get(KEY_REFRESH_TOKEN))
+                .build();
+    }
+
     // ---------------------------------------------------------
-    // GitHub 로그인 (회원 생성만 담당)
-    // JWT 발급은 Controller에서 처리하는 것이 정석
+    // GitHub 연동 해제
     // ---------------------------------------------------------
     @Override
-    public Users githubLogin(GitHubUserResponse gitHubUser) {
+    public boolean disconnectGithub(Long userId) {
 
-        String provider = "github";
-        String providerId = String.valueOf(gitHubUser.getId());
-        String email = gitHubUser.getEmail();  // null 가능
-
-        // -----------------------------------------------------
-        // 1) 이미 SOCIALLOGIN에 연동된 경우 → 바로 로그인
-        // -----------------------------------------------------
-        Users linkedUser = userMapper.findBySocialProvider(provider, providerId);
-        if (linkedUser != null) {
-            return linkedUser;
+        Users user = userMapper.findById(userId);
+        if (user == null) {
+            throw new CustomBusinessException(UserErrorCode.USER_NOT_FOUND);
         }
 
-        // -----------------------------------------------------
-        // 2) 기존 유저가 존재하면 자동 연동 후 로그인
-        // -----------------------------------------------------
-        if (email != null) {
-            Users existingUser = userMapper.findByEmail(email);
-            if (existingUser != null) {
+        // GitHub provider 정보 삭제
+        int result = userMapper.deleteSocialAccount(userId, PROVIDER_GITHUB);
 
-                // 자동 연동
-                userMapper.insertSocialAccount(
-                        existingUser.getUserId(),
-                        provider,
-                        providerId,
-                        email
-                );
+        return result > 0;
+    }
 
-                return existingUser;
-            }
-        }
+    // ---------------------------------------------------------
+    // GitHub 연동 여부 확인
+    // ---------------------------------------------------------
+    @Override
+    public boolean isGithubLinked(Long userId) {
 
-        // -----------------------------------------------------
-        // 3) 기존 유저도 없으면 → 신규 Users 자동 생성
-        // -----------------------------------------------------
+        // 소셜 로그인 추가 여부 확인 (userMapper 필요)
+        Integer count = userMapper.countSocialAccount(userId, PROVIDER_GITHUB);
+
+        return count != null && count > 0;
+    }
+
+    // ---------------------------------------------------------
+    // GitHub 연동 정보 조회
+    // ---------------------------------------------------------
+    @Override
+    public Map<String, Object> getGithubUserInfo(Long userId) {
+        return userMapper.getGithubUserInfo(userId);
+    }
+
+    // ---------------------------------------------------------
+    // GitHub 신규 계정 생성 (provider 충돌 시 사용)
+    // ---------------------------------------------------------
+    private Users createNewGithubUser(GitHubUserResponse gitHubUser) {
+
+        Long githubId = gitHubUser.getId();
+        String providerId = String.valueOf(githubId);
+        String email = gitHubUser.getEmail();
+
         String randomPassword = UUID.randomUUID().toString();
+
         Users newUser = new Users();
+
         newUser.setUserEmail(email != null ? email : "github-" + providerId + "@noemail.com");
         newUser.setUserName(gitHubUser.getName());
         newUser.setUserNickname(gitHubUser.getLogin());
-        newUser.setUserImage(gitHubUser.getAvatar_url());
+        newUser.setUserImage(gitHubUser.getAvatarUrl());
+
         newUser.setUserPw(passwordEncoder.encode(randomPassword));
         newUser.setUserRole("ROLE_USER");
         newUser.setUserEnabled(true);
 
-        // Users INSERT
         userMapper.insertUser(newUser);
 
-        // SOCIALLOGIN INSERT
+        // SOCIAL_LOGIN 테이블 insert
         userMapper.insertSocialAccount(
                 newUser.getUserId(),
-                provider,
+                PROVIDER_GITHUB,
                 providerId,
                 email
         );
 
         return newUser;
+    }
+
+    @Override
+    public boolean linkGithubAccount(Long currentUserId, GitHubUserResponse gitHubUser) {
+
+        log.info("[GitHub 연동] gitHubUser 전체: {}", gitHubUser);
+
+        String providerId = String.valueOf(gitHubUser.getId());
+
+        // 1) 이미 다른 사용자와 연결된 경우
+        Users existingLinkedUser = userMapper.findBySocialProvider(PROVIDER_GITHUB, providerId);
+        if (existingLinkedUser != null && !existingLinkedUser.getUserId().equals(currentUserId)) {
+            throw new CustomBusinessException(UserErrorCode.SOCIAL_ALREADY_LINKED);
+        }
+
+        // 2) 이미 본인 계정에 연결된 경우 → true 반환
+        if (existingLinkedUser != null) {
+            return true;
+        }
+
+        // 3) 이메일 체크 + 임시 이메일 생성
+        String email = gitHubUser.getEmail();
+        if (email == null || email.isBlank()) {
+            email = gitHubUser.getLogin() + "@github-user.com";
+        }
+
+        // 4) 신규 연동 저장
+        userMapper.insertSocialAccount(
+                currentUserId,
+                PROVIDER_GITHUB,
+                providerId,
+                email
+        );
+
+        return true;
     }
 }
