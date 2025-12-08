@@ -1,6 +1,7 @@
 package kr.or.kosa.backend.pay.controller;
 
 import kr.or.kosa.backend.pay.entity.UserPoint;
+import kr.or.kosa.backend.pay.entity.PointHistory;
 import kr.or.kosa.backend.pay.repository.PointMapper;
 import kr.or.kosa.backend.security.jwt.JwtUserDetails;
 import lombok.RequiredArgsConstructor;
@@ -10,12 +11,13 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.HashMap;
 import java.util.Map;
 
 @RestController
 @RequestMapping("/users")
-@CrossOrigin(origins = "http://localhost:5173")
+@CrossOrigin(origins = {"http://localhost:5173", "https://localhost:5173"})
 @RequiredArgsConstructor
 public class UserPointController {
 
@@ -42,9 +44,12 @@ public class UserPointController {
                         .balance(BigDecimal.ZERO)
                         .build());
 
+        List<PointHistory> histories = pointMapper.findPointHistoryByUserId(finalUserId);
+
         Map<String, Object> body = new HashMap<>();
         body.put("userId", finalUserId);
         body.put("points", userPoint.getBalance());
+        body.put("history", histories);
         return ResponseEntity.ok(body);
     }
 }

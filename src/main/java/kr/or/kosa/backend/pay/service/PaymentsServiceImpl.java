@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -51,10 +52,10 @@ public class PaymentsServiceImpl implements PaymentsService {
         // 1) 금액/포인트 정규화 + 유효성 검사 + 포인트 잔액 검증
         boolean pointOnly = normalizeAmountsAndValidate(payments, userId);
 
-        // 2) DB ?? (idempotent)
+        // 2) DB 저장 (idempotent)
         Payments persisted = upsertPayment(payments);
 
-        // ??? ?? ??? ???? ?? ??
+        // 포인트 전액 결제라면 추가 처리
         if (pointOnly) {
             handlePointOnlyFlow(userId, persisted);
         }
@@ -76,14 +77,22 @@ public class PaymentsServiceImpl implements PaymentsService {
 
     @Override
     @Transactional
-    public Payments confirmAndSavePayment(String paymentKey, String orderId, Long amount) {
+    public Payments confirmAndSavePayment(Long userId, String paymentKey, String orderId, Long amount) {
 
         Payments existingPayment = paymentsMapper.findPaymentByOrderId(orderId)
                 .orElseThrow(() -> new IllegalArgumentException("주문 정보를 찾을 수 없습니다."));
 
+        if (existingPayment.getUserId() == null || !existingPayment.getUserId().equals(userId)) {
+            throw new IllegalStateException("본인 결제가 아니어서 승인할 수 없습니다.");
+        }
+
         // 이미 DONE이면 그대로 반환 (멱등성)
         if ("DONE".equals(existingPayment.getStatus())) {
             return existingPayment;
+        }
+
+        if ("PROCESSING".equals(existingPayment.getStatus())) {
+            throw new IllegalStateException("해당 주문은 승인 요청 처리 중입니다. 잠시 후 다시 시도해주세요.");
         }
 
         if (!"READY".equals(existingPayment.getStatus())) {
@@ -100,9 +109,29 @@ public class PaymentsServiceImpl implements PaymentsService {
             throw new IllegalStateException("요청 금액이 서버에 저장된 금액과 일치하지 않습니다.");
         }
 
-        // 토스 승인 API 호출 (외부 클라이언트에 위임)
-        TossConfirmResult tossResult =
-                tossPaymentsClient.confirmPayment(paymentKey, orderId, amount);
+        // 승인 처리 중 상태 전환 (READY → PROCESSING)
+        int locked = paymentsMapper.updatePaymentStatusIfMatch(orderId, "READY", "PROCESSING");
+        if (locked == 0) {
+            Payments current = paymentsMapper.findPaymentByOrderId(orderId)
+                    .orElseThrow(() -> new IllegalStateException("주문 정보가 즉시 조회되지 않습니다."));
+            String currentStatus = current.getStatus();
+            if ("DONE".equalsIgnoreCase(currentStatus)) {
+                return current;
+            }
+            if ("PROCESSING".equalsIgnoreCase(currentStatus)) {
+                throw new IllegalStateException("결제 승인 중입니다. 잠시 후 다시 시도해주세요.");
+            }
+            throw new IllegalStateException("결제 승인 진행 중이거나 상태가 변경되었습니다. 잠시 후 다시 시도해주세요.");
+        }
+
+        TossConfirmResult tossResult;
+        try {
+            tossResult = tossPaymentsClient.confirmPayment(paymentKey, orderId, amount);
+        } catch (Exception e) {
+            // 실패 시 PROCESSING → READY 롤백
+            paymentsMapper.updatePaymentStatusIfMatch(orderId, "PROCESSING", "READY");
+            throw e;
+        }
 
         Payments confirmedPayment = Payments.builder()
                 .paymentKey(paymentKey)
@@ -118,7 +147,6 @@ public class PaymentsServiceImpl implements PaymentsService {
         paymentsMapper.updatePaymentStatus(confirmedPayment);
 
         // 포인트 실제 차감
-        Long userId = existingPayment.getUserId();
         BigDecimal usedPoint = nvl(existingPayment.getUsedPoint());
         if (userId != null && usedPoint.compareTo(BigDecimal.ZERO) > 0) {
             pointService.usePoint(userId, usedPoint, orderId);
@@ -139,11 +167,15 @@ public class PaymentsServiceImpl implements PaymentsService {
 
     @Override
     @Transactional
-    public Payments cancelPayment(String paymentKey, String cancelReason) {
+    public Payments cancelPayment(Long userId, String paymentKey, String cancelReason) {
 
         Payments paymentToCancel = paymentsMapper.findPaymentByPaymentKey(paymentKey)
                 .orElseThrow(() ->
                         new IllegalArgumentException("취소할 결제 정보를 찾을 수 없습니다."));
+
+        if (paymentToCancel.getUserId() == null || !paymentToCancel.getUserId().equals(userId)) {
+            throw new IllegalStateException("본인 결제가 아니어서 취소할 수 없습니다.");
+        }
 
         if ("CANCELED".equals(paymentToCancel.getStatus())) {
             throw new IllegalStateException("이미 취소된 결제입니다.");
@@ -154,16 +186,16 @@ public class PaymentsServiceImpl implements PaymentsService {
                     "결제 완료 상태에서만 환불할 수 있습니다. (현재 상태: " + paymentToCancel.getStatus() + ")");
         }
 
-        // ?? ?? ?? 7? ??? ?? ?? (??? READY ???? ??)
+        // 승인 후 7일 이내만 환불 (READY 시점도 백업)
         LocalDateTime approvalTime = paymentToCancel.getApprovedAt();
         if (approvalTime == null) {
             approvalTime = paymentToCancel.getRequestedAt();
         }
         if (approvalTime == null) {
-            throw new IllegalStateException("?? ?? ??? ?? ? ????.");
+            throw new IllegalStateException("승인 시각이 없어 환불할 수 없습니다.");
         }
         if (approvalTime.isBefore(LocalDateTime.now().minusDays(7))) {
-            throw new IllegalArgumentException("?? ? 7?? ?? ??? ??????.");
+            throw new IllegalArgumentException("승인 후 7일이 지나 환불할 수 없습니다.");
         }
 
         // 토스 취소 API 호출
@@ -172,9 +204,8 @@ public class PaymentsServiceImpl implements PaymentsService {
         paymentsMapper.updatePaymentStatusToCanceled(paymentToCancel.getOrderId(), newStatus);
         subscriptionDomainService.cancelSubscriptionByOrderId(paymentToCancel.getOrderId());
 
-        Long userId = paymentToCancel.getUserId();
         BigDecimal usedPoint = nvl(paymentToCancel.getUsedPoint());
-        if (userId != null && usedPoint.compareTo(BigDecimal.ZERO) > 0) {
+        if (usedPoint.compareTo(BigDecimal.ZERO) > 0) {
             pointService.refundPoint(userId, usedPoint, paymentToCancel.getOrderId(), cancelReason);
         }
 
@@ -182,15 +213,24 @@ public class PaymentsServiceImpl implements PaymentsService {
                 .orElse(paymentToCancel);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public List<Payments> getPaymentHistory(Long userId, LocalDate from, LocalDate to, String status) {
+        LocalDateTime fromDt = (from != null) ? from.atStartOfDay() : null;
+        LocalDateTime toDt = (to != null) ? to.plusDays(1).atStartOfDay() : null;
+        String normalizedStatus = (status == null || status.isBlank()) ? null : status.toUpperCase();
+        return paymentsMapper.findPaymentsInRange(userId, fromDt, toDt, normalizedStatus);
+    }
+
     // ================== 역할별 private 메소드 ==================
 
     private Long validateUserAndInitOrderId(Payments payments) {
         Long userId = payments.getUserId();
         if (userId == null) {
-            throw new IllegalArgumentException("??? ????? userId? ?????.");
+            throw new IllegalArgumentException("필수 파라미터 userId가 없습니다.");
         }
 
-        // orderId ??? ???? ??
+        // orderId 없으면 생성
         if (payments.getOrderId() == null || payments.getOrderId().isBlank()) {
             String newOrderId = "ORD-" + System.currentTimeMillis()
                     + "-" + UUID.randomUUID().toString().substring(0, 8);
@@ -199,16 +239,14 @@ public class PaymentsServiceImpl implements PaymentsService {
         return userId;
     }
 
-
     /**
      * 금액/포인트 정규화 + 유효성 검사 + 포인트 잔액 검증
      */
-
     private boolean normalizeAmountsAndValidate(Payments payments, Long userId) {
 
-        BigDecimal clientAmount   = nvl(payments.getAmount());          // ????? ??? ?? ?? ??
-        BigDecimal originalAmount = nvl(payments.getOriginalAmount());  // ?? ?? ??
-        BigDecimal usedPoint      = nvl(payments.getUsedPoint());       // ??? ???
+        BigDecimal clientAmount   = nvl(payments.getAmount());          // 클라이언트 전달 최종금액
+        BigDecimal originalAmount = nvl(payments.getOriginalAmount());  // 플랜 정가/추가금
+        BigDecimal usedPoint      = nvl(payments.getUsedPoint());       // 사용 포인트
 
         BigDecimal serverPrice =
                 subscriptionDomainService.getMonthlyPrice(payments.getPlanCode());
@@ -222,7 +260,7 @@ public class PaymentsServiceImpl implements PaymentsService {
                 payments, originalAmount, clientAmount, usedPoint, serverPrice
         );
 
-        // 사용 포인트가 원금보다 크면 원금까지만 사용하도록 서버에서 보정
+        // 사용 포인트가 정가보다 크면 정가까지만 사용하도록 보정
         if (usedPoint.compareTo(originalAmount) > 0) {
             usedPoint = originalAmount;
         }
@@ -231,17 +269,20 @@ public class PaymentsServiceImpl implements PaymentsService {
 
         BigDecimal expectedAmount = originalAmount.subtract(usedPoint);
         if (expectedAmount.compareTo(BigDecimal.ZERO) < 0) {
-            throw new IllegalArgumentException("?? ?? ??? 0 ??? ? ????.");
+            throw new IllegalArgumentException("결제 금액이 0보다 작을 수 없습니다.");
         }
 
         boolean pointOnly = expectedAmount.compareTo(BigDecimal.ZERO) == 0;
+        if (pointOnly && usedPoint.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("포인트 전액 결제 시 사용 포인트는 0보다 커야 합니다.");
+        }
 
         if (!pointOnly) {
             if (clientAmount.compareTo(BigDecimal.ZERO) <= 0) {
-                throw new IllegalArgumentException("?? ??? ???? ????.");
+                throw new IllegalArgumentException("결제 금액이 올바르지 않습니다.");
             }
             if (clientAmount.compareTo(expectedAmount) != 0) {
-                throw new IllegalArgumentException("??? ?? ??? ??? ?? ??? ???? ????.");
+                throw new IllegalArgumentException("요청 금액이 서버 금액과 일치하지 않습니다.");
             }
         }
 
@@ -258,7 +299,6 @@ public class PaymentsServiceImpl implements PaymentsService {
 
         return pointOnly;
     }
-
 
     private BigDecimal getUpgradeExtraAmountIfApplicable(Long userId, String planCode) {
         if (planCode == null || userId == null) {
@@ -277,7 +317,7 @@ public class PaymentsServiceImpl implements PaymentsService {
                 return quote.getExtraAmount();
             }
         } catch (Exception e) {
-            System.err.println("upgrade quote ?? ??: " + e.getMessage());
+            System.err.println("upgrade quote 조회 실패: " + e.getMessage());
         }
 
         return null;

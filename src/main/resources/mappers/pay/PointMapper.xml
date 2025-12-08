@@ -87,4 +87,20 @@
         )
     </insert>
 
+    <!-- 포인트 내역 조회 -->
+    <select id="findPointHistoryByUserId"
+            resultMap="PointHistoryResultMap">
+        SELECT
+            id,
+            user_id,
+            change_amount,
+            type,
+            payment_order_id,
+            description,
+            created_at
+        FROM point_history
+        WHERE user_id = #{userId}
+        ORDER BY created_at DESC, id DESC
+    </select>
+
 </mapper>

@@ -151,6 +151,9 @@ public class UserController {
     public ResponseEntity<UserResponseDto> getMyInfo(
             @AuthenticationPrincipal JwtUserDetails user
     ) {
+        if (user == null) {
+            return ResponseEntity.status(401).build();
+        }
         UserResponseDto dto = userService.getUserInfo(user.id());
         return ResponseEntity.ok(dto);
     }
