@@ -3,7 +3,7 @@
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
-<mapper namespace="kr.or.kosa.backend.admin.mapper.AdminMapper">
+<mapper namespace="kr.or.kosa.backend.admin.mapper.AdminUserMapper">
 
 <!--                 유저 검색                -->
     <resultMap id="findCondition"
@@ -80,7 +80,7 @@
         <result column="end_date"   property="userSubscribeEnd"/>
     </resultMap>
 
-    <select id="findOneUserByUseerId" resultType="kr.or.kosa.backend.admin.dto.response.AdminUserDetailResponseDto">
+    <select id="findOneUserByUserId" resultType="kr.or.kosa.backend.admin.dto.response.AdminUserDetailResponseDto">
         SELECT
         u.USER_ID,
         u.USER_EMAIL,
@@ -109,9 +109,18 @@
     </select>
 
 
-<!--    <select id="">-->
-<!--        select user_id, plan_code, amount, approved_at from payments-->
-<!--        where user_id = #{userId} and status = 'DONE'-->
-<!--    </select>-->
+    <select id="findOneUserPaymentDetailByUserId" resultType="kr.or.kosa.backend.admin.dto.UserPaymentDetailDto">
+        SELECT
+        order_id, user_id, plan_code, payment_key,original_amount, used_point, amount, approved_at
+        FROM payments
+        WHERE user_id = 102 AND status = 'DONE'
+        ORDER BY approved_at DESC
+        LIMIT 1
+    </select>
+
+    <select id="checkUsedPoint" resultType="boolean">
+        select COUNT(*) > 0 from point_history ph
+        where user_id = #{userId} and ph.payment_order_id = #{orderId} and change_amount = #{usedPoint}
+    </select>
 
 </mapper>

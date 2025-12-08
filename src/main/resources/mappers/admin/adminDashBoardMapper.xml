@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="kr.or.kosa.backend.admin.mapper.AdminUserMapper">
+
+    <!--                 유저 검색                -->
+    <resultMap id="findCondition"
+               type="kr.or.kosa.backend.admin.dto.response.UserFindResponseDto">
+        <id     column="USER_ID"            property="userId"/>
+        <result column="USER_EMAIL"         property="userEmail"/>
+        <result column="USER_NICKNAME"      property="userNickName"/>
+        <result column="USER_GRADE"         property="userGrade"/>
+        <result column="USER_ROLE"          property="userRole"/>
+    </resultMap>
+
+    <select id="findCondition"
+            resultMap="findCondition">
+        SELECT USER_ID, USER_EMAIL, USER_NICKNAME, USER_GRADE, USER_ROLE
+        FROM USERS
+        <where>
+            <choose>
+                <when test="filter instanceof java.lang.Integer">
+                    USER_ISDELETED = #{filter}
+                </when>
+                <when test="filter instanceof java.lang.String and filter != ''">
+                    USER_ROLE = #{filter}
+                </when>
+            </choose>
+
+
+            <if test="userEmail != null and userEmail != ''">
+                AND USER_EMAIL LIKE CONCAT('%', #{userEmail}, '%')
+            </if>
+        </where>
+        ORDER BY ${sortField} ${sortOrder}
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+
+
+
+</mapper>

@@ -5,10 +5,8 @@ import kr.or.kosa.backend.admin.dto.response.AdminUserDetailResponseDto;
 import kr.or.kosa.backend.admin.dto.response.PageResponseDto;
 import kr.or.kosa.backend.admin.dto.response.UserFindResponseDto;
 
-public interface AdminService {
+public interface AdminUserService {
     PageResponseDto<UserFindResponseDto> findByCondotion(SearchConditionRequestDto req);
     AdminUserDetailResponseDto userDetail(long userId);
-    void subscribeCheck(long userId);
-
-
+    boolean subscribeCheck(long userId);
 }

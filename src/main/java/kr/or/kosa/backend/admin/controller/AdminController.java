@@ -4,7 +4,7 @@ import kr.or.kosa.backend.admin.dto.request.SearchConditionRequestDto;
 import kr.or.kosa.backend.admin.dto.response.AdminUserDetailResponseDto;
 import kr.or.kosa.backend.admin.dto.response.PageResponseDto;
 import kr.or.kosa.backend.admin.dto.response.UserFindResponseDto;
-import kr.or.kosa.backend.admin.service.AdminService;
+import kr.or.kosa.backend.admin.service.AdminUserService;
 import kr.or.kosa.backend.commons.response.ApiResponse;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -12,8 +12,8 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/admin")
 public class AdminController {
-    private final AdminService adminService;
-    public AdminController(AdminService adminService) {
+    private final AdminUserService adminService;
+    public AdminController(AdminUserService adminService) {
         this.adminService = adminService;
     }
 

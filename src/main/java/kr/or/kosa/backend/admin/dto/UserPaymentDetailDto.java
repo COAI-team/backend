@@ -3,9 +3,13 @@ package kr.or.kosa.backend.admin.dto;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
-public record MyPaymentDetailDto(
+public record UserPaymentDetailDto(
+    String order_id,
     long userId,
     String planCode,
+    String paymentKey,
+    BigDecimal originalAmount,
+    BigDecimal usedPoint,
     BigDecimal amount,
     LocalDateTime approvedAt
 ) {
