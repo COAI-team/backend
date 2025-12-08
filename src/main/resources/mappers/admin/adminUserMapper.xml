@@ -6,7 +6,7 @@
 <mapper namespace="kr.or.kosa.backend.admin.mapper.AdminUserMapper">
 
 <!--                 유저 검색                -->
-    <resultMap id="findCondition"
+    <resultMap id="findConditionMap"
                type="kr.or.kosa.backend.admin.dto.response.UserFindResponseDto">
         <id     column="USER_ID"            property="userId"/>
         <result column="USER_EMAIL"         property="userEmail"/>
@@ -16,7 +16,7 @@
     </resultMap>
 
     <select id="findCondition"
-            resultMap="findCondition">
+            resultMap="findConditionMap">
         SELECT USER_ID, USER_EMAIL, USER_NICKNAME, USER_GRADE, USER_ROLE
         FROM USERS
         <where>
@@ -29,8 +29,7 @@
                 </when>
             </choose>
 
-
-            <if test="userEmail != null and userEmail != ''">
+            <if test="userEmail != null &amp;&amp; userEmail != ''">
                 AND USER_EMAIL LIKE CONCAT('%', #{userEmail}, '%')
             </if>
         </where>

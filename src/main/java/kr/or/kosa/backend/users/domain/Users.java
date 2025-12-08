@@ -25,6 +25,7 @@ public class Users {
     private Boolean userEnabled;
     private Boolean userIssubscribed;
 
+    @Builder.Default
     private Boolean needLink = false;
 
     public UserResponseDto toDto() {

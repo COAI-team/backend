@@ -41,6 +41,7 @@ public class SecurityConfig {
                                 "/oauth2/**",
                                 "/users/**",
                                 "/email/**",
+                                "/chat/**",
                                 "/algo/**")
                         .permitAll()
                         .anyRequest().authenticated())
