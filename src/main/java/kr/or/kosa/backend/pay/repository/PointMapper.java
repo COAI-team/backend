@@ -6,6 +6,7 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Optional;
 
 @Mapper
@@ -28,4 +29,6 @@ public interface PointMapper {
                     @Param("refundPoint") BigDecimal refundPoint);
 
     int insertPointHistory(PointHistory history);
+
+    List<PointHistory> findPointHistoryByUserId(@Param("userId") Long userId);
 }

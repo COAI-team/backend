@@ -130,6 +130,9 @@ public class UserController {
     public ResponseEntity<UserResponseDto> getMyInfo(
             @AuthenticationPrincipal JwtUserDetails user
     ) {
+        if (user == null) {
+            return ResponseEntity.status(401).build();
+        }
         UserResponseDto dto = userService.getUserInfo(user.id());
         return ResponseEntity.ok(dto);
     }
@@ -191,7 +194,9 @@ public class UserController {
         ));
     }
 
-    /** GitHub 계정을 현재 사용자 계정에 연동 */
+    /**
+     * GitHub 계정을 현재 사용자 계정에 연동
+     */
     @PostMapping("/github/link")
     public ResponseEntity<Map<String, Object>> linkGithub(
             @AuthenticationPrincipal JwtUserDetails user,
