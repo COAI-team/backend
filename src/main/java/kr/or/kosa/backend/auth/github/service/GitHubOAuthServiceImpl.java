@@ -1,6 +1,8 @@
 package kr.or.kosa.backend.auth.github.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import kr.or.kosa.backend.auth.github.exception.GithubErrorCode;
+import kr.or.kosa.backend.commons.exception.custom.CustomBusinessException;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import kr.or.kosa.backend.auth.github.dto.GitHubUserResponse;
@@ -28,17 +30,18 @@ public class GitHubOAuthServiceImpl implements GitHubOAuthService {
     @Value("${github.client-secret}")
     private String clientSecret;
 
-    @Value("${github.redirect-uri}")
-    private String redirectUri;
-
+    /**
+     * 🔥 code로 Access Token + 프로필 정보 조회
+     */
     @Override
     public GitHubUserResponse getUserInfo(String code) {
-
         String accessToken = requestAccessToken(code);
-
         return requestGitHubUser(accessToken);
     }
 
+    /**
+     * 🔥 1) 인증 코드(code)로 Access Token 요청
+     */
     private String requestAccessToken(String code) {
 
         String url = "https://github.com/login/oauth/access_token";
@@ -47,12 +50,10 @@ public class GitHubOAuthServiceImpl implements GitHubOAuthService {
         headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
         headers.setAccept(List.of(MediaType.APPLICATION_JSON));
 
-        // ✔ GitHub OAuth는 반드시 Form 형태여야 함
         MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
         body.add("client_id", clientId);
         body.add("client_secret", clientSecret);
         body.add("code", code);
-        body.add("redirect_uri", redirectUri);
 
         HttpEntity<MultiValueMap<String, String>> entity = new HttpEntity<>(body, headers);
 
@@ -62,17 +63,30 @@ public class GitHubOAuthServiceImpl implements GitHubOAuthService {
                 entity,
                 JsonNode.class);
 
-        log.info("GitHub token response = {}", response.getBody());
+        JsonNode responseBody = response.getBody();
 
-        return response.getBody().get("access_token").asText();
+        if (responseBody == null) {
+            throw new CustomBusinessException(GithubErrorCode.TOKEN_RESPONSE_NULL);
+        }
+
+        JsonNode tokenNode = responseBody.get("access_token");
+
+        if (tokenNode == null) {
+            throw new CustomBusinessException(GithubErrorCode.TOKEN_MISSING);
+        }
+
+        return tokenNode.asText();
     }
 
+    /**
+     * 🔥 2) Access Token으로 GitHub 사용자 정보 조회
+     */
     private GitHubUserResponse requestGitHubUser(String accessToken) {
 
         String url = "https://api.github.com/user";
 
         HttpHeaders headers = new HttpHeaders();
-        headers.set("Authorization", "Bearer " + accessToken);
+        headers.set("Authorization", "token " + accessToken);
         headers.set("Accept", "application/json");
 
         HttpEntity<Void> entity = new HttpEntity<>(headers);

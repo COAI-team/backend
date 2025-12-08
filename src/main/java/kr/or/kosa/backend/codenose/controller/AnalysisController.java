@@ -17,59 +17,6 @@ public class AnalysisController {
 
   private final AnalysisService analysisService;
 
-  /**
-   * 기존 분석 엔드포인트 (코드를 직접 전달하는 방식)
-   * POST /api/analysis/analyze
-   * Body: { "code": "...", "analysisTypes": [...], "toneLevel": 3,
-   * "customRequirements": "...", "userId": 1 }
-   */
-  @PostMapping("/analyze")
-  public ResponseEntity<String> analyzeCode(@RequestBody AnalysisRequestDTO requestDto) {
-    System.out.println("[TRACE] AnalysisController.analyzeCode called with: " + requestDto);
-    // In a real app, you would get the userId from the security context
-    // For example:
-    // Long userId = ((UserDetails)
-    // SecurityContextHolder.getContext().getAuthentication().getPrincipal()).getId();
-    // requestDto.setUserId(userId);
-
-    // String result = analysisService.analyzeCode(requestDto); // Original call
-    String dummyResult = """
-        {
-          "aiScore": 75,
-          "codeSmells": [
-            {
-              "name": "Dummy Long Method",
-              "description": "This is a dummy code smell for a long method. Please implement the actual AI."
-            },
-            {
-              "name": "Dummy Magic Number",
-              "description": "This is a dummy code smell for a magic number. Authenticate users properly."
-            }
-          ],
-          "suggestions": [
-            {
-              "problematicSnippet": "Dummy problematic code",
-              "proposedReplacement": "Dummy suggested replacement"
-            }
-          ]
-        }
-        """;
-    return ResponseEntity.ok(dummyResult);
-  }
-
-  /**
-   * 저장된 파일을 분석하는 새로운 엔드포인트 (2단계: AI 분석)
-   * POST /api/analysis/analyze-stored
-   * Body: {
-   * "repositoryUrl": "https://github.com/user/repo",
-   * "filePath": "src/main/java/Example.java",
-   * "code": "실제 코드 내용...",
-   * "analysisTypes": ["code_smell", "design_pattern"],
-   * "toneLevel": 3,
-   * "customRequirements": "특정 패턴에 집중해주세요",
-   * "userId": 1
-   * }
-   */
   @PostMapping("/analyze-stored")
   public ResponseEntity<ApiResponse<String>> analyzeStoredFile(@RequestBody AnalysisRequestDTO requestDto) {
     System.out.println("[TRACE] AnalysisController.analyzeStoredFile called with: " + requestDto);

@@ -51,6 +51,23 @@
         </foreach>
     </select>
 
+    <select id="getGithubUserInfo" resultType="map">
+        SELECT
+            s.SOCIALLOGIN_PROVIDER_ID AS githubId,
+            u.USER_NICKNAME AS githubLogin,
+            u.USER_IMAGE AS avatarUrl
+        FROM SOCIALLOGIN s
+                 JOIN USERS u ON s.USER_ID = u.USER_ID
+        WHERE s.USER_ID = #{userId}
+          AND s.SOCIALLOGIN_PROVIDER = 'github'
+    </select>
+
+    <select id="findSocialProviderByUserId" resultType="string">
+        SELECT SOCIALLOGIN_PROVIDER
+        FROM SOCIALLOGIN
+        WHERE USER_ID = #{userId}
+        LIMIT 1
+    </select>
 
     <!-- ========= INSERT ========= -->
 
@@ -133,6 +150,19 @@
                      #{userId}, #{provider}, #{providerId}, #{userEmail}
                  )
     </insert>
+
+    <delete id="deleteSocialAccount">
+        DELETE FROM SOCIALLOGIN
+        WHERE USER_ID = #{userId}
+          AND SOCIALLOGIN_PROVIDER = #{provider}
+    </delete>
+
+    <select id="countSocialAccount" resultType="int">
+        SELECT COUNT(*)
+        FROM SOCIALLOGIN
+        WHERE USER_ID = #{userId}
+          AND SOCIALLOGIN_PROVIDER = #{provider}
+    </select>
 
     <!-- ========= 90일 뒤 자동 탈퇴 ========= -->
 

@@ -5,6 +5,7 @@ import dev.langchain4j.service.AiServices;
 import dev.langchain4j.service.SystemMessage;
 import dev.langchain4j.service.UserMessage;
 import dev.langchain4j.service.V;
+import kr.or.kosa.backend.codenose.service.PromptManager;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -15,11 +16,13 @@ public class AgenticWorkflowService {
     private final Generator generator;
     private final Critic critic;
     private final Refiner refiner;
+    private final PromptManager promptManager;
 
-    public AgenticWorkflowService(ChatLanguageModel chatLanguageModel) {
+    public AgenticWorkflowService(ChatLanguageModel chatLanguageModel, PromptManager promptManager) {
         this.generator = AiServices.create(Generator.class, chatLanguageModel);
         this.critic = AiServices.create(Critic.class, chatLanguageModel);
         this.refiner = AiServices.create(Refiner.class, chatLanguageModel);
+        this.promptManager = promptManager;
     }
 
     public String executeWorkflow(String userCode, String systemPrompt) {
@@ -35,10 +38,11 @@ public class AgenticWorkflowService {
         // Step 2: Critic Loop
         int maxIterations = 2; // Keep it short for latency
         String currentJson = draft;
+        String criticSystemPrompt = promptManager.getPrompt("CRITIC_SYSTEM_PROMPT");
 
         for (int i = 0; i < maxIterations; i++) {
             // Critic evaluates the JSON content
-            String critique = critic.critique(currentJson);
+            String critique = critic.critique(currentJson, criticSystemPrompt);
 
             if (critique.toLowerCase().contains("approved")) {
                 log.info("Code approved by Critic at iteration {}", i + 1);
@@ -64,19 +68,9 @@ public class AgenticWorkflowService {
     }
 
     interface Critic {
-        @SystemMessage("""
-                You are a strict code review critic.
-                Your job is to review the JSON output from a code analysis tool.
-
-                Check for:
-                1. **JSON Validity**: Is it valid JSON?
-                2. **Tone**: Does the 'description' field match the requested persona (witty/sarcastic)?
-                3. **Accuracy**: Do the 'codeSmells' and 'suggestions' make sense for the code?
-
-                If everything is good, reply with 'APPROVED'.
-                If there are issues, list them briefly.
-                """)
-        String critique(@UserMessage("Review this JSON analysis:\n{{json}}") @V("json") String json);
+        @SystemMessage("{{systemPrompt}}")
+        String critique(@UserMessage("Review this JSON analysis:\n{{json}}") @V("json") String json,
+                @V("systemPrompt") String systemPrompt);
     }
 
     interface Refiner {

@@ -39,6 +39,11 @@
         <result column="approved_at"
                 property="approvedAt"
                 javaType="java.time.LocalDateTime"/>
+
+        <!-- 구독 정보 (조인 전용) -->
+        <result column="subscription_status"    property="subscriptionStatus"/>
+        <result column="subscription_start_at"  property="subscriptionStartAt" javaType="java.time.LocalDateTime"/>
+        <result column="subscription_end_at"    property="subscriptionEndAt" javaType="java.time.LocalDateTime"/>
     </resultMap>
 
     <!-- ================== INSERT (READY 단계 최초 저장) ================== -->
@@ -74,51 +79,59 @@
     <select id="findPaymentByOrderId"
             resultMap="PaymentsResultMap">
         SELECT
-        order_id,
-        user_id,
-        plan_code,
-        payment_key,
-        order_name,
-        customer_name,
-        original_amount,
-        used_point,
-        amount,
-        status,
-        requested_at,
-        canceled_at,
-        pay_method,
-        pg_raw_response,
-        card_company,
-        card_approval_no,
-        approved_at
-        FROM payments
-        WHERE order_id = #{orderId}
+        p.order_id,
+        p.user_id,
+        p.plan_code,
+        p.payment_key,
+        p.order_name,
+        p.customer_name,
+        p.original_amount,
+        p.used_point,
+        p.amount,
+        p.status,
+        p.requested_at,
+        p.canceled_at,
+        p.pay_method,
+        p.pg_raw_response,
+        p.card_company,
+        p.card_approval_no,
+        p.approved_at,
+        s.status      AS subscription_status,
+        s.start_date  AS subscription_start_at,
+        s.end_date    AS subscription_end_at
+        FROM payments p
+        LEFT JOIN subscriptions s ON s.order_id = p.order_id
+        WHERE p.order_id = #{orderId}
     </select>
 
     <!-- ================== SELECT by paymentKey (환불용) ================== -->
     <select id="findPaymentByPaymentKey"
             resultMap="PaymentsResultMap">
         SELECT
-        order_id,
-        user_id,
-        plan_code,
-        payment_key,
-        order_name,
-        customer_name,
-        original_amount,
-        used_point,
-        amount,
-        status,
-        requested_at,
-        canceled_at,
-        pay_method,
-        pg_raw_response,
-        card_company,
-        card_approval_no,
-        approved_at
-        FROM payments
-        WHERE payment_key = #{paymentKey}
-        AND status = 'DONE'
+        p.order_id,
+        p.user_id,
+        p.plan_code,
+        p.payment_key,
+        p.order_name,
+        p.customer_name,
+        p.original_amount,
+        p.used_point,
+        p.amount,
+        p.status,
+        p.requested_at,
+        p.canceled_at,
+        p.pay_method,
+        p.pg_raw_response,
+        p.card_company,
+        p.card_approval_no,
+        p.approved_at,
+        s.status      AS subscription_status,
+        s.start_date  AS subscription_start_at,
+        s.end_date    AS subscription_end_at
+        FROM payments p
+        LEFT JOIN subscriptions s ON s.order_id = p.order_id
+        WHERE p.payment_key = #{paymentKey}
+        AND p.status = 'DONE'
     </select>
 
     <!-- ================== UPDATE status (승인 시) ================== -->
@@ -134,6 +147,14 @@
         card_approval_no = #{cardApprovalNo},
         approved_at      = #{approvedAt}
         WHERE order_id = #{orderId}
+    </update>
+
+    <!-- ================== 상태만 조건부 업데이트 (동시 승인 방지용) ================== -->
+    <update id="updatePaymentStatusIfMatch">
+        UPDATE payments
+        SET status = #{toStatus}
+        WHERE order_id = #{orderId}
+          AND status = #{fromStatus}
     </update>
 
     <!-- ================== UPDATE status (취소 시) ================== -->
@@ -166,27 +187,72 @@
     <select id="findRecentPaymentsByUser"
             resultMap="PaymentsResultMap">
         SELECT
-        order_id,
-        user_id,
-        plan_code,
-        payment_key,
-        order_name,
-        customer_name,
-        original_amount,
-        used_point,
-        amount,
-        status,
-        requested_at,
-        canceled_at,
-        pay_method,
-        pg_raw_response,
-        card_company,
-        card_approval_no,
-        approved_at
-        FROM payments
-        WHERE user_id = #{userId}
-        ORDER BY requested_at DESC
+        p.order_id,
+        p.user_id,
+        p.plan_code,
+        p.payment_key,
+        p.order_name,
+        p.customer_name,
+        p.original_amount,
+        p.used_point,
+        p.amount,
+        p.status,
+        p.requested_at,
+        p.canceled_at,
+        p.pay_method,
+        p.pg_raw_response,
+        p.card_company,
+        p.card_approval_no,
+        p.approved_at,
+        s.status      AS subscription_status,
+        s.start_date  AS subscription_start_at,
+        s.end_date    AS subscription_end_at
+        FROM payments p
+        LEFT JOIN subscriptions s ON s.order_id = p.order_id
+        WHERE p.user_id = #{userId}
+        ORDER BY p.requested_at DESC
         LIMIT #{limit}
+    </select>
+
+    <!-- ================== 기간/상태별 결제 내역 ================== -->
+    <select id="findPaymentsInRange"
+            resultMap="PaymentsResultMap">
+        SELECT
+        p.order_id,
+        p.user_id,
+        p.plan_code,
+        p.payment_key,
+        p.order_name,
+        p.customer_name,
+        p.original_amount,
+        p.used_point,
+        p.amount,
+        p.status,
+        p.requested_at,
+        p.canceled_at,
+        p.pay_method,
+        p.pg_raw_response,
+        p.card_company,
+        p.card_approval_no,
+        p.approved_at,
+        s.status      AS subscription_status,
+        s.start_date  AS subscription_start_at,
+        s.end_date    AS subscription_end_at
+        FROM payments p
+        LEFT JOIN subscriptions s ON s.order_id = p.order_id
+        <where>
+            p.user_id = #{userId}
+            <if test="from != null">
+                AND p.requested_at &gt;= #{from}
+            </if>
+            <if test="to != null">
+                AND p.requested_at &lt; #{to}
+            </if>
+            <if test="status != null">
+                AND p.status = #{status}
+            </if>
+        </where>
+        ORDER BY p.requested_at DESC
     </select>
 
 </mapper>

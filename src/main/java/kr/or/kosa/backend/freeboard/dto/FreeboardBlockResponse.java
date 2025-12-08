@@ -5,10 +5,8 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-/**
- * 조회(응답) 시에 사용되는 블록 DTO
- * tiptap / code 블록 공통 구조
- */
+// 조회(응답) 시에 사용되는 블록 DTO
+// tiptap / code 블록 공통 구조
 @Getter
 @NoArgsConstructor
 @AllArgsConstructor

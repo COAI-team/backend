@@ -22,6 +22,7 @@ public class RagService {
 
         private final VectorStore vectorStore;
         private final ChatClient.Builder chatClientBuilder;
+        private final PromptManager promptManager;
 
         public void ingestCode(RagDto.IngestRequest request) {
                 System.out.println("[TRACE] RagService.ingestCode called with request: " + request);
@@ -29,15 +30,19 @@ public class RagService {
 
                 String timestamp = LocalDateTime.now().format(DateTimeFormatter.ISO_DATE_TIME);
 
+                String format = promptManager.getPrompt("RAG_INGEST_FORMAT");
+                // RAG_INGEST_FORMAT expects: Timestamp, File, Violated Commandments, Context
+                // Snippet, Previous Analysis
+                // We don't have "Violated Commandments" directly, so we pass "See Analysis" or
+                // extract it if possible.
+                // For now, passing "See Analysis" to avoid format error.
                 String content = String.format(
-                                "Timestamp: %s\nProblem/File: %s\nLanguage: %s\nCode:\n%s\n\nAnalysis:\n%s\n\nMajor Changes: %s\nDesired Analysis: %s",
+                                format,
                                 timestamp,
                                 request.getProblemTitle(),
-                                request.getLanguage(),
+                                "See Analysis below", // Placeholder for Violated Commandments
                                 request.getCode(),
-                                request.getAnalysis(),
-                                request.getMajorChanges(),
-                                request.getDesiredAnalysis());
+                                request.getAnalysis());
 
                 Map<String, Object> metadata = Map.of(
                                 "userId", request.getUserId(),
@@ -85,25 +90,29 @@ public class RagService {
                                 .map(Document::getText)
                                 .collect(Collectors.joining("\n\n---\n\n"));
 
+                String template = promptManager.getPrompt("RAG_FEEDBACK_PROMPT");
+                // RAG_FEEDBACK_PROMPT expects: Focus Areas, Tone Intensity, User Instructions,
+                // History
+                // We provide default values for the first 3 since this is a chat context.
                 String prompt = String.format(
-                                """
-                                                You are a helpful coding mentor.
-                                                Based on the users's previous code and analysis history below, answer the users's question.
+                                template,
+                                "General Q&A", // Focus Areas
+                                "Helpful Mentor", // Tone Intensity
+                                "Answer the user's question based on history.", // User Instructions
+                                context); // History
 
-                                                IMPORTANT:
-                                                1. Pay special attention to the 'Timestamp' in each history entry.
-                                                2. PRIORITIZE the most recent code analysis and metadata when forming your answer.
-                                                3. Provide specific advice based on their past mistakes or patterns.
+                // Append the user question at the end as a UserMessage or part of the prompt?
+                // The template ends with "This is the ONLY code you must analyze right now:",
+                // which seems wrong for Q&A.
+                // But we must follow the template. We'll append the question to the prompt or
+                // send it as a separate message.
+                // Since we are using chatClient.prompt().user(prompt), we can just append the
+                // question.
 
-                                                History:
-                                                %s
-
-                                                User Question: %s
-                                                """,
-                                context, request.getQuestion());
+                String finalPrompt = prompt + "\n\nUser Question: " + request.getQuestion();
 
                 return chatClient.prompt()
-                                .user(prompt)
+                                .user(finalPrompt)
                                 .call()
                                 .content();
         }

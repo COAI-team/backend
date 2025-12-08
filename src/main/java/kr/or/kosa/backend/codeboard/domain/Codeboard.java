@@ -1,11 +1,9 @@
 package kr.or.kosa.backend.codeboard.domain;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Getter
 @NoArgsConstructor
@@ -14,10 +12,14 @@ import java.time.LocalDateTime;
 public class Codeboard {
     private Long codeboardId;
     private Long userId;
+    private String analysisId;
     private String codeboardTitle;
-    private String codeContent;       // 코드 그 자체(미리보기/분석용)
-    private String codePlainText;     // 태그/요약용
-    private LocalDateTime createdAt;
-    private Long clickCount;
-    private String deletedYn;
+    private String codeboardBlocks;    // JSON 문자열 (List<BlockShape> 직렬화)
+    private String codeboardPlainText; // 검색용 순수 텍스트 (BlockTextExtractor로 추출)
+    private Long codeboardClick;
+    private LocalDateTime codeboardCreatedAt;
+    private String codeboardDeletedYn;
+
+    @Setter
+    private List<String> tags;
 }

@@ -1,6 +1,8 @@
 package kr.or.kosa.backend.codeboard.mapper;
 
 import kr.or.kosa.backend.codeboard.domain.Codeboard;
+import kr.or.kosa.backend.codeboard.dto.CodeboardDetailResponseDto;
+import kr.or.kosa.backend.codeboard.dto.CodeboardListResponseDto;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -11,21 +13,29 @@ public interface CodeboardMapper {
 
     int insert(Codeboard codeboard);
 
-    Codeboard selectById(@Param("id") Long id);
-
     int update(Codeboard codeboard);
 
-    int delete(@Param("id") Long id);
+    int delete(Long codeboardId);
 
-    List<Codeboard> selectPage(@Param("offset") int offset, @Param("size") int size);
+    CodeboardDetailResponseDto selectById(Long codeboardId);
+
+    void increaseClick(Long codeboardId);
 
     int countAll();
 
-    void increaseClick(@Param("id") Long id);
-
     // 좋아요 개수 증가
-    void incrementLikeCount(@Param("codeboardId") Long codeboardId);
+    void incrementLikeCount(@Param("freeboardId") Long freeboardId);
 
     // 좋아요 개수 감소
-    void decrementLikeCount(@Param("codeboardId") Long codeboardId);
+    void decrementLikeCount(@Param("freeboardId") Long freeboardId);
+
+    int countPosts(@Param("keyword") String keyword);
+
+    List<CodeboardListResponseDto> findPosts(
+            @Param("offset") int offset,
+            @Param("pageSize") int pageSize,
+            @Param("sortField") String sortField,
+            @Param("sortDirection") String sortDirection,
+            @Param("keyword") String keyword
+    );
 }

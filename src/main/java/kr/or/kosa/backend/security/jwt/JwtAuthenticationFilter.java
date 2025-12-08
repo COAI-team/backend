@@ -30,13 +30,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         String path = request.getRequestURI();
 
-        // GitHub OAuth(login) 경로는 JWT 검사 제외
-        if (path.startsWith("/auth/github")) {
+        // 🔥 GitHub 관련 URL은 JWT 검사 제외
+        if (path.startsWith("/auth/github/login-url") ||
+                path.startsWith("/auth/github/callback") ||
+                path.startsWith("/auth/github/user")) {
+
             filterChain.doFilter(request, response);
             return;
         }
 
-        // 그 외의 경로는 JWT 검증
+        // 🔥 그 외의 경로는 JWT 검증
         String token = resolveToken(request);
 
         try {
