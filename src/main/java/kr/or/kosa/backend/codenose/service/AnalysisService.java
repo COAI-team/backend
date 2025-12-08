@@ -7,7 +7,6 @@ import kr.or.kosa.backend.codenose.dto.dtoReal.AnalysisRequestDTO;
 import kr.or.kosa.backend.codenose.dto.dtoReal.CodeResultDTO;
 import kr.or.kosa.backend.codenose.dto.dtoReal.GithubFileDTO;
 import kr.or.kosa.backend.codenose.dto.dtoReal.UserCodePatternDTO;
-import kr.or.kosa.backend.codenose.dto.dtoReal.UserCodePatternDTO;
 import kr.or.kosa.backend.codenose.mapper.AnalysisMapper;
 import kr.or.kosa.backend.codenose.service.agent.AgenticWorkflowService;
 
@@ -18,7 +17,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.Message;
-import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.Prompt;
@@ -41,9 +39,11 @@ public class AnalysisService {
     private final ObjectMapper objectMapper;
     private final ChatClient chatClient;
     private final RagService ragService;
-    private final kr.or.kosa.backend.codenose.service.search.HybridSearchService hybridSearchService;
-    private final kr.or.kosa.backend.codenose.service.agent.AgenticWorkflowService agenticWorkflowService;
+    private final HybridSearchService hybridSearchService;
+    private final AgenticWorkflowService agenticWorkflowService;
     private final StyleExtractorModule styleExtractorModule;
+    private final PromptManager promptManager;
+    private final PromptGenerator promptGenerator;
 
     @Autowired
     public AnalysisService(
@@ -51,9 +51,11 @@ public class AnalysisService {
             AnalysisMapper analysisMapper,
             ObjectMapper objectMapper,
             RagService ragService,
-            kr.or.kosa.backend.codenose.service.search.HybridSearchService hybridSearchService,
-            kr.or.kosa.backend.codenose.service.agent.AgenticWorkflowService agenticWorkflowService,
-            StyleExtractorModule styleExtractorModule) {
+            HybridSearchService hybridSearchService,
+            AgenticWorkflowService agenticWorkflowService,
+            StyleExtractorModule styleExtractorModule,
+            PromptManager promptManager,
+            PromptGenerator promptGenerator) {
         this.chatClient = chatClientBuilder.build();
         this.analysisMapper = analysisMapper;
         this.objectMapper = objectMapper;
@@ -62,59 +64,8 @@ public class AnalysisService {
 
         this.agenticWorkflowService = agenticWorkflowService;
         this.styleExtractorModule = styleExtractorModule;
-    }
-
-    private final String systemPrompt = """
-            당신은 코드 분석 전문가입니다.
-            사용자가 제공한 코드를 분석하고 개선점을 제시해주세요.
-            """;
-
-    /**
-     * 코드 분석 수행 (간단 버전)
-     * 
-     * @param userId      사용자 ID
-     * @param userMessage 사용자 메시지
-     * @param requestDto  분석 요청 DTO
-     * @return AI 분석 결과
-     */
-    public String analyzeCode(String userId, String userMessage, AnalysisRequestDTO requestDto) {
-        try {
-            List<Message> messages = new ArrayList<>();
-            messages.add(new SystemPromptTemplate(systemPrompt).createMessage());
-            messages.add(new UserMessage(userMessage));
-
-            Prompt prompt = new Prompt(messages);
-            ChatResponse response = chatClient.prompt(prompt).call().chatResponse();
-
-            String aiResponseContent = response.getResult()
-                    .getOutput()
-                    .getText();
-
-            // DB에 저장
-            saveAnalysis(requestDto, aiResponseContent);
-
-            // RAG VectorDB에 저장
-            try {
-                RagDto.IngestRequest ingestRequest = new RagDto.IngestRequest(
-                        userId,
-                        requestDto.getCode(),
-                        aiResponseContent,
-                        "unknown", // Language detection needed or pass from frontend
-                        "Direct Analysis",
-                        "Direct Code Input",
-                        requestDto.getCustomRequirements());
-                ragService.ingestCode(ingestRequest);
-            } catch (Exception e) {
-                log.error("Failed to ingest code to RAG system", e);
-                // Don't fail the main request if RAG ingestion fails
-            }
-
-            return aiResponseContent;
-
-        } catch (Exception e) {
-            log.error("Error during code analysis: {}", e.getMessage(), e);
-            throw new RuntimeException("Failed to analyze code.", e);
-        }
+        this.promptManager = promptManager;
+        this.promptGenerator = promptGenerator;
     }
 
     /**
@@ -140,10 +91,12 @@ public class AnalysisService {
 
             // 2. 사용자 컨텍스트 조회 (Hybrid Search)
             // Using Hybrid Search to get relevant context documents
+            String language = getLanguageFromExtension(storedFile.getFileName());
             List<org.springframework.ai.document.Document> contextDocs = hybridSearchService.search(
                     "mistakes patterns errors improvement",
                     storedFile.getFileContent(),
-                    3);
+                    3,
+                    language);
 
             String userContext = contextDocs.stream()
                     .map(org.springframework.ai.document.Document::getText)
@@ -157,7 +110,7 @@ public class AnalysisService {
                     userContext.substring(0, Math.min(userContext.length(), 100)) + "...");
 
             // 3. 프롬프트 생성 (toneLevel에 따른 시스템 프롬프트 + Users Context)
-            String systemPromptWithTone = PromptGenerator.createSystemPrompt(
+            String systemPromptWithTone = promptGenerator.createSystemPrompt(
                     requestDto.getAnalysisTypes(),
                     requestDto.getToneLevel(),
                     requestDto.getCustomRequirements(),
@@ -366,10 +319,12 @@ public class AnalysisService {
 
                 // 2. 사용자 컨텍스트 조회 (Hybrid Search)
                 // Using Hybrid Search to get relevant context documents
+                String language = getLanguageFromExtension(storedFile.getFileName());
                 List<org.springframework.ai.document.Document> contextDocs = hybridSearchService.search(
                         "mistakes patterns errors improvement",
                         storedFile.getFileContent(),
-                        3);
+                        3,
+                        language);
 
                 String userContext = contextDocs.stream()
                         .map(org.springframework.ai.document.Document::getText)
@@ -389,7 +344,7 @@ public class AnalysisService {
 
                 // 4. 프롬프트 생성 (Style Rules 포함)
                 String customReqWithStyle = requestDto.getCustomRequirements() + "\n\n[Style Rules]\n" + styleRules;
-                String systemPromptWithTone = PromptGenerator.createSystemPrompt(
+                String systemPromptWithTone = promptGenerator.createSystemPrompt(
                         requestDto.getAnalysisTypes(),
                         requestDto.getToneLevel(),
                         customReqWithStyle,
@@ -450,5 +405,16 @@ public class AnalysisService {
         }
 
         return cleaned;
+    }
+
+    private String getLanguageFromExtension(String fileName) {
+        if (fileName == null)
+            return "java";
+        String lower = fileName.toLowerCase();
+        if (lower.endsWith(".py"))
+            return "python";
+        if (lower.endsWith(".js") || lower.endsWith(".jsx") || lower.endsWith(".ts") || lower.endsWith(".tsx"))
+            return "javascript";
+        return "java";
     }
 }

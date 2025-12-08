@@ -3,6 +3,7 @@ package kr.or.kosa.backend.codenose.controller;
 import kr.or.kosa.backend.codenose.dto.dtoReal.CodeResultDTO;
 import kr.or.kosa.backend.codenose.dto.dtoReal.UserCodePatternDTO;
 import kr.or.kosa.backend.codenose.service.InsightsService;
+import kr.or.kosa.backend.codenose.service.WordCloudService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -15,6 +16,7 @@ import java.util.List;
 public class InsightsController {
 
     private final InsightsService insightsService;
+    private final WordCloudService wordCloudService;
 
     @GetMapping("/history/{userId}")
     public ResponseEntity<List<CodeResultDTO>> getAnalysisHistory(@PathVariable Long userId) {
@@ -46,5 +48,17 @@ public class InsightsController {
         System.out.println(
                 "[TRACE] InsightsController.getPatternDetails called with userId: " + userId + ", pattern: " + pattern);
         return ResponseEntity.ok(insightsService.getPatternDetails(userId, pattern));
+    }
+
+    @GetMapping("/wordcloud")
+    public ResponseEntity<String> getWordCloud(
+            @RequestParam Long userId,
+            @RequestParam int year,
+            @RequestParam int month) {
+        String base64Image = wordCloudService.generateWordCloud(userId, year, month);
+        if (base64Image == null) {
+            return ResponseEntity.noContent().build();
+        }
+        return ResponseEntity.ok(base64Image);
     }
 }

@@ -20,19 +20,26 @@ public class HybridSearchService {
 
     private static final int RRF_K = 60;
 
-    public List<Document> search(String query, String codeSnippet, int topK) {
-        System.out.println("[TRACE] HybridSearchService.search called with query: " + query);
+    public List<Document> search(String query, String codeSnippet, int topK, String language) {
+        System.out
+                .println("[TRACE] HybridSearchService.search called with query: " + query + ", language: " + language);
         List<Document> semanticResults = vectorStore.similaritySearch(
                 SearchRequest.builder().query(query).topK(topK * 2).build());
 
         List<Document> syntacticResults = new ArrayList<>();
         if (codeSnippet != null && !codeSnippet.isEmpty()) {
-            String featureString = syntacticSearchService.getFeatureString(codeSnippet);
-            syntacticResults = vectorStore.similaritySearch(
-                    SearchRequest.builder().query(featureString).topK(topK * 2).build());
+            String featureString = syntacticSearchService.getFeatureString(codeSnippet, language);
+            if (!featureString.isEmpty()) {
+                syntacticResults = vectorStore.similaritySearch(
+                        SearchRequest.builder().query(featureString).topK(topK * 2).build());
+            }
         }
 
         return performRRF(semanticResults, syntacticResults, topK);
+    }
+
+    public List<Document> search(String query, String codeSnippet, int topK) {
+        return search(query, codeSnippet, topK, "java");
     }
 
     private List<Document> performRRF(List<Document> semanticResults, List<Document> syntacticResults, int topK) {

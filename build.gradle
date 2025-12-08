@@ -70,7 +70,13 @@ dependencies {
     /* ANTLR */
     antlr "org.antlr:antlr4:4.13.1"
     implementation 'org.antlr:antlr4-runtime:4.13.1'
+}
 
+generateGrammarSource {
+    outputDirectory = file("${project.buildDir}/generated/sources/antlr/main/kr/or/kosa/backend/codenose/parser")
+}
+
+dependencies {
     /* Spring Integration */
     implementation 'org.springframework.boot:spring-boot-starter-integration'
 
@@ -106,6 +112,10 @@ dependencies {
 
     /* Jsoup */
     implementation 'org.jsoup:jsoup:1.17.2'
+
+    /* Kumo (Word Cloud) */
+    implementation 'com.kennycason:kumo-core:1.28'
+    implementation 'com.kennycason:kumo-tokenizers:1.28'
 
     /* Test */
     testImplementation 'org.springframework.boot:spring-boot-starter-test'

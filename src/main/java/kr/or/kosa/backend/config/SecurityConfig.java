@@ -32,7 +32,8 @@ public class SecurityConfig {
         http
                 .cors(Customizer.withDefaults())
                 .csrf(AbstractHttpConfigurer::disable)
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .sessionManagement(session -> session
+                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
                                 "/",
@@ -40,41 +41,39 @@ public class SecurityConfig {
                                 "/oauth2/**",
                                 "/users/**",
                                 "/email/**",
-                                "/algo/**"
-                        ).permitAll()
-                        .anyRequest().authenticated()
-                )
+                                "/algo/**")
+                        .permitAll()
+                        .anyRequest().authenticated())
                 .addFilterBefore(
                         new JwtAuthenticationFilter(jwtProvider),
-                        UsernamePasswordAuthenticationFilter.class
-                );
+                        UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
 
-//    @Bean
-//    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-//
-//        http
-//                .cors(Customizer.withDefaults())
-//                .csrf(AbstractHttpConfigurer::disable)
-//                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-//
-//                .authorizeHttpRequests(auth -> auth
-//                        // .requestMatchers(
-//                        // "/**"
-//                        // )
-//                        // .permitAll()
-//                        .anyRequest().permitAll());
-//
-//        // .addFilterBefore(
-//        // new JwtAuthenticationFilter(jwtProvider),
-//        // UsernamePasswordAuthenticationFilter.class
-//        // );
-//
-//        return http.build();
-//    }
-
+    // @Bean
+    // public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    //
+    // http
+    // .cors(Customizer.withDefaults())
+    // .csrf(AbstractHttpConfigurer::disable)
+    // .sessionManagement(session ->
+    // session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+    //
+    // .authorizeHttpRequests(auth -> auth
+    // // .requestMatchers(
+    // // "/**"
+    // // )
+    // // .permitAll()
+    // .anyRequest().permitAll());
+    //
+    // // .addFilterBefore(
+    // // new JwtAuthenticationFilter(jwtProvider),
+    // // UsernamePasswordAuthenticationFilter.class
+    // // );
+    //
+    // return http.build();
+    // }
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();

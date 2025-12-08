@@ -184,6 +184,27 @@
         WHERE ANALYSIS_ID = #{analysisId}
     </select>
 
+    <!-- 사용자별 특정 기간 동안의 코드 분석 결과 조회 -->
+    <select id="findCodeResultsByUserIdAndDateRange" resultMap="CodeResultResultMap">
+        SELECT
+            ANALYSIS_ID,
+            USER_ID,
+            REPOSITORY_URL,
+            FILE_PATH,
+            ANALYSIS_TYPE,
+            TONE_LEVEL,
+            CUSTOM_REQUIREMENTS,
+            ANALYSIS_RESULT,
+            AI_SCORE,
+            CODE_SMELLS,
+            SUGGESTIONS,
+            CREATED_AT
+        FROM CODE_ANALYSIS_HISTORY
+        WHERE USER_ID = #{userId}
+          AND CREATED_AT BETWEEN #{startDate} AND #{endDate}
+        ORDER BY CREATED_AT DESC
+    </select>
+
     <!-- ========== 사용자 코드 패턴 관련 쿼리 ========== -->
 
     <!-- 사용자 코드 패턴 저장 -->
