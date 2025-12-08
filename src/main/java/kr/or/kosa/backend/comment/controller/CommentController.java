@@ -18,7 +18,7 @@ import java.util.Map;
 
 @Log4j2
 @RestController
-@RequestMapping("/comments")
+@RequestMapping("/comment")
 @RequiredArgsConstructor
 public class CommentController {
 
@@ -40,17 +40,24 @@ public class CommentController {
     }
 
     @GetMapping
-    public ResponseEntity<List<CommentWithRepliesResponse>> list(
-            @RequestParam Long boardId,
+    public ResponseEntity<ApiResponse<List<CommentWithRepliesResponse>>> list(
             @RequestParam String boardType,
+            @RequestParam Long boardId,
+            @RequestParam(required = false) Long cursor,
+            @RequestParam(defaultValue = "20") int size,
             @RequestAttribute(value = "userId", required = false) Long userId
     ) {
-        List<CommentWithRepliesResponse> response = commentService.getCommentsByBoard(
+        Long currentUserId = (userId != null) ? userId : 1L;
+
+        List<CommentWithRepliesResponse> comments = commentService.getCommentsByBoard(
                 boardId,
                 boardType,
-                userId
+                cursor,
+                size,
+                currentUserId
         );
-        return ResponseEntity.ok(response);
+
+        return ResponseEntity.ok(ApiResponse.success(comments));
     }
 
     @PutMapping("/{commentId}")

@@ -2,27 +2,28 @@ package kr.or.kosa.backend.freeboard.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import kr.or.kosa.backend.commons.exception.custom.CustomBusinessException;
+import kr.or.kosa.backend.commons.pagination.PageRequest;
+import kr.or.kosa.backend.commons.pagination.PageResponse;
+import kr.or.kosa.backend.commons.pagination.SearchCondition;
+import kr.or.kosa.backend.commons.pagination.SortCondition;
+import kr.or.kosa.backend.commons.pagination.SortDirection;
 import kr.or.kosa.backend.freeboard.domain.Freeboard;
 import kr.or.kosa.backend.freeboard.dto.FreeboardDetailResponseDto;
 import kr.or.kosa.backend.freeboard.dto.FreeboardDto;
 import kr.or.kosa.backend.freeboard.dto.FreeboardListResponseDto;
 import kr.or.kosa.backend.freeboard.exception.FreeboardErrorCode;
 import kr.or.kosa.backend.freeboard.mapper.FreeboardMapper;
+import kr.or.kosa.backend.freeboard.sort.FreeboardSortType;
 import kr.or.kosa.backend.like.domain.Like;
 import kr.or.kosa.backend.like.domain.ReferenceType;
 import kr.or.kosa.backend.like.mapper.LikeMapper;
 import kr.or.kosa.backend.tag.service.TagService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 @Slf4j
 @Service
@@ -35,68 +36,24 @@ public class FreeboardService {
     private final TagService tagService;
     private final LikeMapper likeMapper;
 
-    public Map<String, Object> listPage(int page, int size) {
-        int offset = (page - 1) * size;
+    // 자유게시판 목록 조회 (검색 + 정렬 + 페이지네이션)
+    public PageResponse<FreeboardListResponseDto> getList(
+            int page,
+            int size,
+            FreeboardSortType sortType,
+            SortDirection direction,
+            String keyword
+    ) {
+        PageRequest pageRequest = new PageRequest(page, size);
+        SearchCondition searchCondition = new SearchCondition(keyword);
+        SortCondition sortCondition = new SortCondition(sortType, direction);
 
-        List<FreeboardListResponseDto> boards = mapper.selectPage(offset, size);
-        int totalCount = mapper.countAll();
+        List<FreeboardListResponseDto> boards =
+                mapper.findPosts(pageRequest, searchCondition, sortCondition);
 
-        Map<String, Object> result = new HashMap<>();
-        result.put("boards", boards);
-        result.put("totalCount", totalCount);
-        result.put("page", page);
-        result.put("size", size);
-        result.put("totalPages", (int) Math.ceil((double) totalCount / size));
+        long totalCount = mapper.countPosts(searchCondition);
 
-        return result;
-    }
-
-    public Page<FreeboardListResponseDto> getList(Pageable pageable, String keyword) {
-        int offset = (int) pageable.getOffset();
-        int pageSize = pageable.getPageSize();
-        String sortField = getSortField(pageable);
-        String sortDirection = getSortDirection(pageable);
-
-        int totalCount = mapper.countPosts(keyword);
-
-        List<FreeboardListResponseDto> posts = mapper.findPosts(
-                offset,
-                pageSize,
-                sortField,
-                sortDirection,
-                keyword
-        );
-
-        return new PageImpl<>(posts, pageable, totalCount);
-    }
-
-    private String getSortField(Pageable pageable) {
-        if (pageable.getSort().isEmpty()) {
-            return "created_at";
-        }
-
-        String property = pageable.getSort().iterator().next().getProperty();
-
-        switch (property) {
-            case "commentCount":
-                return "comment_count";
-            case "likeCount":
-                return "like_count";
-            case "viewCount":
-            case "click":
-                return "view_count";
-            case "createdAt":
-            default:
-                return "created_at";
-        }
-    }
-
-    private String getSortDirection(Pageable pageable) {
-        if (pageable.getSort().isEmpty()) {
-            return "DESC";
-        }
-
-        return pageable.getSort().iterator().next().getDirection().name();
+        return new PageResponse<>(boards, pageRequest, totalCount);
     }
 
     @Transactional
@@ -108,9 +65,16 @@ public class FreeboardService {
             throw new CustomBusinessException(FreeboardErrorCode.NOT_FOUND);
         }
 
+        log.info("조회된 좋아요 수: {}", freeboard.getLikeCount());  // 디버깅 로그
+
         List<String> tags = tagService.getFreeboardTags(id);
-        Like existingLike = likeMapper.selectLike(userId, ReferenceType.POST_FREEBOARD, id);
-        boolean isLiked = existingLike != null;
+
+        boolean isLiked = false;
+        if (userId != null) {
+            Like existingLike = likeMapper.selectLike(userId, ReferenceType.POST_FREEBOARD, id);
+            isLiked = existingLike != null;
+            log.info("사용자 {}의 좋아요 여부: {}", userId, isLiked);  // 디버깅 로그
+        }
 
         return FreeboardDetailResponseDto.builder()
                 .freeboardId(freeboard.getFreeboardId())
@@ -130,9 +94,9 @@ public class FreeboardService {
 
     @Transactional
     public Long write(FreeboardDto dto, Long userId) {
-
         String jsonContent;
         String plainText;
+
         try {
             jsonContent = dto.toJsonContent(objectMapper);
             plainText = dto.toPlainText(objectMapper);

@@ -18,7 +18,11 @@ public enum FreeboardErrorCode implements ErrorCode {
     DELETE_ERROR("FB007", "게시글 삭제 중 오류가 발생했습니다."),
 
     // JSON 변환
-    JSON_PARSE_ERROR("FB008", "게시글 콘텐츠 변환 중 오류가 발생했습니다.");
+    JSON_PARSE_ERROR("FB008", "게시글 콘텐츠 변환 중 오류가 발생했습니다."),
+
+    // 정렬
+    INVALID_SORT("FB009", "허용되지 않은 정렬 조건입니다.");
+
 
     private final String code;
     private final String message;

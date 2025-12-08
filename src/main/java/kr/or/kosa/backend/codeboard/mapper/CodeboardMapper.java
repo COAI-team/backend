@@ -23,12 +23,6 @@ public interface CodeboardMapper {
 
     int countAll();
 
-    // 좋아요 개수 증가
-    void incrementLikeCount(@Param("freeboardId") Long freeboardId);
-
-    // 좋아요 개수 감소
-    void decrementLikeCount(@Param("freeboardId") Long freeboardId);
-
     int countPosts(@Param("keyword") String keyword);
 
     List<CodeboardListResponseDto> findPosts(

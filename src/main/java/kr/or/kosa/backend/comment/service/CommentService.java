@@ -126,20 +126,21 @@ public class CommentService {
                 .build();
     }
 
-    public List<CommentWithRepliesResponse> getCommentsByBoard(Long boardId, String boardType, Long currentUserId) {
-        // 댓글만 조회 (이미 userNickname 포함)
-        List<CommentResponse> comments = commentMapper.selectCommentsByBoard(boardId, boardType);
+    // 커서 기반 무한 스크롤로 수정
+    public List<CommentWithRepliesResponse> getCommentsByBoard(Long boardId, String boardType, Long cursor, int size, Long currentUserId) {
+        // 최상위 댓글만 조회 (커서 기반)
+        List<CommentResponse> comments = commentMapper.selectCommentsByBoard(boardType, boardId, cursor, size);
 
         if (comments.isEmpty()) {
             return Collections.emptyList();
         }
 
-        // 모든 댓글 ID 수집
+        // 부모 댓글 ID 수집
         List<Long> commentIds = comments.stream()
                 .map(CommentResponse::getCommentId)
                 .collect(Collectors.toList());
 
-        // 대댓글 한 번에 조회 (이미 userNickname 포함)
+        // 대댓글 한 번에 조회
         List<CommentResponse> replies = commentMapper.selectRepliesByParentIds(commentIds);
 
         // 댓글별로 대댓글 그룹핑
