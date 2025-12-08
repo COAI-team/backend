@@ -20,7 +20,7 @@ import java.util.Map;
  */
 @Slf4j
 @RestController
-@RequestMapping("crawler")
+@RequestMapping("/algo/crawler")
 @RequiredArgsConstructor
 public class ProblemCrawlerController {
 
