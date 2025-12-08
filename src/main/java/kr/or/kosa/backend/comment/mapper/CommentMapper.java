@@ -14,11 +14,15 @@ public interface CommentMapper {
     Long insertComment(Comment comment);
 
     // 댓글 조회
-    Comment selectCommentById(Long commentId);
+    Comment selectCommentById(@Param("commentId") Long commentId);
 
-    // 게시글의 댓글 목록 조회 (최상위 댓글만)
-    List<CommentResponse> selectCommentsByBoard(@Param("boardId") Long boardId,
-                                                @Param("boardType") String boardType);
+    // 게시글의 댓글 목록 조회 (커서 기반 무한 스크롤)
+    List<CommentResponse> selectCommentsByBoard(
+            @Param("boardType") String boardType,
+            @Param("boardId") Long boardId,
+            @Param("cursor") Long cursor,
+            @Param("size") int size
+    );
 
     // 부모 댓글 ID 목록으로 대댓글 조회
     List<CommentResponse> selectRepliesByParentIds(@Param("parentCommentIds") List<Long> parentCommentIds);
@@ -28,12 +32,6 @@ public interface CommentMapper {
 
     // 댓글 소프트 삭제
     Long deleteComment(@Param("commentId") Long commentId);
-
-    // 좋아요 개수 증가
-    void incrementLikeCount(@Param("commentId") Long commentId);
-
-    // 좋아요 개수 감소
-    void decrementLikeCount(@Param("commentId") Long commentId);
 
     // 특정 사용자의 댓글인지 확인
     boolean existsByCommentIdAndUserId(@Param("commentId") Long commentId,

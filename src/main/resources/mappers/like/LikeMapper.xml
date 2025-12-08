@@ -38,4 +38,16 @@
         AND REFERENCE_ID = #{referenceId}
     </delete>
 
+    <!-- 사용자가 좋아요 누른 ID 목록 조회 -->
+    <select id="selectLikedReferenceIds" resultType="java.lang.Long">
+        SELECT REFERENCE_ID
+        FROM `LIKE`
+        WHERE USER_ID = #{userId}
+        AND REFERENCE_TYPE = #{referenceType}
+        AND REFERENCE_ID IN
+        <foreach collection="referenceIds" item="refId" open="(" separator="," close=")">
+            #{refId}
+        </foreach>
+    </select>
+
 </mapper>

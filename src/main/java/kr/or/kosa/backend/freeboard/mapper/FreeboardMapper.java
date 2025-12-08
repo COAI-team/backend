@@ -1,51 +1,41 @@
 package kr.or.kosa.backend.freeboard.mapper;
 
+import kr.or.kosa.backend.commons.pagination.PageRequest;
+import kr.or.kosa.backend.commons.pagination.SearchCondition;
+import kr.or.kosa.backend.commons.pagination.SortCondition;
+import kr.or.kosa.backend.freeboard.domain.Freeboard;
 import kr.or.kosa.backend.freeboard.dto.FreeboardDetailResponseDto;
 import kr.or.kosa.backend.freeboard.dto.FreeboardListResponseDto;
 import org.apache.ibatis.annotations.Mapper;
-import java.util.List;
-import kr.or.kosa.backend.freeboard.domain.Freeboard;
 import org.apache.ibatis.annotations.Param;
+
+import java.util.List;
 
 @Mapper
 public interface FreeboardMapper {
 
-    // 특정 페이지의 게시글 목록
-    List<FreeboardListResponseDto> selectPage(@Param("offset") int offset, @Param("size") int size);
+    // 게시글 목록 조회 (페이징 + 검색 + 정렬)
+    List<FreeboardListResponseDto> findPosts(
+            @Param("page") PageRequest pageRequest,
+            @Param("search") SearchCondition searchCondition,
+            @Param("sort") SortCondition sortCondition
+    );
+
+    // 전체 개수 조회 (검색 조건 적용)
+    long countPosts(@Param("search") SearchCondition searchCondition);
 
     // 게시글 상세 조회
     FreeboardDetailResponseDto selectById(@Param("freeboardId") Long freeboardId);
 
     // 게시글 작성
-    int insert(Freeboard board);
+    int insert(Freeboard freeboard);
 
     // 게시글 수정
-    int update(Freeboard board);
+    int update(Freeboard freeboard);
 
     // 게시글 삭제 (소프트 삭제)
-    int delete(Long id);
+    int delete(@Param("freeboardId") Long freeboardId);
 
     // 조회수 증가
-    int increaseClick(Long id);
-
-    // 총 게시글 수 (페이징용)
-    int countAll();
-
-    // 좋아요 개수 증가
-    void incrementLikeCount(@Param("freeboardId") Long freeboardId);
-
-    // 좋아요 개수 감소
-    void decrementLikeCount(@Param("freeboardId") Long freeboardId);
-
-    // 검색 조건에 맞는 게시글 수
-    int countPosts(@Param("keyword") String keyword);
-
-    // 검색/정렬 기능이 포함된 게시글 목록
-    List<FreeboardListResponseDto> findPosts(
-            @Param("offset") int offset,
-            @Param("pageSize") int pageSize,
-            @Param("sortField") String sortField,
-            @Param("sortDirection") String sortDirection,
-            @Param("keyword") String keyword
-    );
+    void increaseClick(@Param("freeboardId") Long freeboardId);
 }

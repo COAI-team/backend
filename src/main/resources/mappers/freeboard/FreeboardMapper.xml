@@ -1,132 +1,24 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE mapper
-        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
 <mapper namespace="kr.or.kosa.backend.freeboard.mapper.FreeboardMapper">
 
-    <!-- 게시글 목록용 resultMap -->
-    <resultMap id="FreeboardListResponseMap" type="kr.or.kosa.backend.freeboard.dto.FreeboardListResponseDto">
+    <!-- 목록 조회용 resultMap -->
+    <resultMap id="freeboardListResultMap" type="kr.or.kosa.backend.freeboard.dto.FreeboardListResponseDto">
         <id property="freeboardId" column="FREEBOARD_ID"/>
         <result property="userId" column="USER_ID"/>
         <result property="userNickname" column="USER_NICKNAME"/>
         <result property="freeboardTitle" column="FREEBOARD_TITLE"/>
-        <result property="freeboardSummary" column="FREEBOARD_SUMMARY"/>
         <result property="freeboardClick" column="FREEBOARD_CLICK"/>
-        <result property="freeboardRepresentImage" column="FREEBOARD_REPRESENT_IMAGE"/>
-        <result property="freeboardCreatedAt" column="FREEBOARD_CREATED_AT"/>
         <result property="likeCount" column="LIKE_COUNT"/>
         <result property="commentCount" column="COMMENT_COUNT"/>
-
-        <collection property="tags" ofType="java.lang.String">
-            <result column="TAG_NAME"/>
-        </collection>
+        <result property="freeboardRepresentImage" column="FREEBOARD_REPRESENT_IMAGE"/>
+        <result property="freeboardCreatedAt" column="FREEBOARD_CREATED_AT"/>
     </resultMap>
 
-    <!-- 게시글 목록 (페이징) -->
-    <select id="selectPage" resultMap="FreeboardListResponseMap">
-        SELECT
-        f.FREEBOARD_ID,
-        f.USER_ID,
-        f.FREEBOARD_TITLE,
-        SUBSTRING(f.FREEBOARD_CONTENT, 1, 200) as FREEBOARD_SUMMARY,
-        f.FREEBOARD_CLICK,
-        f.FREEBOARD_REPRESENT_IMAGE,
-        f.FREEBOARD_CREATED_AT,
-        t.TAG_NAME,
-        u.USER_NICKNAME,
-        COALESCE(f.LIKE_COUNT, 0) as LIKE_COUNT,
-        COALESCE(
-        (SELECT COUNT(*)
-        FROM COMMENT c
-        WHERE c.BOARD_ID = f.FREEBOARD_ID
-        AND c.BOARD_TYPE = 'FREEBOARD'
-        AND c.IS_DELETED = FALSE),
-        0
-        ) as COMMENT_COUNT
-        FROM FREEBOARD f
-        LEFT JOIN FREEBOARD_TAG ft ON f.FREEBOARD_ID = ft.FREEBOARD_ID
-        LEFT JOIN TAG t ON ft.TAG_ID = t.TAG_ID
-        LEFT JOIN USERS u ON f.USER_ID = u.USER_ID
-        WHERE f.FREEBOARD_DELETED_YN = 'N'
-        ORDER BY f.FREEBOARD_ID DESC
-        LIMIT #{size} OFFSET #{offset}
-    </select>
-
-    <!-- 검색/정렬 기능이 포함된 게시글 목록 조회 -->
-    <select id="findPosts" resultMap="FreeboardListResponseMap">
-        SELECT
-        f.FREEBOARD_ID,
-        f.USER_ID,
-        f.FREEBOARD_TITLE,
-        f.FREEBOARD_CONTENT,
-        SUBSTRING(f.FREEBOARD_PLAIN_TEXT, 1, 200) as FREEBOARD_SUMMARY,  -- 이 부분 확인
-        f.FREEBOARD_CLICK,
-        f.FREEBOARD_REPRESENT_IMAGE,
-        f.FREEBOARD_CREATED_AT,
-        t.TAG_NAME,
-        u.USER_NICKNAME,
-        COALESCE(f.LIKE_COUNT, 0) as LIKE_COUNT,
-        COALESCE(
-        (SELECT COUNT(*)
-        FROM COMMENT c
-        WHERE c.BOARD_ID = f.FREEBOARD_ID
-        AND c.BOARD_TYPE = 'FREEBOARD'
-        AND c.IS_DELETED = FALSE),
-        0
-        ) as COMMENT_COUNT
-        FROM FREEBOARD f
-        LEFT JOIN FREEBOARD_TAG ft ON f.FREEBOARD_ID = ft.FREEBOARD_ID
-        LEFT JOIN TAG t ON ft.TAG_ID = t.TAG_ID
-        LEFT JOIN USERS u ON f.USER_ID = u.USER_ID
-        WHERE f.FREEBOARD_DELETED_YN = 'N'
-        <if test="keyword != null and keyword != ''">
-            AND (
-            f.FREEBOARD_TITLE LIKE CONCAT('%', #{keyword}, '%')
-            OR f.FREEBOARD_PLAIN_TEXT LIKE CONCAT('%', #{keyword}, '%')
-            OR u.USER_NICKNAME LIKE CONCAT('%', #{keyword}, '%')
-            OR t.TAG_NAME LIKE CONCAT('%', #{keyword}, '%')
-            )
-        </if>
-        ORDER BY
-        <choose>
-            <when test="sortField == 'comment_count'">
-                COMMENT_COUNT ${sortDirection}, f.FREEBOARD_CREATED_AT DESC
-            </when>
-            <when test="sortField == 'like_count'">
-                f.LIKE_COUNT ${sortDirection}, f.FREEBOARD_CREATED_AT DESC
-            </when>
-            <when test="sortField == 'view_count'">
-                f.FREEBOARD_CLICK ${sortDirection}, f.FREEBOARD_CREATED_AT DESC
-            </when>
-            <otherwise>
-                f.FREEBOARD_CREATED_AT ${sortDirection}
-            </otherwise>
-        </choose>
-        LIMIT #{pageSize} OFFSET #{offset}
-    </select>
-
-    <!-- 검색 조건에 맞는 전체 게시글 수 조회 -->
-    <select id="countPosts" resultType="int">
-        SELECT COUNT(DISTINCT f.FREEBOARD_ID)
-        FROM FREEBOARD f
-        LEFT JOIN FREEBOARD_TAG ft ON f.FREEBOARD_ID = ft.FREEBOARD_ID
-        LEFT JOIN TAG t ON ft.TAG_ID = t.TAG_ID
-        LEFT JOIN USERS u ON f.USER_ID = u.USER_ID
-        WHERE f.FREEBOARD_DELETED_YN = 'N'
-        <if test="keyword != null and keyword != ''">
-            AND (
-            f.FREEBOARD_TITLE LIKE CONCAT('%', #{keyword}, '%')
-            OR f.FREEBOARD_CONTENT LIKE CONCAT('%', #{keyword}, '%')
-            OR f.FREEBOARD_PLAIN_TEXT LIKE CONCAT('%', #{keyword}, '%')
-            OR u.USER_NICKNAME LIKE CONCAT('%', #{keyword}, '%')
-            OR t.TAG_NAME LIKE CONCAT('%', #{keyword}, '%')
-            )
-        </if>
-    </select>
-
     <!-- 상세 조회용 resultMap -->
-    <resultMap id="FreeboardDetailResponseMap" type="kr.or.kosa.backend.freeboard.dto.FreeboardDetailResponseDto">
+    <resultMap id="freeboardDetailResultMap" type="kr.or.kosa.backend.freeboard.dto.FreeboardDetailResponseDto">
         <id property="freeboardId" column="FREEBOARD_ID"/>
         <result property="userId" column="USER_ID"/>
         <result property="userNickname" column="USER_NICKNAME"/>
@@ -139,94 +31,142 @@
         <result property="freeboardCreatedAt" column="FREEBOARD_CREATED_AT"/>
     </resultMap>
 
-    <!-- 상세 조회 -->
-    <select id="selectById" resultMap="FreeboardDetailResponseMap">
+    <!-- 게시글 목록 조회 (서브쿼리로 좋아요/댓글 수 실시간 집계) -->
+    <select id="findPosts" resultMap="freeboardListResultMap">
         SELECT
         f.FREEBOARD_ID,
         f.USER_ID,
+        u.USER_NICKNAME,
+        f.FREEBOARD_TITLE,
+        f.FREEBOARD_CLICK,
+        f.FREEBOARD_REPRESENT_IMAGE,
+        f.FREEBOARD_CREATED_AT,
+        (SELECT COUNT(*)
+        FROM `LIKE` l
+        WHERE l.REFERENCE_ID = f.FREEBOARD_ID
+        AND l.REFERENCE_TYPE = 'POST_FREEBOARD') AS LIKE_COUNT,
+        (SELECT COUNT(*)
+        FROM `COMMENT` c
+        WHERE c.BOARD_ID = f.FREEBOARD_ID
+        AND c.BOARD_TYPE = 'FREEBOARD'
+        AND c.IS_DELETED = FALSE) AS COMMENT_COUNT
+        FROM FREEBOARD f
+        LEFT JOIN USERS u ON f.USER_ID = u.USER_ID
+        <where>
+            f.FREEBOARD_DELETED_YN = 'N'
+            <if test="search.hasKeyword()">
+                AND (
+                f.FREEBOARD_TITLE LIKE CONCAT('%', #{search.keyword}, '%')
+                OR f.FREEBOARD_PLAIN_TEXT LIKE CONCAT('%', #{search.keyword}, '%')
+                OR u.USER_NICKNAME LIKE CONCAT('%', #{search.keyword}, '%')
+                )
+            </if>
+        </where>
+        ORDER BY
+        <choose>
+            <when test="sort.column == 'like_count'">
+                LIKE_COUNT ${sort.directionSql}
+            </when>
+            <when test="sort.column == 'comment_count'">
+                COMMENT_COUNT ${sort.directionSql}
+            </when>
+            <when test="sort.column == 'view_count'">
+                f.FREEBOARD_CLICK ${sort.directionSql}
+            </when>
+            <otherwise>
+                f.FREEBOARD_CREATED_AT ${sort.directionSql}
+            </otherwise>
+        </choose>
+        LIMIT #{page.size} OFFSET #{page.offset}
+    </select>
+
+    <!-- 전체 개수 조회 -->
+    <select id="countPosts" resultType="long">
+        SELECT COUNT(*)
+        FROM FREEBOARD f
+        LEFT JOIN USERS u ON f.USER_ID = u.USER_ID
+        <where>
+            f.FREEBOARD_DELETED_YN = 'N'
+            <if test="search.hasKeyword()">
+                AND (
+                f.FREEBOARD_TITLE LIKE CONCAT('%', #{search.keyword}, '%')
+                OR f.FREEBOARD_PLAIN_TEXT LIKE CONCAT('%', #{search.keyword}, '%')
+                OR u.USER_NICKNAME LIKE CONCAT('%', #{search.keyword}, '%')
+                )
+            </if>
+        </where>
+    </select>
+
+    <!-- 상세 조회 (서브쿼리로 좋아요 수 실시간 집계) -->
+    <select id="selectById" resultMap="freeboardDetailResultMap">
+        SELECT
+        f.FREEBOARD_ID,
+        f.USER_ID,
+        u.USER_NICKNAME,
         f.FREEBOARD_TITLE,
         f.FREEBOARD_CONTENT,
         f.FREEBOARD_CLICK,
+        (SELECT COUNT(*)
+        FROM `LIKE` l
+        WHERE l.REFERENCE_ID = f.FREEBOARD_ID
+        AND l.REFERENCE_TYPE = 'POST_FREEBOARD'),
+        0 AS LIKE_COUNT,
         f.FREEBOARD_IMAGE,
         f.FREEBOARD_REPRESENT_IMAGE,
-        f.FREEBOARD_CREATED_AT,
-        f.LIKE_COUNT,
-        u.USER_NICKNAME
+        f.FREEBOARD_CREATED_AT
         FROM FREEBOARD f
         LEFT JOIN USERS u ON f.USER_ID = u.USER_ID
         WHERE f.FREEBOARD_ID = #{freeboardId}
         AND f.FREEBOARD_DELETED_YN = 'N'
     </select>
 
-    <!-- 등록 -->
-    <insert id="insert" parameterType="kr.or.kosa.backend.freeboard.domain.Freeboard"
-            useGeneratedKeys="true" keyProperty="freeboardId">
+    <!-- 게시글 작성 -->
+    <insert id="insert"
+            parameterType="kr.or.kosa.backend.freeboard.domain.Freeboard"
+            useGeneratedKeys="true"
+            keyProperty="freeboardId">
         INSERT INTO FREEBOARD (
         USER_ID,
         FREEBOARD_TITLE,
         FREEBOARD_CONTENT,
-        FREEBOARD_CLICK,
-        FREEBOARD_IMAGE,
+        FREEBOARD_PLAIN_TEXT,
         FREEBOARD_REPRESENT_IMAGE,
-        FREEBOARD_CREATED_AT,
-        FREEBOARD_DELETED_YN
+        FREEBOARD_DELETED_YN,
+        FREEBOARD_CREATED_AT
         ) VALUES (
         #{userId},
         #{freeboardTitle},
         #{freeboardContent},
-        0,
-        #{freeboardImage},
+        #{freeboardPlainText},
         #{freeboardRepresentImage},
-        NOW(),
-        'N'
+        #{freeboardDeletedYn},
+        NOW()
         )
     </insert>
 
-    <!-- 수정 -->
-    <update id="update" parameterType="kr.or.kosa.backend.freeboard.domain.Freeboard">
+    <!-- 게시글 수정 -->
+    <update id="update">
         UPDATE FREEBOARD
-        SET
-        FREEBOARD_TITLE = #{freeboardTitle},
+        SET FREEBOARD_TITLE = #{freeboardTitle},
         FREEBOARD_CONTENT = #{freeboardContent},
         FREEBOARD_PLAIN_TEXT = #{freeboardPlainText},
-        FREEBOARD_IMAGE = #{freeboardImage},
-        FREEBOARD_REPRESENT_IMAGE = #{freeboardRepresentImage}
+        FREEBOARD_REPRESENT_IMAGE = #{freeboardRepresentImage},
+        FREEBOARD_UPDATED_AT = NOW()
         WHERE FREEBOARD_ID = #{freeboardId}
-        AND FREEBOARD_DELETED_YN = 'N'
     </update>
 
-    <!-- 삭제 -->
-    <update id="delete" parameterType="long">
+    <!-- 게시글 삭제 (소프트 삭제) -->
+    <update id="delete">
         UPDATE FREEBOARD
-        SET FREEBOARD_DELETED_YN = 'Y'
-        WHERE FREEBOARD_ID = #{id}
+        SET FREEBOARD_DELETED_YN = 'Y',
+        FREEBOARD_UPDATED_AT = NOW()
+        WHERE FREEBOARD_ID = #{freeboardId}
     </update>
 
     <!-- 조회수 증가 -->
-    <update id="increaseClick" parameterType="long">
+    <update id="increaseClick">
         UPDATE FREEBOARD
         SET FREEBOARD_CLICK = FREEBOARD_CLICK + 1
-        WHERE FREEBOARD_ID = #{id}
-    </update>
-
-    <!-- 전체 게시글 수 -->
-    <select id="countAll" resultType="int">
-        SELECT COUNT(*)
-        FROM FREEBOARD
-        WHERE FREEBOARD_DELETED_YN = 'N'
-    </select>
-
-    <!-- 좋아요 수 증가 -->
-    <update id="incrementLikeCount">
-        UPDATE FREEBOARD
-        SET LIKE_COUNT = LIKE_COUNT + 1
-        WHERE FREEBOARD_ID = #{freeboardId}
-    </update>
-
-    <!-- 좋아요 수 감소 -->
-    <update id="decrementLikeCount">
-        UPDATE FREEBOARD
-        SET LIKE_COUNT = GREATEST(LIKE_COUNT - 1, 0)
         WHERE FREEBOARD_ID = #{freeboardId}
     </update>
 
