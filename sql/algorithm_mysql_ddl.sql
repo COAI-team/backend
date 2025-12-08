@@ -1,36 +1,38 @@
 -- =============================================
 -- AUTO_INCREMENT 적용된 최종 알고리즘 도메인 MySQL DDL
 -- =============================================
--- 데이터베이스 생성
-CREATE DATABASE IF NOT EXISTS `algo` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE `algo`;
--- =============================================
--- 0. 사용자 테이블 (외래키 참조를 위해 먼저 생성)
--- =============================================
-    create table USERS
-(
-    USER_ID           bigint auto_increment
-        primary key,
-    USER_EMAIL        varchar(255)                                               not null,
-    USER_PW           varchar(255)                                               not null,
-    USER_NAME         varchar(100)                                               not null,
-    USER_NICKNAME     varchar(50)                                                not null,
-    USER_IMAGE        varchar(500)                                               null,
-    USER_GRADE        int                              default 1                 not null,
-    USER_ROLE         enum ('ROLE_USER', 'ROLE_ADMIN') default 'ROLE_USER'       not null,
-    USER_ISDELETED    tinyint(1)                       default 0                 not null,
-    USER_DELETEDAT    datetime                                                   null,
-    USER_CREATEDAT    datetime                         default CURRENT_TIMESTAMP not null,
-    USER_UPDATEDAT    datetime                         default CURRENT_TIMESTAMP null on update CURRENT_TIMESTAMP,
-    USER_ENABLED      tinyint(1)                       default 1                 not null,
-    USER_ISSUBSCRIBED tinyint(1)                       default 0                 not null,
-    constraint UQ_USERS_EMAIL
-        unique (USER_EMAIL),
-    constraint UQ_USERS_NICKNAME
-        unique (USER_NICKNAME)
-);
-INSERT INTO USERS (USER_ID, USER_EMAIL, USER_PW, USER_NAME, USER_NICKNAME, USER_IMAGE, USER_GRADE, USER_ROLE, USER_ISDELETED, USER_DELETEDAT, USER_CREATEDAT, USER_UPDATEDAT, USER_ENABLED, USER_ISSUBSCRIBED) 
-VALUES (1, 'dummyuser@example.com', '$2a$10$abcdefghijklmnopqrstuvwxyz0123456789.hashed.password.string', '테스트사용자', '더미닉네임1', NULL, 1, 'ROLE_USER', 0, NULL, NOW(), NOW(), 1, 0);
+-- SET NAMES utf8mb4;
+-- SET CHARACTER SET utf8mb4;
+-- -- 데이터베이스 생성
+-- CREATE DATABASE IF NOT EXISTS `algo` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+-- USE `algo`;
+-- -- =============================================
+-- -- 0. 사용자 테이블 (외래키 참조를 위해 먼저 생성)
+-- -- =============================================
+--     create table USERS
+-- (
+--     USER_ID           bigint auto_increment
+--         primary key,
+--     USER_EMAIL        varchar(255)                                               not null,
+--     USER_PW           varchar(255)                                               not null,
+--     USER_NAME         varchar(100)                                               not null,
+--     USER_NICKNAME     varchar(50)                                                not null,
+--     USER_IMAGE        varchar(500)                                               null,
+--     USER_GRADE        int                              default 1                 not null,
+--     USER_ROLE         enum ('ROLE_USER', 'ROLE_ADMIN') default 'ROLE_USER'       not null,
+--     USER_ISDELETED    tinyint(1)                       default 0                 not null,
+--     USER_DELETEDAT    datetime                                                   null,
+--     USER_CREATEDAT    datetime                         default CURRENT_TIMESTAMP not null,
+--     USER_UPDATEDAT    datetime                         default CURRENT_TIMESTAMP null on update CURRENT_TIMESTAMP,
+--     USER_ENABLED      tinyint(1)                       default 1                 not null,
+--     USER_ISSUBSCRIBED tinyint(1)                       default 0                 not null,
+--     constraint UQ_USERS_EMAIL
+--         unique (USER_EMAIL),
+--     constraint UQ_USERS_NICKNAME
+--         unique (USER_NICKNAME)
+-- );
+-- INSERT INTO USERS (USER_ID, USER_EMAIL, USER_PW, USER_NAME, USER_NICKNAME, USER_IMAGE, USER_GRADE, USER_ROLE, USER_ISDELETED, USER_DELETEDAT, USER_CREATEDAT, USER_UPDATEDAT, USER_ENABLED, USER_ISSUBSCRIBED) 
+-- VALUES (1, 'dummyuser@example.com', '$2a$10$abcdefghijklmnopqrstuvwxyz0123456789.hashed.password.string', '테스트사용자', '더미닉네임1', NULL, 1, 'ROLE_USER', 0, NULL, NOW(), NOW(), 1, 0);
 -- =============================================
 -- 1. 알고리즘 문제 테이블 (SQL 문제 지원 추가)
 -- =============================================
@@ -396,94 +398,94 @@ ORDER BY CASE
 -- =============================================
 -- 코드분석 - 성일 
 -- =============================================
--- CREATE TABLE `USER_CODE_PATTERNS` (
---     `PATTERN_ID` VARCHAR(255) NOT NULL COMMENT 'UUID',
---     `USER_ID` BIGINT NOT NULL,
---     `PATTERN_TYPE` VARCHAR(100) NULL COMMENT 'Long Method, Magic Number 등',
---     `FREQUENCY` INT DEFAULT 0 NULL,
---     `LAST_DETECTED` DATETIME NULL,
---     `IMPROVEMENT_STATUS` VARCHAR(100) NULL COMMENT 'Detected, In Progress, Resolved',
---     `CREATED_AT` DATETIME DEFAULT CURRENT_TIMESTAMP NULL,
---     `UPDATED_AT` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NULL,
---     PRIMARY KEY (`PATTERN_ID`),
---     FOREIGN KEY (`USER_ID`) REFERENCES `USERS`(`USER_ID`) ON DELETE CASCADE,
---     INDEX `idx_user_pattern` (`USER_ID`, `PATTERN_TYPE`)
--- ) COMMENT = '사용자 코딩 습관 및 패턴';
--- -- 분석용 원본 파일 저장 (GitHub 파일 등)
--- CREATE TABLE `GITHUB_FILES` (
---     `FILE_ID` VARCHAR(255) NOT NULL,
---     `USER_ID` BIGINT NOT NULL,
---     `REPOSITORY_URL` VARCHAR(1000) NULL,
---     `OWNER` VARCHAR(255) NULL,
---     `REPO` VARCHAR(255) NULL,
---     `FILE_PATH` VARCHAR(1000) NULL,
---     `FILE_NAME` VARCHAR(500) NULL,
---     `FILE_CONTENT` LONGTEXT NULL,
---     `FILE_SIZE` INT NULL,
---     `ENCODING` VARCHAR(50) NULL,
---     `CREATED_AT` DATETIME DEFAULT CURRENT_TIMESTAMP NULL,
---     `UPDATED_AT` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NULL,
---     PRIMARY KEY (`FILE_ID`),
---     FOREIGN KEY (`USER_ID`) REFERENCES `USERS`(`USER_ID`) ON DELETE CASCADE
--- );
--- -- 코드 분석 이력 (상세 리포트)
--- CREATE TABLE `CODE_ANALYSIS_HISTORY` (
---     `ANALYSIS_ID` VARCHAR(255) NOT NULL COMMENT 'UUID',
---     `USER_ID` BIGINT NOT NULL,
---     `REPOSITORY_URL` VARCHAR(1000) NULL,
---     `FILE_PATH` VARCHAR(1000) NULL,
---     `ANALYSIS_TYPE` VARCHAR(100) NULL,
---     `TONE_LEVEL` INT NULL,
---     `CUSTOM_REQUIREMENTS` TEXT NULL,
---     `ANALYSIS_RESULT` LONGTEXT NULL COMMENT 'JSON 문자열',
---     `AI_SCORE` INT NULL,
---     `CODE_SMELLS` LONGTEXT NULL COMMENT 'JSON 문자열',
---     `SUGGESTIONS` LONGTEXT NULL COMMENT 'JSON 문자열',
---     `CREATED_AT` DATETIME DEFAULT CURRENT_TIMESTAMP NULL,
---     PRIMARY KEY (`ANALYSIS_ID`),
---     FOREIGN KEY (`USER_ID`) REFERENCES `USERS`(`USER_ID`) ON DELETE CASCADE
--- );
--- -- 분석 결과와 패턴 매핑
--- CREATE TABLE `ANALYSIS_PATTERN_MAPPING` (
---     `MAPPING_ID` VARCHAR(255) NOT NULL,
---     `ANALYSIS_ID` VARCHAR(255) NOT NULL,
---     `PATTERN_ID` VARCHAR(255) NOT NULL,
---     `SEVERITY` VARCHAR(50) NULL,
---     `LINE_NUMBER` INT NULL,
---     `CODE_SNIPPET` TEXT NULL,
---     `CREATED_AT` DATETIME DEFAULT CURRENT_TIMESTAMP NULL,
---     PRIMARY KEY (`MAPPING_ID`),
---     FOREIGN KEY (`ANALYSIS_ID`) REFERENCES `CODE_ANALYSIS_HISTORY`(`ANALYSIS_ID`) ON DELETE CASCADE,
---     FOREIGN KEY (`PATTERN_ID`) REFERENCES `USER_CODE_PATTERNS`(`PATTERN_ID`) ON DELETE CASCADE
--- );
--- -- 게시판 공유용 결과 테이블 (CODERESULT)
--- CREATE TABLE `CODERESULT` (
---     `CODE_RESULT_ID` BIGINT NOT NULL AUTO_INCREMENT,
---     `USER_ID` BIGINT NOT NULL,
---     `CODE_RESULT_TITLE` VARCHAR(500) NULL,
---     `CODE_FILE_URL` VARCHAR(1000) NULL,
---     `ANALYSIS_DETAIL` LONGTEXT NULL,
---     `SCORE` DECIMAL(5, 2) NULL,
---     `REPOSITORY_URL` VARCHAR(1000) NULL,
---     `FILE_PATH` VARCHAR(1000) NULL,
---     `ANALYSIS_TYPE` VARCHAR(100) NULL,
---     `TONE_LEVEL` INT NULL,
---     `AI_SCORE` INT NULL,
---     `CODE_SMELLS` LONGTEXT NULL,
---     `SUGGESTIONS` LONGTEXT NULL,
---     `CREATED_AT` DATETIME DEFAULT CURRENT_TIMESTAMP NULL,
---     `UPDATED_AT` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NULL,
---     PRIMARY KEY (`CODE_RESULT_ID`),
---     FOREIGN KEY (`USER_ID`) REFERENCES `USERS`(`USER_ID`) ON DELETE CASCADE
--- );
--- -- =============================================
--- -- 성능 최적화 설정
--- -- =============================================
--- SET GLOBAL innodb_buffer_pool_size = 1073741824;
--- SET GLOBAL slow_query_log = 'ON';
--- SET GLOBAL long_query_time = 2;
--- SET @@auto_increment_increment = 1;
--- SET @@auto_increment_offset = 1;
--- SET FOREIGN_KEY_CHECKS = 1;
--- COMMIT;
--- SHOW TABLES;
+CREATE TABLE `USER_CODE_PATTERNS` (
+    `PATTERN_ID` VARCHAR(255) NOT NULL COMMENT 'UUID',
+    `USER_ID` BIGINT NOT NULL,
+    `PATTERN_TYPE` VARCHAR(100) NULL COMMENT 'Long Method, Magic Number 등',
+    `FREQUENCY` INT DEFAULT 0 NULL,
+    `LAST_DETECTED` DATETIME NULL,
+    `IMPROVEMENT_STATUS` VARCHAR(100) NULL COMMENT 'Detected, In Progress, Resolved',
+    `CREATED_AT` DATETIME DEFAULT CURRENT_TIMESTAMP NULL,
+    `UPDATED_AT` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NULL,
+    PRIMARY KEY (`PATTERN_ID`),
+    FOREIGN KEY (`USER_ID`) REFERENCES `USERS`(`USER_ID`) ON DELETE CASCADE,
+    INDEX `idx_user_pattern` (`USER_ID`, `PATTERN_TYPE`)
+) COMMENT = '사용자 코딩 습관 및 패턴';
+-- 분석용 원본 파일 저장 (GitHub 파일 등)
+CREATE TABLE `GITHUB_FILES` (
+    `FILE_ID` VARCHAR(255) NOT NULL,
+    `USER_ID` BIGINT NOT NULL,
+    `REPOSITORY_URL` VARCHAR(1000) NULL,
+    `OWNER` VARCHAR(255) NULL,
+    `REPO` VARCHAR(255) NULL,
+    `FILE_PATH` VARCHAR(1000) NULL,
+    `FILE_NAME` VARCHAR(500) NULL,
+    `FILE_CONTENT` LONGTEXT NULL,
+    `FILE_SIZE` INT NULL,
+    `ENCODING` VARCHAR(50) NULL,
+    `CREATED_AT` DATETIME DEFAULT CURRENT_TIMESTAMP NULL,
+    `UPDATED_AT` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NULL,
+    PRIMARY KEY (`FILE_ID`),
+    FOREIGN KEY (`USER_ID`) REFERENCES `USERS`(`USER_ID`) ON DELETE CASCADE
+);
+-- 코드 분석 이력 (상세 리포트)
+CREATE TABLE `CODE_ANALYSIS_HISTORY` (
+    `ANALYSIS_ID` VARCHAR(255) NOT NULL COMMENT 'UUID',
+    `USER_ID` BIGINT NOT NULL,
+    `REPOSITORY_URL` VARCHAR(1000) NULL,
+    `FILE_PATH` VARCHAR(1000) NULL,
+    `ANALYSIS_TYPE` VARCHAR(100) NULL,
+    `TONE_LEVEL` INT NULL,
+    `CUSTOM_REQUIREMENTS` TEXT NULL,
+    `ANALYSIS_RESULT` LONGTEXT NULL COMMENT 'JSON 문자열',
+    `AI_SCORE` INT NULL,
+    `CODE_SMELLS` LONGTEXT NULL COMMENT 'JSON 문자열',
+    `SUGGESTIONS` LONGTEXT NULL COMMENT 'JSON 문자열',
+    `CREATED_AT` DATETIME DEFAULT CURRENT_TIMESTAMP NULL,
+    PRIMARY KEY (`ANALYSIS_ID`),
+    FOREIGN KEY (`USER_ID`) REFERENCES `USERS`(`USER_ID`) ON DELETE CASCADE
+);
+-- 분석 결과와 패턴 매핑
+CREATE TABLE `ANALYSIS_PATTERN_MAPPING` (
+    `MAPPING_ID` VARCHAR(255) NOT NULL,
+    `ANALYSIS_ID` VARCHAR(255) NOT NULL,
+    `PATTERN_ID` VARCHAR(255) NOT NULL,
+    `SEVERITY` VARCHAR(50) NULL,
+    `LINE_NUMBER` INT NULL,
+    `CODE_SNIPPET` TEXT NULL,
+    `CREATED_AT` DATETIME DEFAULT CURRENT_TIMESTAMP NULL,
+    PRIMARY KEY (`MAPPING_ID`),
+    FOREIGN KEY (`ANALYSIS_ID`) REFERENCES `CODE_ANALYSIS_HISTORY`(`ANALYSIS_ID`) ON DELETE CASCADE,
+    FOREIGN KEY (`PATTERN_ID`) REFERENCES `USER_CODE_PATTERNS`(`PATTERN_ID`) ON DELETE CASCADE
+);
+-- 게시판 공유용 결과 테이블 (CODERESULT)
+CREATE TABLE `CODERESULT` (
+    `CODE_RESULT_ID` BIGINT NOT NULL AUTO_INCREMENT,
+    `USER_ID` BIGINT NOT NULL,
+    `CODE_RESULT_TITLE` VARCHAR(500) NULL,
+    `CODE_FILE_URL` VARCHAR(1000) NULL,
+    `ANALYSIS_DETAIL` LONGTEXT NULL,
+    `SCORE` DECIMAL(5, 2) NULL,
+    `REPOSITORY_URL` VARCHAR(1000) NULL,
+    `FILE_PATH` VARCHAR(1000) NULL,
+    `ANALYSIS_TYPE` VARCHAR(100) NULL,
+    `TONE_LEVEL` INT NULL,
+    `AI_SCORE` INT NULL,
+    `CODE_SMELLS` LONGTEXT NULL,
+    `SUGGESTIONS` LONGTEXT NULL,
+    `CREATED_AT` DATETIME DEFAULT CURRENT_TIMESTAMP NULL,
+    `UPDATED_AT` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NULL,
+    PRIMARY KEY (`CODE_RESULT_ID`),
+    FOREIGN KEY (`USER_ID`) REFERENCES `USERS`(`USER_ID`) ON DELETE CASCADE
+);
+-- =============================================
+-- 성능 최적화 설정
+-- =============================================
+SET GLOBAL innodb_buffer_pool_size = 1073741824;
+SET GLOBAL slow_query_log = 'ON';
+SET GLOBAL long_query_time = 2;
+SET @@auto_increment_increment = 1;
+SET @@auto_increment_offset = 1;
+SET FOREIGN_KEY_CHECKS = 1;
+COMMIT;
+SHOW TABLES;
