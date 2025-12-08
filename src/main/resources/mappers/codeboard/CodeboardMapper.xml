@@ -99,7 +99,7 @@
         U.USER_NICKNAME AS userNickname,
         C.ANALYSIS_ID AS analysisId,
         C.CODEBOARD_TITLE AS codeboardTitle,
-        C.CODEBOARD_PLAIN_TEXT AS codeboardPlainText,
+        SUBSTRING(C.CODEBOARD_PLAIN_TEXT, 1, 200) AS codeboardSummary,
         C.CODEBOARD_CLICK AS codeboardClick,
         C.CODEBOARD_CREATED_AT AS codeboardCreatedAt,
         COALESCE(L.LIKE_COUNT, 0) AS likeCount,
@@ -113,12 +113,12 @@
         GROUP BY REFERENCE_ID
         ) L ON C.CODEBOARD_ID = L.REFERENCE_ID
         LEFT JOIN (
-        SELECT REFERENCE_ID, COUNT(*) AS COMMENT_COUNT
+        SELECT BOARD_ID, COUNT(*) AS COMMENT_COUNT
         FROM COMMENT
-        WHERE REFERENCE_TYPE = 'POST_CODEBOARD'
-        AND COMMENT_DELETED_YN = 'N'
-        GROUP BY REFERENCE_ID
-        ) CM ON C.CODEBOARD_ID = CM.REFERENCE_ID
+        WHERE BOARD_TYPE = 'CODEBOARD'
+        AND IS_DELETED = 0
+        GROUP BY BOARD_ID
+        ) CM ON C.CODEBOARD_ID = CM.BOARD_ID
         WHERE C.CODEBOARD_DELETED_YN = 'N'
         <if test="keyword != null and keyword != ''">
             AND (
@@ -126,24 +126,22 @@
             OR C.CODEBOARD_PLAIN_TEXT LIKE CONCAT('%', #{keyword}, '%')
             )
         </if>
-        ORDER BY ${sortField} ${sortDirection}
+        ORDER BY
+        <choose>
+            <when test="sortField == 'comment_count'">
+                commentCount ${sortDirection}, C.CODEBOARD_CREATED_AT DESC
+            </when>
+            <when test="sortField == 'like_count'">
+                likeCount ${sortDirection}, C.CODEBOARD_CREATED_AT DESC
+            </when>
+            <when test="sortField == 'view_count'">
+                C.CODEBOARD_CLICK ${sortDirection}, C.CODEBOARD_CREATED_AT DESC
+            </when>
+            <otherwise>
+                C.CODEBOARD_CREATED_AT ${sortDirection}
+            </otherwise>
+        </choose>
         LIMIT #{pageSize} OFFSET #{offset}
     </select>
-
-    <!-- 좋아요 수 증가 -->
-    <update id="incrementLikeCount">
-        UPDATE CODEBOARD
-        SET CODEBOARD_LIKE_COUNT = CODEBOARD_LIKE_COUNT + 1
-        WHERE CODEBOARD_ID = #{codeboardId}
-        AND CODEBOARD_DELETED_YN = 'N'
-    </update>
-
-    <!-- 좋아요 수 감소 -->
-    <update id="decrementLikeCount">
-        UPDATE CODEBOARD
-        SET CODEBOARD_LIKE_COUNT = GREATEST(0, CODEBOARD_LIKE_COUNT - 1)
-        WHERE CODEBOARD_ID = #{codeboardId}
-        AND CODEBOARD_DELETED_YN = 'N'
-    </update>
 
 </mapper>

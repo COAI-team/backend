@@ -216,18 +216,4 @@
         WHERE FREEBOARD_DELETED_YN = 'N'
     </select>
 
-    <!-- 좋아요 수 증가 -->
-    <update id="incrementLikeCount">
-        UPDATE FREEBOARD
-        SET LIKE_COUNT = LIKE_COUNT + 1
-        WHERE FREEBOARD_ID = #{freeboardId}
-    </update>
-
-    <!-- 좋아요 수 감소 -->
-    <update id="decrementLikeCount">
-        UPDATE FREEBOARD
-        SET LIKE_COUNT = GREATEST(LIKE_COUNT - 1, 0)
-        WHERE FREEBOARD_ID = #{freeboardId}
-    </update>
-
 </mapper>
