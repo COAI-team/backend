@@ -5,8 +5,9 @@ import kr.or.kosa.backend.algorithm.dto.UserAlgoLevelDto;
 import kr.or.kosa.backend.algorithm.dto.enums.AlgoLevel;
 import kr.or.kosa.backend.algorithm.dto.enums.MissionType;
 import kr.or.kosa.backend.algorithm.mapper.DailyMissionMapper;
+import kr.or.kosa.backend.pay.entity.Subscription;
+import kr.or.kosa.backend.pay.repository.SubscriptionMapper;
 import kr.or.kosa.backend.pay.service.PointService;
-import kr.or.kosa.backend.users.domain.Users;
 import kr.or.kosa.backend.users.mapper.UserMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,6 +30,7 @@ public class DailyMissionService {
     private final UserMapper userMapper;
     private final PointService pointService;
     private final RateLimitService rateLimitService;
+    private final SubscriptionMapper subscriptionMapper;
 
     /**
      * 오늘의 미션 조회 (없으면 생성)
@@ -210,11 +212,19 @@ public class DailyMissionService {
 
     /**
      * 사용자의 구독 여부 확인
+     * subscriptions 테이블에서 활성 구독(ACTIVE, 만료되지 않음) 여부 조회
      */
     @Transactional(readOnly = true)
     public boolean isSubscriber(Long userId) {
-        Users user = userMapper.findById(userId);
-        return user != null && Boolean.TRUE.equals(user.getUserIssubscribed());
+        List<Subscription> activeSubscriptions = subscriptionMapper.findActiveSubscriptionsByUserId(userId);
+        boolean isSubscriber = activeSubscriptions != null && !activeSubscriptions.isEmpty();
+
+        if (isSubscriber) {
+            log.debug("사용자 {} 활성 구독 확인: {}", userId,
+                    activeSubscriptions.get(0).getSubscriptionType());
+        }
+
+        return isSubscriber;
     }
 
     /**
