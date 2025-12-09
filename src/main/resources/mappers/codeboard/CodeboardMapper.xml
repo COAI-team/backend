@@ -4,6 +4,53 @@
 
 <mapper namespace="kr.or.kosa.backend.codeboard.mapper.CodeboardMapper">
 
+    <!-- 게시글 목록 조회 -->
+    <select id="findPosts" resultType="kr.or.kosa.backend.codeboard.dto.CodeboardListResponseDto">
+        SELECT
+        C.CODEBOARD_ID AS codeboardId,
+        C.USER_ID AS userId,
+        U.USER_NICKNAME AS userNickname,
+        C.ANALYSIS_ID AS analysisId,
+        C.CODEBOARD_TITLE AS codeboardTitle,
+        SUBSTRING(C.CODEBOARD_PLAIN_TEXT, 1, 200) AS codeboardSummary,
+        C.CODEBOARD_CLICK AS codeboardClick,
+        C.CODEBOARD_CREATED_AT AS codeboardCreatedAt,
+        (SELECT COUNT(*)
+        FROM `LIKE`
+        WHERE REFERENCE_ID = C.CODEBOARD_ID
+        AND REFERENCE_TYPE = 'POST_CODEBOARD') AS likeCount,
+        (SELECT COUNT(*)
+        FROM COMMENT
+        WHERE BOARD_ID = C.CODEBOARD_ID
+        AND BOARD_TYPE = 'CODEBOARD'
+        AND IS_DELETED = 0) AS commentCount
+        FROM CODEBOARD C
+        INNER JOIN USERS U ON C.USER_ID = U.USER_ID
+        WHERE C.CODEBOARD_DELETED_YN = 'N'
+        <if test="search.keyword != null and search.keyword != ''">
+            AND (
+            C.CODEBOARD_TITLE LIKE CONCAT('%', #{search.keyword}, '%')
+            OR C.CODEBOARD_PLAIN_TEXT LIKE CONCAT('%', #{search.keyword}, '%')
+            )
+        </if>
+        ORDER BY
+        <choose>
+            <when test="sort.column == 'like_count'">
+                likeCount ${sort.directionSql}
+            </when>
+            <when test="sort.column == 'comment_count'">
+                commentCount ${sort.directionSql}
+            </when>
+            <when test="sort.column == 'view_count'">
+                C.CODEBOARD_CLICK ${sort.directionSql}
+            </when>
+            <otherwise>
+                C.CODEBOARD_CREATED_AT ${sort.directionSql}
+            </otherwise>
+        </choose>
+        LIMIT #{page.size} OFFSET #{page.offset}
+    </select>
+
     <!-- 게시글 등록 -->
     <insert id="insert" parameterType="kr.or.kosa.backend.codeboard.domain.Codeboard"
             useGeneratedKeys="true" keyProperty="codeboardId">
@@ -56,16 +103,13 @@
         C.CODEBOARD_TITLE AS codeboardTitle,
         C.CODEBOARD_BLOCKS AS codeboardContent,
         C.CODEBOARD_CLICK AS codeboardClick,
-        C.CODEBOARD_CREATED_AT AS codeboardCreatedAt,
-        COALESCE(L.LIKE_COUNT, 0) AS likeCount
+        (SELECT COUNT(*)
+        FROM `LIKE` L
+        WHERE L.REFERENCE_ID = C.CODEBOARD_ID
+        AND L.REFERENCE_TYPE = 'POST_CODEBOARD') AS likeCount,
+        C.CODEBOARD_CREATED_AT AS codeboardCreatedAt
         FROM CODEBOARD C
-        INNER JOIN USERS U ON C.USER_ID = U.USER_ID
-        LEFT JOIN (
-        SELECT REFERENCE_ID, COUNT(*) AS LIKE_COUNT
-        FROM `LIKE`
-        WHERE REFERENCE_TYPE = 'POST_CODEBOARD'
-        GROUP BY REFERENCE_ID
-        ) L ON C.CODEBOARD_ID = L.REFERENCE_ID
+        LEFT JOIN USERS U ON C.USER_ID = U.USER_ID
         WHERE C.CODEBOARD_ID = #{codeboardId}
         AND C.CODEBOARD_DELETED_YN = 'N'
     </select>
@@ -79,69 +123,16 @@
     </update>
 
     <!-- 게시글 총 개수 조회 -->
-    <select id="countPosts" resultType="int">
+    <select id="countPosts" resultType="long">
         SELECT COUNT(*)
         FROM CODEBOARD C
         WHERE C.CODEBOARD_DELETED_YN = 'N'
-        <if test="keyword != null and keyword != ''">
+        <if test="search.keyword != null and search.keyword != ''">
             AND (
-            C.CODEBOARD_TITLE LIKE CONCAT('%', #{keyword}, '%')
-            OR C.CODEBOARD_PLAIN_TEXT LIKE CONCAT('%', #{keyword}, '%')
+            C.CODEBOARD_TITLE LIKE CONCAT('%', #{search.keyword}, '%')
+            OR C.CODEBOARD_PLAIN_TEXT LIKE CONCAT('%', #{search.keyword}, '%')
             )
         </if>
-    </select>
-
-    <!-- 게시글 목록 조회 -->
-    <select id="findPosts" resultType="kr.or.kosa.backend.codeboard.dto.CodeboardListResponseDto">
-        SELECT
-        C.CODEBOARD_ID AS codeboardId,
-        C.USER_ID AS userId,
-        U.USER_NICKNAME AS userNickname,
-        C.ANALYSIS_ID AS analysisId,
-        C.CODEBOARD_TITLE AS codeboardTitle,
-        SUBSTRING(C.CODEBOARD_PLAIN_TEXT, 1, 200) AS codeboardSummary,
-        C.CODEBOARD_CLICK AS codeboardClick,
-        C.CODEBOARD_CREATED_AT AS codeboardCreatedAt,
-        COALESCE(L.LIKE_COUNT, 0) AS likeCount,
-        COALESCE(CM.COMMENT_COUNT, 0) AS commentCount
-        FROM CODEBOARD C
-        INNER JOIN USERS U ON C.USER_ID = U.USER_ID
-        LEFT JOIN (
-        SELECT REFERENCE_ID, COUNT(*) AS LIKE_COUNT
-        FROM `LIKE`
-        WHERE REFERENCE_TYPE = 'POST_CODEBOARD'
-        GROUP BY REFERENCE_ID
-        ) L ON C.CODEBOARD_ID = L.REFERENCE_ID
-        LEFT JOIN (
-        SELECT BOARD_ID, COUNT(*) AS COMMENT_COUNT
-        FROM COMMENT
-        WHERE BOARD_TYPE = 'CODEBOARD'
-        AND IS_DELETED = 0
-        GROUP BY BOARD_ID
-        ) CM ON C.CODEBOARD_ID = CM.BOARD_ID
-        WHERE C.CODEBOARD_DELETED_YN = 'N'
-        <if test="keyword != null and keyword != ''">
-            AND (
-            C.CODEBOARD_TITLE LIKE CONCAT('%', #{keyword}, '%')
-            OR C.CODEBOARD_PLAIN_TEXT LIKE CONCAT('%', #{keyword}, '%')
-            )
-        </if>
-        ORDER BY
-        <choose>
-            <when test="sortField == 'comment_count'">
-                commentCount ${sortDirection}, C.CODEBOARD_CREATED_AT DESC
-            </when>
-            <when test="sortField == 'like_count'">
-                likeCount ${sortDirection}, C.CODEBOARD_CREATED_AT DESC
-            </when>
-            <when test="sortField == 'view_count'">
-                C.CODEBOARD_CLICK ${sortDirection}, C.CODEBOARD_CREATED_AT DESC
-            </when>
-            <otherwise>
-                C.CODEBOARD_CREATED_AT ${sortDirection}
-            </otherwise>
-        </choose>
-        LIMIT #{pageSize} OFFSET #{offset}
     </select>
 
 </mapper>

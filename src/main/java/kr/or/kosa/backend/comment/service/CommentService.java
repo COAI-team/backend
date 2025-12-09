@@ -1,23 +1,22 @@
 package kr.or.kosa.backend.comment.service;
 
-import kr.or.kosa.backend.codeboard.domain.Codeboard;
 import kr.or.kosa.backend.codeboard.dto.CodeboardDetailResponseDto;
 import kr.or.kosa.backend.codeboard.mapper.CodeboardMapper;
 import kr.or.kosa.backend.comment.domain.Comment;
 import kr.or.kosa.backend.comment.dto.CommentCreateRequest;
 import kr.or.kosa.backend.comment.dto.CommentResponse;
 import kr.or.kosa.backend.comment.dto.CommentUpdateRequest;
-import kr.or.kosa.backend.comment.dto.CommentWithRepliesResponse;
 import kr.or.kosa.backend.comment.exception.CommentErrorCode;
 import kr.or.kosa.backend.comment.mapper.CommentMapper;
 import kr.or.kosa.backend.commons.exception.custom.CustomBusinessException;
-import kr.or.kosa.backend.freeboard.domain.Freeboard;
+import kr.or.kosa.backend.commons.pagination.CursorRequest;
+import kr.or.kosa.backend.commons.pagination.CursorResponse;
 import kr.or.kosa.backend.freeboard.dto.FreeboardDetailResponseDto;
 import kr.or.kosa.backend.freeboard.mapper.FreeboardMapper;
-import kr.or.kosa.backend.like.service.LikeService;
 import kr.or.kosa.backend.like.domain.ReferenceType;
-import kr.or.kosa.backend.notification.service.NotificationService;
+import kr.or.kosa.backend.like.service.LikeService;
 import kr.or.kosa.backend.notification.domain.NotificationType;
+import kr.or.kosa.backend.notification.service.NotificationService;
 import kr.or.kosa.backend.users.domain.Users;
 import kr.or.kosa.backend.users.mapper.UserMapper;
 import lombok.RequiredArgsConstructor;
@@ -25,8 +24,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.*;
-import java.util.stream.Collectors;
+import java.util.List;
 
 @Slf4j
 @Service
@@ -126,82 +124,26 @@ public class CommentService {
                 .build();
     }
 
-    // 커서 기반 무한 스크롤로 수정
-    public List<CommentWithRepliesResponse> getCommentsByBoard(Long boardId, String boardType, Long cursor, int size, Long currentUserId) {
-        // 최상위 댓글만 조회 (커서 기반)
-        List<CommentResponse> comments = commentMapper.selectCommentsByBoard(boardType, boardId, cursor, size);
+    // 커서 기반 댓글 목록 조회 (답글 포함)
+    public CursorResponse<CommentResponse> getComments(
+            Long boardId,
+            String boardType,
+            CursorRequest cursor,
+            Long userId
+    ) {
+        // 댓글 + 답글 모두 조회 (SQL에서 한 번에)
+        List<CommentResponse> comments = commentMapper.selectCommentsWithReplies(
+                boardId,
+                boardType,
+                cursor,
+                userId
+        );
 
-        if (comments.isEmpty()) {
-            return Collections.emptyList();
-        }
-
-        // 부모 댓글 ID 수집
-        List<Long> commentIds = comments.stream()
-                .map(CommentResponse::getCommentId)
-                .collect(Collectors.toList());
-
-        // 대댓글 한 번에 조회
-        List<CommentResponse> replies = commentMapper.selectRepliesByParentIds(commentIds);
-
-        // 댓글별로 대댓글 그룹핑
-        Map<Long, List<CommentResponse>> repliesByParentId = replies.stream()
-                .collect(Collectors.groupingBy(CommentResponse::getParentCommentId));
-
-        // 현재 사용자가 좋아요 누른 댓글 ID 목록 조회
-        List<Long> allCommentIds = new ArrayList<>(commentIds);
-        allCommentIds.addAll(replies.stream().map(CommentResponse::getCommentId).collect(Collectors.toList()));
-
-        Set<Long> likedCommentIds = currentUserId != null
-                ? new HashSet<>(likeService.getLikedIds(currentUserId, ReferenceType.COMMENT, allCommentIds))
-                : Collections.emptySet();
-
-        // 게시글 작성자 ID 조회
-        Long boardAuthorId = getBoardAuthorId(boardType, boardId);
-
-        // 응답 조립
-        return comments.stream()
-                .map(comment -> {
-                    List<CommentResponse> replyResponses = repliesByParentId
-                            .getOrDefault(comment.getCommentId(), Collections.emptyList())
-                            .stream()
-                            .map(reply -> CommentResponse.builder()
-                                    .commentId(reply.getCommentId())
-                                    .boardId(reply.getBoardId())
-                                    .boardType(reply.getBoardType())
-                                    .parentCommentId(reply.getParentCommentId())
-                                    .userId(reply.getUserId())
-                                    .userNickname(reply.getUserNickname())
-                                    .content(reply.getContent())
-                                    .likeCount(reply.getLikeCount())
-                                    .isLiked(likedCommentIds.contains(reply.getCommentId()))
-                                    .isAuthor(reply.getUserId().equals(boardAuthorId))
-                                    .isDeleted(reply.getIsDeleted())
-                                    .createdAt(reply.getCreatedAt())
-                                    .updatedAt(reply.getUpdatedAt())
-                                    .build())
-                            .collect(Collectors.toList());
-
-                    return CommentWithRepliesResponse.builder()
-                            .commentId(comment.getCommentId())
-                            .boardId(comment.getBoardId())
-                            .boardType(comment.getBoardType())
-                            .userId(comment.getUserId())
-                            .userNickname(comment.getUserNickname())
-                            .content(comment.getContent())
-                            .likeCount(comment.getLikeCount())
-                            .isLiked(likedCommentIds.contains(comment.getCommentId()))
-                            .isAuthor(comment.getUserId().equals(boardAuthorId))
-                            .isDeleted(comment.getIsDeleted())
-                            .createdAt(comment.getCreatedAt())
-                            .updatedAt(comment.getUpdatedAt())
-                            .replies(replyResponses)
-                            .build();
-                })
-                .collect(Collectors.toList());
+        return new CursorResponse<CommentResponse>(comments, cursor.getSize());
     }
 
     @Transactional
-    public CommentResponse updateComment(Long commentId, CommentUpdateRequest request, Long userId) {
+    public void updateComment(Long commentId, CommentUpdateRequest request, Long userId) {
         Comment comment = commentMapper.selectCommentById(commentId);
         if (comment == null) {
             throw new CustomBusinessException(CommentErrorCode.NOT_FOUND);
@@ -221,8 +163,6 @@ public class CommentService {
         if (updated == 0) {
             throw new CustomBusinessException(CommentErrorCode.UPDATE_ERROR);
         }
-
-        return CommentResponse.from(comment);
     }
 
     @Transactional
