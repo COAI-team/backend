@@ -11,7 +11,11 @@ import kr.or.kosa.backend.algorithm.dto.enums.JudgeResult;
 import kr.or.kosa.backend.algorithm.dto.enums.LanguageType;
 import kr.or.kosa.backend.algorithm.dto.enums.ProblemType;
 import kr.or.kosa.backend.algorithm.dto.enums.SolveMode;
-import kr.or.kosa.backend.algorithm.dto.*;
+import kr.or.kosa.backend.algorithm.dto.request.SubmissionRequestDto;
+import kr.or.kosa.backend.algorithm.dto.request.TestRunRequestDto;
+import kr.or.kosa.backend.algorithm.dto.response.ProblemSolveResponseDto;
+import kr.or.kosa.backend.algorithm.dto.response.SubmissionResponseDto;
+import kr.or.kosa.backend.algorithm.dto.response.TestRunResponseDto;
 import kr.or.kosa.backend.algorithm.mapper.AlgorithmProblemMapper;
 import kr.or.kosa.backend.algorithm.mapper.AlgorithmSubmissionMapper;
 import lombok.RequiredArgsConstructor;
@@ -45,7 +49,7 @@ public class AlgorithmSolvingService {
 
     private final AlgorithmProblemMapper problemMapper;
     private final AlgorithmSubmissionMapper submissionMapper;
-    private final Judge0Service judge0Service;
+    private final CodeExecutorService codeExecutorService;  // Judge0 또는 Piston 선택
     private final AlgorithmJudgingService judgingService;
     private final LanguageConstantService languageConstantService;
 
@@ -218,15 +222,7 @@ public class AlgorithmSolvingService {
         log.info("언어 상수 조회 완료 - language: {}, timeFactor: {}, memoryFactor: {}",
                 dbLanguageName, constant.getTimeFactor(), constant.getMemoryFactor());
 
-        // 4. Judge0 DTO로 변환
-        List<Judge0Service.TestCaseDto> testCaseDtos = sampleTestcases.stream()
-                .map(tc -> Judge0Service.TestCaseDto.builder()
-                        .input(tc.getInputData())
-                        .expectedOutput(tc.getExpectedOutput())
-                        .build())
-                .collect(Collectors.toList());
-
-        // 5. Judge0 실행
+        // 4. Judge0 실행 (AlgoTestcaseDto 직접 전달)
         try {
             // 언어별 제한 시간/메모리 계산
             Integer realTimeLimit = constant.calculateRealTimeLimit(problem.getTimelimit());
@@ -236,18 +232,19 @@ public class AlgorithmSolvingService {
                     dbLanguageName, problem.getTimelimit(), realTimeLimit,
                     problem.getMemorylimit(), realMemoryLimit);
 
-            CompletableFuture<Judge0Service.JudgeResultDto> judgeFuture = judge0Service
-                    .judgeCode(request.getSourceCode(), dbLanguageName, testCaseDtos, realTimeLimit, realMemoryLimit);
+            // Judge0 또는 Piston 사용 (환경 설정에 따라 자동 선택)
+            CompletableFuture<TestRunResponseDto> judgeFuture = codeExecutorService
+                    .judgeCode(request.getSourceCode(), dbLanguageName, sampleTestcases, realTimeLimit, realMemoryLimit);
 
-            Judge0Service.JudgeResultDto judgeResult = judgeFuture.get();
+            TestRunResponseDto judgeResult = judgeFuture.get();
 
             log.info("샘플 테스트 실행 완료 - 결과: {}, 통과: {}/{}",
                     judgeResult.getOverallResult(),
-                    judgeResult.getPassedTestCount(),
-                    judgeResult.getTotalTestCount());
+                    judgeResult.getPassedCount(),
+                    judgeResult.getTotalCount());
 
-            // 6. 응답 DTO 변환 (DB 저장 없이 바로 반환)
-            return convertToTestRunResponse(judgeResult);
+            // 5. 응답 DTO 반환 (DB 저장 없이 바로 반환)
+            return judgeResult;
 
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -257,38 +254,6 @@ public class AlgorithmSolvingService {
             log.error("샘플 테스트 실행 중 오류 발생", e);
             throw new RuntimeException("테스트 실행 중 오류가 발생했습니다: " + e.getMessage(), e);
         }
-    }
-
-    /**
-     * Judge0 결과를 TestRunResponseDto로 변환
-     */
-    private TestRunResponseDto convertToTestRunResponse(Judge0Service.JudgeResultDto judgeResult) {
-        List<TestRunResponseDto.TestCaseResultDto> testCaseResults = null;
-
-        if (judgeResult.getTestCaseResults() != null) {
-            testCaseResults = judgeResult.getTestCaseResults().stream()
-                    .map(r -> TestRunResponseDto.TestCaseResultDto.builder()
-                            .testCaseNumber(r.getTestCaseNumber())
-                            .input(r.getInput())
-                            .expectedOutput(r.getExpectedOutput())
-                            .actualOutput(r.getActualOutput())
-                            .result(r.getResult())
-                            .executionTime(r.getExecutionTime())
-                            .memoryUsage(r.getMemoryUsage())
-                            .errorMessage(r.getErrorMessage())
-                            .build())
-                    .collect(Collectors.toList());
-        }
-
-        return TestRunResponseDto.builder()
-                .overallResult(judgeResult.getOverallResult())
-                .passedCount(judgeResult.getPassedTestCount())
-                .totalCount(judgeResult.getTotalTestCount())
-                .testPassRate(judgeResult.getTestPassRate())
-                .maxExecutionTime(judgeResult.getMaxExecutionTime())
-                .maxMemoryUsage(judgeResult.getMaxMemoryUsage())
-                .testCaseResults(testCaseResults)
-                .build();
     }
 
     /**
@@ -403,7 +368,7 @@ public class AlgorithmSolvingService {
 
     private SubmissionResponseDto convertToSubmissionResponse(AlgoSubmissionDto submission,
             AlgoProblemDto problem,
-            List<Judge0Service.TestCaseResultDto> testCaseResults) {
+            List<TestRunResponseDto.TestCaseResultDto> testCaseResults) {
         return SubmissionResponseDto.builder()
                 .submissionId(submission.getAlgosubmissionId())
                 .problemId(submission.getAlgoProblemId())

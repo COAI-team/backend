@@ -91,6 +91,28 @@ public class AlgoProblemDto {
      */
     private Boolean algoProblemStatus;
 
+    // === LLM 생성 문제 전용 필드 (사용자에게 표시) ===
+
+    /**
+     * 제약 조건
+     */
+    private String constraints;
+
+    /**
+     * 입력 형식 설명
+     */
+    private String inputFormat;
+
+    /**
+     * 출력 형식 설명
+     */
+    private String outputFormat;
+
+    /**
+     * 예상 시간 복잡도 (예: O(n log n))
+     */
+    private String expectedTimeComplexity;
+
     // === 추가 필드 (연관 데이터) ===
 
     /**

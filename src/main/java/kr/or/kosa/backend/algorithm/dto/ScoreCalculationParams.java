@@ -3,15 +3,18 @@ package kr.or.kosa.backend.algorithm.dto;
 import kr.or.kosa.backend.algorithm.dto.enums.ProblemDifficulty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.Getter;
 
 /**
  * 점수 계산에 필요한 파라미터 DTO
+ *
+ * 내부 전달용 DTO: 서비스 간 불변 객체로 전달
+ * - @Builder: 서비스에서 객체 생성
+ * - @AllArgsConstructor: Builder 내부에서 사용
+ * - @Getter: 값 읽기 전용
  */
-@Data
+@Getter
 @Builder
-@NoArgsConstructor
 @AllArgsConstructor
 public class ScoreCalculationParams {
 

@@ -1,9 +1,8 @@
-package kr.or.kosa.backend.algorithm.dto;
+package kr.or.kosa.backend.algorithm.dto.response;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.Getter;
 
 import java.time.LocalDateTime;
 import java.math.BigDecimal;
@@ -11,14 +10,9 @@ import java.util.List;
 
 /**
  * 제출 결과 응답 DTO
- *
- * 변경사항:
- * - focusScore 제거 (모니터링은 점수에 미반영)
- * - solveMode, monitoringSessionId 추가
  */
-@Data
+@Getter
 @Builder
-@NoArgsConstructor
 @AllArgsConstructor
 public class SubmissionResponseDto {
 
@@ -67,9 +61,8 @@ public class SubmissionResponseDto {
     // 제출 시각
     private LocalDateTime submittedAt;
 
-    @Data
+    @Getter
     @Builder
-    @NoArgsConstructor
     @AllArgsConstructor
     public static class TestCaseResultDto {
         private Integer testCaseNumber;
@@ -81,9 +74,8 @@ public class SubmissionResponseDto {
         private String errorMessage;
     }
 
-    @Data
+    @Getter
     @Builder
-    @NoArgsConstructor
     @AllArgsConstructor
     public static class ScoreBreakdownDto {
         private BigDecimal judgeScore;      // 채점 점수 (40%)

@@ -5,7 +5,8 @@ import kr.or.kosa.backend.algorithm.dto.AlgoSubmissionDto;
 import kr.or.kosa.backend.algorithm.dto.AICodeEvaluationResult;
 import kr.or.kosa.backend.algorithm.dto.ScoreCalculationParams;
 import kr.or.kosa.backend.algorithm.dto.ScoreCalculationResult;
-import kr.or.kosa.backend.algorithm.dto.SubmissionAiStatusDto;
+import kr.or.kosa.backend.algorithm.dto.response.SubmissionAiStatusResponseDto;
+import kr.or.kosa.backend.algorithm.dto.response.TestRunResponseDto;
 import kr.or.kosa.backend.algorithm.dto.enums.AiFeedbackStatus;
 import kr.or.kosa.backend.algorithm.mapper.AlgorithmSubmissionMapper;
 
@@ -36,7 +37,7 @@ public class AlgorithmEvaluationService {
     public CompletableFuture<Void> processEvaluationAsync(
             Long submissionId,
             AlgoProblemDto problem,
-            Judge0Service.JudgeResultDto judgeResult
+            TestRunResponseDto judgeResult
     ) {
         log.info("🤖 AI 평가 비동기 진입점 - submissionId: {}, thread: {}",
                 submissionId, Thread.currentThread().getName());
@@ -60,7 +61,7 @@ public class AlgorithmEvaluationService {
     public void executeEvaluationWithTransaction(
             Long submissionId,
             AlgoProblemDto problem,
-            Judge0Service.JudgeResultDto judgeResult
+            TestRunResponseDto judgeResult
     ) throws Exception {
         log.info("📊 AI 평가 트랜잭션 시작 - submissionId: {}", submissionId);
 
@@ -87,8 +88,8 @@ public class AlgorithmEvaluationService {
         // 4. 점수 계산
         ScoreCalculationParams params = ScoreCalculationParams.builder()
                 .judgeResult(judgeResult.getOverallResult())
-                .passedTestCount(judgeResult.getPassedTestCount())
-                .totalTestCount(judgeResult.getTotalTestCount())
+                .passedTestCount(judgeResult.getPassedCount())
+                .totalTestCount(judgeResult.getTotalCount())
                 .aiScore(aiResult.getAiScore())
                 .solvingTimeSeconds(submission.getSolvingDurationSeconds())
                 .timeLimitSeconds(1800)
@@ -169,13 +170,13 @@ public class AlgorithmEvaluationService {
     }
 
     @Transactional(readOnly = true)
-    public SubmissionAiStatusDto getEvaluationStatus(Long submissionId) {
+    public SubmissionAiStatusResponseDto getEvaluationStatus(Long submissionId) {
         AlgoSubmissionDto submission = submissionMapper.selectSubmissionById(submissionId);
         if (submission == null) {
             throw new IllegalArgumentException("제출 정보를 찾을 수 없습니다: " + submissionId);
         }
 
-        return SubmissionAiStatusDto.builder()
+        return SubmissionAiStatusResponseDto.builder()
                 .submissionId(submissionId)
                 .aiFeedbackStatus(
                         submission.getAiFeedbackStatus() != null

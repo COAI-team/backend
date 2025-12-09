@@ -1,18 +1,16 @@
-package kr.or.kosa.backend.algorithm.dto;
+package kr.or.kosa.backend.algorithm.dto.response;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.Getter;
 
 /**
- * 문제 통계 정보 Dto
+ * 문제 통계 응답 DTO
  */
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
+@Getter
 @Builder
-public class ProblemStatisticsDto {
+@AllArgsConstructor
+public class ProblemStatisticsResponseDto {
 
     private Integer totalProblems;      // 전체 문제 수
     private Integer solvedProblems;     // 내가 푼 문제 수

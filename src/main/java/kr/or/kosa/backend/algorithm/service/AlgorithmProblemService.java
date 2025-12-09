@@ -2,16 +2,23 @@ package kr.or.kosa.backend.algorithm.service;
 
 import kr.or.kosa.backend.algorithm.dto.AlgoProblemDto;
 import kr.or.kosa.backend.algorithm.dto.AlgoTestcaseDto;
-import kr.or.kosa.backend.algorithm.dto.*;
+import kr.or.kosa.backend.algorithm.dto.ProblemValidationLogDto;
+import kr.or.kosa.backend.algorithm.dto.ValidationResultDto;
+import kr.or.kosa.backend.algorithm.dto.request.ProblemListRequestDto;
+import kr.or.kosa.backend.algorithm.dto.response.ProblemGenerationResponseDto;
+import kr.or.kosa.backend.algorithm.dto.response.ProblemStatisticsResponseDto;
 import kr.or.kosa.backend.algorithm.mapper.AlgorithmProblemMapper;
+import kr.or.kosa.backend.algorithm.mapper.ProblemValidationLogMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -20,6 +27,7 @@ import java.util.Map;
 public class AlgorithmProblemService {
 
     private final AlgorithmProblemMapper algorithmProblemMapper;
+    private final ProblemValidationLogMapper validationLogMapper;
 
 
     /**
@@ -155,7 +163,7 @@ public class AlgorithmProblemService {
      * @param userId 사용자 ID (nullable)
      * @return 통계 정보
      */
-    public ProblemStatisticsDto getProblemStatistics(Long userId) {
+    public ProblemStatisticsResponseDto getProblemStatistics(Long userId) {
         log.debug("통계 정보 조회 - userId: {}", userId);
 
         try {
@@ -164,7 +172,7 @@ public class AlgorithmProblemService {
 
             // TODO: Mapper에 selectProblemStatistics 메서드 구현 필요
             // 현재는 기본값 반환 (merge 충돌 해결을 위한 임시 구현)
-            return ProblemStatisticsDto.builder()
+            return ProblemStatisticsResponseDto.builder()
                     .totalProblems(totalProblems)
                     .solvedProblems(0)      // TODO: 사용자별 해결 문제 수 조회
                     .averageAccuracy(0.0)   // TODO: 평균 정답률 계산
@@ -314,7 +322,15 @@ public class AlgorithmProblemService {
                 saveTestcases(problem.getAlgoProblemId(), responseDto.getTestCases());
             }
 
-            // 4. ResponseDto에 생성된 ID 설정
+            // 4. 검증 로그 저장 (검증 결과가 있거나 검증 코드가 있는 경우)
+            boolean hasValidationResults = responseDto.getValidationResults() != null && !responseDto.getValidationResults().isEmpty();
+            boolean hasValidationCode = responseDto.getOptimalCode() != null || responseDto.getNaiveCode() != null;
+
+            if (hasValidationResults || hasValidationCode) {
+                saveValidationLog(problem.getAlgoProblemId(), responseDto);
+            }
+
+            // 5. ResponseDto에 생성된 ID 설정
             responseDto.setProblemId(problem.getAlgoProblemId());
 
             return problem.getAlgoProblemId();
@@ -351,5 +367,128 @@ public class AlgorithmProblemService {
             log.error("전체 테스트케이스 조회 실패 - problemId: {}", problemId, e);
             throw new RuntimeException("전체 테스트케이스 조회 중 오류가 발생했습니다.", e);
         }
+    }
+
+    /**
+     * 검증 로그 저장
+     *
+     * @param problemId   문제 ID
+     * @param responseDto 문제 생성 응답 (검증 결과 포함)
+     */
+    @Transactional
+    private void saveValidationLog(Long problemId, ProblemGenerationResponseDto responseDto) {
+        try {
+            List<ValidationResultDto> validationResults = responseDto.getValidationResults();
+
+            // 검증 결과 분석 (null-safe)
+            String validationStatus;
+            Double similarityScore = null;
+            Boolean similarityValid = null;
+            Integer optimalExecutionTime = null;
+            Integer naiveExecutionTime = null;
+            Double timeRatio = null;
+            Boolean timeRatioValid = null;
+            String optimalCodeResult = null;
+            String naiveCodeResult = null;
+            String failureReasons = null;
+
+            if (validationResults != null && !validationResults.isEmpty()) {
+                // 검증 결과가 있는 경우
+                boolean allPassed = validationResults.stream().allMatch(ValidationResultDto::isPassed);
+                validationStatus = allPassed ? "PASSED" : "FAILED";
+
+                // 메타데이터에서 유사도 점수 추출
+                for (ValidationResultDto result : validationResults) {
+                    Map<String, Object> metadata = result.getMetadata();
+
+                    if ("SimilarityChecker".equals(result.getValidatorName())) {
+                        if (metadata != null && metadata.containsKey("maxSimilarity")) {
+                            similarityScore = ((Number) metadata.get("maxSimilarity")).doubleValue();
+                        }
+                        similarityValid = result.isPassed();
+                    }
+
+                    if ("CodeExecutionValidator".equals(result.getValidatorName())) {
+                        if (metadata != null && metadata.containsKey("optimalExecutionTime")) {
+                            optimalExecutionTime = ((Number) metadata.get("optimalExecutionTime")).intValue();
+                        }
+                        optimalCodeResult = result.isPassed() ? "PASS" : "FAIL";
+                    }
+
+                    if ("TimeRatioValidator".equals(result.getValidatorName())) {
+                        if (metadata != null && metadata.containsKey("naiveExecutionTime")) {
+                            naiveExecutionTime = ((Number) metadata.get("naiveExecutionTime")).intValue();
+                        }
+                        if (metadata != null && metadata.containsKey("timeRatio")) {
+                            timeRatio = ((Number) metadata.get("timeRatio")).doubleValue();
+                        }
+                        timeRatioValid = result.isPassed();
+                        naiveCodeResult = result.isPassed() ? "PASS" : "FAIL";
+                    }
+                }
+
+                // 실패 원인 수집 (JSON 형태)
+                failureReasons = collectFailureReasons(validationResults);
+            } else {
+                // 검증 결과 없이 코드만 있는 경우 (PENDING 상태로 저장)
+                validationStatus = "PENDING";
+                log.info("검증 결과 없음 - PENDING 상태로 저장 (문제 ID: {})", problemId);
+            }
+
+            // 검증 로그 DTO 생성
+            ProblemValidationLogDto validationLog = ProblemValidationLogDto.builder()
+                    .algoProblemId(problemId)
+                    .optimalCode(responseDto.getOptimalCode())
+                    .naiveCode(responseDto.getNaiveCode())
+                    .expectedTimeComplexity(responseDto.getProblem().getExpectedTimeComplexity())
+                    .optimalCodeResult(optimalCodeResult)
+                    .naiveCodeResult(naiveCodeResult)
+                    .optimalExecutionTime(optimalExecutionTime)
+                    .naiveExecutionTime(naiveExecutionTime)
+                    .timeRatio(timeRatio)
+                    .timeRatioValid(timeRatioValid)
+                    .similarityScore(similarityScore)
+                    .similarityValid(similarityValid)
+                    .validationStatus(validationStatus)
+                    .correctionAttempts(0)  // 저장 시점에서는 수정 시도 전
+                    .failureReasons(failureReasons)
+                    .createdAt(LocalDateTime.now())
+                    .completedAt(LocalDateTime.now())
+                    .build();
+
+            // DB 저장
+            int result = validationLogMapper.insertValidationLog(validationLog);
+
+            if (result > 0) {
+                log.info("검증 로그 저장 완료 - 문제 ID: {}, 검증 상태: {}, 로그 ID: {}",
+                        problemId, validationStatus, validationLog.getValidationId());
+            } else {
+                log.warn("검증 로그 저장 실패 - 문제 ID: {}", problemId);
+            }
+
+        } catch (Exception e) {
+            log.error("검증 로그 저장 중 오류 발생 - problemId: {}", problemId, e);
+            // 검증 로그 저장 실패가 전체 프로세스를 중단하지 않도록 예외를 던지지 않음
+        }
+    }
+
+    /**
+     * 실패 원인 수집 (JSON 형태)
+     */
+    private String collectFailureReasons(List<ValidationResultDto> validationResults) {
+        List<String> failures = validationResults.stream()
+                .filter(r -> !r.isPassed())
+                .map(r -> String.format("{\"validator\":\"%s\",\"errors\":%s}",
+                        r.getValidatorName(),
+                        r.getErrors().stream()
+                                .map(e -> "\"" + e.replace("\"", "\\\"") + "\"")
+                                .collect(Collectors.joining(",", "[", "]"))))
+                .collect(Collectors.toList());
+
+        if (failures.isEmpty()) {
+            return null;
+        }
+
+        return "[" + String.join(",", failures) + "]";
     }
 }

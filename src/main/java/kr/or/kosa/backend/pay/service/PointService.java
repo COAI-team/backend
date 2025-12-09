@@ -12,4 +12,7 @@ public interface PointService {
 
     // 환불 시 되돌리기
     void refundPoint(Long userId, BigDecimal amountToRefund, String orderId, String reason);
+
+    // 보상 포인트 적립
+    void addRewardPoint(Long userId, int rewardPoints, String description);
 }

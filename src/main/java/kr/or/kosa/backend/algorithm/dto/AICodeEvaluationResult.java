@@ -1,12 +1,22 @@
 package kr.or.kosa.backend.algorithm.dto;
 
+import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Data;
+import lombok.Getter;
 
 import java.util.List;
 
-@Data
+/**
+ * AI 코드 평가 결과 DTO
+ *
+ * 내부 전달용 DTO: 서비스 간 불변 객체로 전달
+ * - @Builder: 서비스에서 객체 생성
+ * - @AllArgsConstructor: Builder 내부에서 사용 (기존 누락 수정)
+ * - @Getter: 값 읽기 전용
+ */
+@Getter
 @Builder
+@AllArgsConstructor
 public class AICodeEvaluationResult {
 
     private Double aiScore;            // AI 채점 점수

@@ -1,4 +1,4 @@
-package kr.or.kosa.backend.algorithm.dto;
+package kr.or.kosa.backend.algorithm.dto.request;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -6,7 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * 문제 목록 조회 요청 Dto
+ * 문제 목록 조회 요청 DTO
  */
 @Data
 @NoArgsConstructor

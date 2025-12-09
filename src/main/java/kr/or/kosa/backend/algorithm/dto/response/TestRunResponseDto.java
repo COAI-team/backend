@@ -1,18 +1,16 @@
-package kr.or.kosa.backend.algorithm.dto;
+package kr.or.kosa.backend.algorithm.dto.response;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.Getter;
 
 import java.util.List;
 
 /**
- * 샘플 테스트 실행 결과 DTO
+ * 샘플 테스트 실행 결과 응답 DTO
  */
-@Data
+@Getter
 @Builder
-@NoArgsConstructor
 @AllArgsConstructor
 public class TestRunResponseDto {
 
@@ -24,9 +22,8 @@ public class TestRunResponseDto {
     private Integer maxMemoryUsage;    // 최대 메모리 사용량 (KB)
     private List<TestCaseResultDto> testCaseResults;  // 각 테스트케이스 결과
 
-    @Data
+    @Getter
     @Builder
-    @NoArgsConstructor
     @AllArgsConstructor
     public static class TestCaseResultDto {
         private Integer testCaseNumber;    // 테스트케이스 번호
