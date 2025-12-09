@@ -54,7 +54,7 @@ public class SecurityConfig {
                             .requestMatchers(org.springframework.http.HttpMethod.GET, "/freeboard/**").permitAll()
                             .requestMatchers(org.springframework.http.HttpMethod.GET, "/codeboard/**").permitAll()
                             .requestMatchers(org.springframework.http.HttpMethod.GET, "/like/**").permitAll()
-                            .requestMatchers(org.springframework.http.HttpMethod.GET, "/comment/**").permitAll()
+                            .requestMatchers(org.springframework.http.HttpMethod.GET, "/comment", "/comment/**").permitAll()
                             .requestMatchers(org.springframework.http.HttpMethod.GET, "/analysis/**").permitAll()
                             .anyRequest().authenticated());
 
