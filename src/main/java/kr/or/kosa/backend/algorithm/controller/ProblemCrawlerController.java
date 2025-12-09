@@ -478,4 +478,148 @@ public class ProblemCrawlerController {
         }
     }
 
+    // ===== Vector DB 관리 API (삭제) =====
+
+    /**
+     * 영어 문제 조회 (삭제 전 확인용)
+     *
+     * GET /algo/crawler/vectordb/english?topK=100
+     */
+    @GetMapping("/vectordb/english")
+    public ResponseEntity<?> findEnglishProblems(
+            @RequestParam(defaultValue = "100") int topK) {
+        log.info("🔍 영어 문제 검색: topK={}", topK);
+
+        try {
+            List<Document> englishDocs = vectorStoreService.findEnglishProblems(topK);
+
+            List<Map<String, Object>> resultList = englishDocs.stream()
+                    .map(doc -> Map.of(
+                            "id", doc.getId(),
+                            "title", doc.getMetadata().getOrDefault("title", "Unknown"),
+                            "source", doc.getMetadata().getOrDefault("source", "Unknown"),
+                            "externalId", doc.getMetadata().getOrDefault("externalId", "Unknown"),
+                            "contentPreview", doc.getText().substring(0, Math.min(200, doc.getText().length())) + "..."
+                    ))
+                    .toList();
+
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "영어 문제 검색 완료",
+                    "count", englishDocs.size(),
+                    "problems", resultList
+            ));
+
+        } catch (Exception e) {
+            log.error("영어 문제 검색 실패", e);
+            return ResponseEntity.status(500).body(Map.of(
+                    "success", false,
+                    "message", "검색 중 오류 발생: " + e.getMessage()
+            ));
+        }
+    }
+
+    /**
+     * 영어 문제 일괄 삭제
+     *
+     * DELETE /algo/crawler/vectordb/english?searchLimit=500
+     */
+    @DeleteMapping("/vectordb/english")
+    public ResponseEntity<?> deleteEnglishProblems(
+            @RequestParam(defaultValue = "500") int searchLimit) {
+        log.info("🗑️ 영어 문제 삭제 요청: searchLimit={}", searchLimit);
+
+        try {
+            int deletedCount = vectorStoreService.deleteEnglishProblems(searchLimit);
+
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "영어 문제 삭제 완료",
+                    "deletedCount", deletedCount
+            ));
+
+        } catch (Exception e) {
+            log.error("영어 문제 삭제 실패", e);
+            return ResponseEntity.status(500).body(Map.of(
+                    "success", false,
+                    "message", "삭제 중 오류 발생: " + e.getMessage()
+            ));
+        }
+    }
+
+    /**
+     * 특정 문서 ID로 삭제
+     *
+     * DELETE /algo/crawler/vectordb/documents
+     * Body: {
+     *   "documentIds": ["uuid1", "uuid2", ...]
+     * }
+     */
+    @DeleteMapping("/vectordb/documents")
+    public ResponseEntity<?> deleteDocuments(@RequestBody Map<String, List<String>> request) {
+        List<String> documentIds = request.get("documentIds");
+
+        if (documentIds == null || documentIds.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", "삭제할 문서 ID가 필요합니다"
+            ));
+        }
+
+        log.info("🗑️ 문서 삭제 요청: {}개 문서", documentIds.size());
+
+        try {
+            int deletedCount = vectorStoreService.deleteDocuments(documentIds);
+
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "문서 삭제 완료",
+                    "deletedCount", deletedCount
+            ));
+
+        } catch (Exception e) {
+            log.error("문서 삭제 실패", e);
+            return ResponseEntity.status(500).body(Map.of(
+                    "success", false,
+                    "message", "삭제 중 오류 발생: " + e.getMessage()
+            ));
+        }
+    }
+
+    /**
+     * Vector DB 전체 초기화 (주의: 모든 문서 삭제)
+     *
+     * DELETE /algo/crawler/vectordb/all?confirm=true
+     */
+    @DeleteMapping("/vectordb/all")
+    public ResponseEntity<?> deleteAllProblems(
+            @RequestParam(defaultValue = "false") boolean confirm) {
+        log.warn("⚠️ Vector DB 전체 삭제 요청: confirm={}", confirm);
+
+        if (!confirm) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", "전체 삭제를 수행하려면 confirm=true 파라미터가 필요합니다"
+            ));
+        }
+
+        try {
+            int deletedCount = vectorStoreService.deleteAllProblems(true);
+
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "Vector DB 전체 삭제 완료",
+                    "deletedCount", deletedCount,
+                    "warning", "모든 문서가 삭제되었습니다"
+            ));
+
+        } catch (Exception e) {
+            log.error("전체 삭제 실패", e);
+            return ResponseEntity.status(500).body(Map.of(
+                    "success", false,
+                    "message", "삭제 중 오류 발생: " + e.getMessage()
+            ));
+        }
+    }
+
 }

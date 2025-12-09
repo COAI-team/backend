@@ -317,6 +317,13 @@ public class ProblemCrawlerService {
             for (SolvedAcProblemDto problem : problems) {
                 if (documents.size() >= totalCount) break;
 
+                // 한국어 제목이 없는 문제는 건너뛰기 (영어 전용 문제 필터링)
+                if (problem.getTitleKo() == null || problem.getTitleKo().isBlank()) {
+                    log.debug("⏭️ 영어 전용 문제 건너뛰기: {} (problemId: {})",
+                            problem.getTitle(), problem.getProblemId());
+                    continue;
+                }
+
                 try {
                     ProblemDocumentDto doc = bojCrawler.crawlProblemDetail(problem);
                     documents.add(doc);
