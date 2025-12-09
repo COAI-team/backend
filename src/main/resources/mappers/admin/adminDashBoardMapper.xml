@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="kr.or.kosa.backend.admin.mapper.AdminDashBoardMapper">
+
+    <select id="userSignUpCount" resultType="kr.or.kosa.backend.admin.dto.response.AdminDashBoardUserCountResponseDto">
+        SELECT year, month, COUNT(*) AS user_count
+        FROM (
+        SELECT YEAR(USER_CREATEDAT) AS year, MONTH(USER_CREATEDAT) AS month
+        FROM USERS
+        WHERE USER_ROLE = 'ROLE_USER'
+        AND USER_DELETEDAT IS NULL
+        ) AS sub
+        GROUP BY year, month WITH ROLLUP
+        ORDER BY year, month
+    </select>
+
+
+    <select id="todaySignUpCount" resultType="int">
+        SELECT COUNT(*) AS today_user_count
+        FROM USERS
+        WHERE USER_ROLE = 'ROLE_USER'
+        AND USER_DELETEDAT IS NULL
+        AND DATE(USER_CREATEDAT) = CURDATE()
+    </select>
+
+    <select id="todayPaymentSummary" resultType="kr.or.kosa.backend.admin.dto.TodayPaymentSummaryDto">
+        select
+            count(*) as today_payment_count,
+            IFNULL(sum(amount), 0) as today_total_pay
+        from payments
+        where DATE(approved_at) = CURDATE()
+    </select>
+
+    <select id="paymentSummary" resultType="kr.or.kosa.backend.admin.dto.PaymentSummaryDto">
+        SELECT
+            YEAR(approved_at) AS year,
+            MONTH(approved_at) AS month,
+            COUNT(*) AS paymentCount,
+            IFNULL(SUM(amount), 0) AS total_pay
+        FROM payments
+        WHERE status = 'DONE'
+        GROUP BY YEAR(approved_at), MONTH(approved_at)
+        WITH ROLLUP
+        ORDER BY YEAR(approved_at), MONTH(approved_at)
+    </select>
+
+</mapper>

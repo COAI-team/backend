@@ -39,7 +39,7 @@ public class SecurityConfig {
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
                 .authorizeHttpRequests(auth -> auth
-                        
+
                         // 인증 없이 접근 허용
                         .requestMatchers(
                                 "/",
@@ -51,6 +51,7 @@ public class SecurityConfig {
                                 "/users/password/**",
                                 "/email/**",
                                 "/algo/**",
+                                "/admin/**",
                                 "/codeAnalysis/**",
                                 "/api/analysis/**"
                         ).permitAll()

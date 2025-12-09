@@ -5,13 +5,8 @@ public record AdminDashBoardUserCountResponseDto(
     String month,
     int userCount
 ) {
-    public AdminDashBoardUserCountResponseDto(
-        String year,
-        String month,
-        int userCount
-    ){
-        this.year = year == null ? "TOTAL" : year;
-        this.month = month == null ? "-" : month;
-        this.userCount = userCount;
+    public AdminDashBoardUserCountResponseDto{
+        year = (year == null) ? "TOTAL" : year;
+        month = (month == null) ? "-" : month;
     }
 }
