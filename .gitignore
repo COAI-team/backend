@@ -66,6 +66,7 @@ out/
 
 # 환경 변수 파일 무시
 src/main/java/kr/or/kosa/backend/config/.env
+.env
 .env.*
 
 # 보안 / 인증키 파일 무시
