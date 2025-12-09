@@ -40,13 +40,4 @@ public class AnalysisWithoutRagController {
         return ResponseEntity.ok(ApiResponse.success(result));
     }
 
-    /**
-     * 저장된 파일을 분석하는 스트리밍 엔드포인트 - RAG 제외
-     * POST /api/analysis/norag/analyze-stored/stream
-     */
-    @PostMapping(value = "/analyze-stored/stream", produces = org.springframework.http.MediaType.TEXT_EVENT_STREAM_VALUE)
-    public reactor.core.publisher.Flux<String> analyzeStoredFileStream(@RequestBody AnalysisRequestDTO requestDto) {
-        System.out.println("[TRACE] AnalysisWithoutRagController.analyzeStoredFileStream called with: " + requestDto);
-        return analysisService.analyzeStoredFileStream(requestDto);
-    }
 }

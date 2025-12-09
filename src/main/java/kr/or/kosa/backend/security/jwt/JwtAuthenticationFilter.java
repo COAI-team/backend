@@ -27,8 +27,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     protected void doFilterInternal(
             @NonNull HttpServletRequest request,
             @NonNull HttpServletResponse response,
-            @NonNull FilterChain filterChain
-    ) throws ServletException, IOException {
+            @NonNull FilterChain filterChain) throws ServletException, IOException {
 
         String path = request.getRequestURI();
 
@@ -43,34 +42,39 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         // 🔥 그 외의 경로는 JWT 검증
         String token = resolveToken(request);
+        log.info("[JwtFilter] Request URI: {}, Token Present: {}", path, token != null);
 
         try {
-            if (token != null && jwtProvider.validateToken(token)) {
-                Long userId = jwtProvider.getUserId(token);
-                JwtUserDetails userDetails =
-                        new JwtUserDetails(userId, jwtProvider.getEmail(token));
+            if (token != null) {
+                boolean isValid = jwtProvider.validateToken(token);
+                log.info("[JwtFilter] Token Valid: {}", isValid);
 
-                JwtAuthentication auth = new JwtAuthentication(userDetails);
-                SecurityContextHolder.getContext().setAuthentication(auth);
+                if (isValid) {
+                    Long userId = jwtProvider.getUserId(token);
+                    JwtUserDetails userDetails = new JwtUserDetails(userId, jwtProvider.getEmail(token));
 
-                // 컨트롤러에서 @RequestAttribute로 userId를 받을 수 있도록 설정
-                request.setAttribute("userId", userId);
+                    JwtAuthentication auth = new JwtAuthentication(userDetails);
+                    SecurityContextHolder.getContext().setAuthentication(auth);
+
+                    // 컨트롤러에서 @RequestAttribute로 userId를 받을 수 있도록 설정
+                    request.setAttribute("userId", userId);
+                    log.info("[JwtFilter] Authentication set for userId: {}", userId);
+                }
             }
 
             filterChain.doFilter(request, response);
+            log.info("[JwtFilter] FilterChain passed for URI: {}", path);
 
         } catch (ExpiredJwtException e) {
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            response.setContentType("application/json;charset=UTF-8");
-            response.getWriter().write(
-                    "{\"code\": \"TOKEN_EXPIRED\", \"message\": \"Access token expired\"}"
-            );
+            log.warn("Expired JWT token: {}", e.getMessage());
+            // Token is expired, but we let the request continue as Anonymous.
+            // If the endpoint requires auth, SecurityConfig will block it (403).
+            // If the endpoint is permitAll, it will succeed.
+            filterChain.doFilter(request, response);
         } catch (JwtException e) {
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            response.setContentType("application/json;charset=UTF-8");
-            response.getWriter().write(
-                    "{\"code\": \"INVALID_TOKEN\", \"message\": \"Invalid JWT token\"}"
-            );
+            log.warn("Invalid JWT token: {}", e.getMessage());
+            // Token is invalid, treat as Anonymous.
+            filterChain.doFilter(request, response);
         }
     }
 

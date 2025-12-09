@@ -20,6 +20,9 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.http.HttpMethod;
+
+import jakarta.servlet.DispatcherType;
 
 @Configuration
 @RequiredArgsConstructor
@@ -42,9 +45,13 @@ public class SecurityConfig {
                                                                 "/users/register",
                                                                 "/users/login",
                                                                 "/users/github/link",
+                                                                "/users/password/**",
                                                                 "/email/**",
                                                                 "/algo/**",
-                                                                "/users/password/**")
+                                                                "/api/**",
+                                                                "/analysis/**")
+                                                .permitAll()
+                                                .requestMatchers(HttpMethod.GET, "/freeboard/**", "/codeboard/**")
                                                 .permitAll()
                                                 .anyRequest().authenticated())
                                 .addFilterBefore(
@@ -54,29 +61,6 @@ public class SecurityConfig {
                 return http.build();
         }
 
-        // @Bean
-        // public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        //
-        // http
-        // .cors(Customizer.withDefaults())
-        // .csrf(AbstractHttpConfigurer::disable)
-        // .sessionManagement(session ->
-        // session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-        //
-        // .authorizeHttpRequests(auth -> auth
-        // // .requestMatchers(
-        // // "/**"
-        // // )
-        // // .permitAll()
-        // .anyRequest().permitAll());
-        //
-        // // .addFilterBefore(
-        // // new JwtAuthenticationFilter(jwtProvider),
-        // // UsernamePasswordAuthenticationFilter.class
-        // // );
-        //
-        // return http.build();
-        // }
         @Bean
         public PasswordEncoder passwordEncoder() {
                 return new BCryptPasswordEncoder();
@@ -86,5 +70,19 @@ public class SecurityConfig {
         public AuthenticationManager authenticationManager(AuthenticationConfiguration config)
                         throws Exception {
                 return config.getAuthenticationManager();
+        }
+
+        @Bean
+        public CorsConfigurationSource corsConfigurationSource() {
+                CorsConfiguration configuration = new CorsConfiguration();
+                configuration.setAllowedOrigins(List.of("http://localhost:5173"));
+                configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
+                configuration.setAllowedHeaders(List.of("*"));
+                configuration.setAllowCredentials(true);
+                configuration.setExposedHeaders(List.of("Authorization")); // 필요한 경우 추가
+
+                UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+                source.registerCorsConfiguration("/**", configuration);
+                return source;
         }
 }

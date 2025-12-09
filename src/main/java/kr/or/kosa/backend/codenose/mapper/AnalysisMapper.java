@@ -45,6 +45,16 @@ public interface AnalysisMapper {
          */
         CodeResultDTO findCodeResultById(String analysisId);
 
+        /**
+         * 메타데이터가 없는 분석 결과 조회
+         */
+        List<CodeResultDTO> findAnalysisWithoutMetadata();
+
+        /**
+         * 분석 결과 메타데이터 업데이트
+         */
+        void updateAnalysisMetadata(@Param("analysisId") String analysisId, @Param("metadata") String metadata);
+
         // ========== 사용자 코드 패턴 관련 ==========
         /**
          * 사용자 코드 패턴 저장

@@ -36,6 +36,7 @@
         <result property="codeSmells" column="CODE_SMELLS"/>
         <result property="suggestions" column="SUGGESTIONS"/>
         <result property="createdAt" column="CREATED_AT"/>
+        <result property="metadata" column="METADATA"/>
     </resultMap>
 
     <!-- ========== GITHUB_FILES 관련 쿼리 ========== -->
@@ -128,6 +129,8 @@
             AI_SCORE,
             CODE_SMELLS,
             SUGGESTIONS,
+            METADATA,
+            RELATED_ANALYSIS_IDS,
             CREATED_AT
         ) VALUES (
                      #{analysisId},
@@ -141,6 +144,8 @@
                      #{aiScore},
                      #{codeSmells, jdbcType=LONGVARCHAR},
                      #{suggestions, jdbcType=LONGVARCHAR},
+                     #{metadata, jdbcType=LONGVARCHAR},
+                     #{relatedAnalysisIds, jdbcType=LONGVARCHAR},
                      #{createdAt}
                  )
     </insert>
@@ -159,6 +164,7 @@
             AI_SCORE,
             CODE_SMELLS,
             SUGGESTIONS,
+            METADATA,
             CREATED_AT
         FROM CODE_ANALYSIS_HISTORY
         WHERE USER_ID = #{userId}
@@ -179,6 +185,7 @@
             AI_SCORE,
             CODE_SMELLS,
             SUGGESTIONS,
+            METADATA,
             CREATED_AT
         FROM CODE_ANALYSIS_HISTORY
         WHERE ANALYSIS_ID = #{analysisId}
@@ -198,12 +205,34 @@
             AI_SCORE,
             CODE_SMELLS,
             SUGGESTIONS,
+            METADATA,
             CREATED_AT
         FROM CODE_ANALYSIS_HISTORY
         WHERE USER_ID = #{userId}
           AND CREATED_AT BETWEEN #{startDate} AND #{endDate}
-        ORDER BY CREATED_AT DESC
+        ORDER BY CREATED_AT ASC
     </select>
+
+    <select id="findAnalysisWithoutMetadata" resultMap="CodeResultResultMap">
+        SELECT
+            ANALYSIS_ID,
+            USER_ID,
+            REPOSITORY_URL,
+            FILE_PATH,
+            AI_SCORE,
+            CODE_SMELLS,
+            SUGGESTIONS,
+            METADATA,
+            CREATED_AT
+        FROM CODE_ANALYSIS_HISTORY
+        WHERE METADATA IS NULL
+    </select>
+
+    <update id="updateAnalysisMetadata">
+        UPDATE CODE_ANALYSIS_HISTORY
+        SET METADATA = #{metadata, jdbcType=LONGVARCHAR}
+        WHERE ANALYSIS_ID = #{analysisId}
+    </update>
 
     <!-- ========== 사용자 코드 패턴 관련 쿼리 ========== -->
 

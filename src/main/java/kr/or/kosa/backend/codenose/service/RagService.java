@@ -52,7 +52,9 @@ public class RagService {
                                 "timestamp", timestamp,
                                 "majorChanges", request.getMajorChanges() != null ? request.getMajorChanges() : "",
                                 "desiredAnalysis",
-                                request.getDesiredAnalysis() != null ? request.getDesiredAnalysis() : "");
+                                request.getDesiredAnalysis() != null ? request.getDesiredAnalysis() : "",
+                                "analysisId",
+                                request.getAnalysisId() != null ? request.getAnalysisId() : "");
 
                 Document document = new Document(content, metadata);
                 vectorStore.add(List.of(document));
