@@ -1,7 +1,7 @@
 package kr.or.kosa.backend.algorithm.controller;
 
 import jakarta.annotation.PostConstruct;
-import kr.or.kosa.backend.config.Judge0Properties;
+import kr.or.kosa.backend.config.Judge0Config.Judge0Properties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;

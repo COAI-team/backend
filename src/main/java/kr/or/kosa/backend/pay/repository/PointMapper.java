@@ -28,6 +28,12 @@ public interface PointMapper {
     int refundPoint(@Param("userId") Long userId,
                     @Param("refundPoint") BigDecimal refundPoint);
 
+    /**
+     * 포인트 적립 (보상).
+     */
+    int addRewardPoint(@Param("userId") Long userId,
+                       @Param("rewardPoint") BigDecimal rewardPoint);
+
     int insertPointHistory(PointHistory history);
 
     List<PointHistory> findPointHistoryByUserId(@Param("userId") Long userId);

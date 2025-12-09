@@ -1,12 +1,10 @@
 package kr.or.kosa.backend.algorithm.service;
 
-import kr.or.kosa.backend.algorithm.dto.Judge0RequestDto;
-import kr.or.kosa.backend.algorithm.dto.Judge0ResponseDto;
+import kr.or.kosa.backend.algorithm.dto.AlgoTestcaseDto;
 import kr.or.kosa.backend.algorithm.dto.enums.JudgeResult;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import kr.or.kosa.backend.algorithm.dto.request.Judge0RequestDto;
+import kr.or.kosa.backend.algorithm.dto.response.Judge0ResponseDto;
+import kr.or.kosa.backend.algorithm.dto.response.TestRunResponseDto;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -21,6 +19,7 @@ import java.util.concurrent.CompletableFuture;
 
 /**
  * Judge0 API 연동 서비스 (ALG-07 관련) - 수정 버전
+ * AlgoTestcaseDto를 입력으로 받고 TestRunResponseDto를 반환
  */
 @Service
 @RequiredArgsConstructor
@@ -140,9 +139,9 @@ public class Judge0Service {
             case "Prolog" -> 69; // Prolog (GNU Prolog 1.4.5)
 
             // === Python 계열 ===
-            case "Python 3" -> 113; // Python (3.14.0) - 최신
+            case "Python 3" -> 71; // Python (3.8.1) - 안정 버전
             case "Python 2" -> 70; // Python (2.7.17)
-            case "PyPy3" -> 113; // Python 3 최신으로 대체
+            case "PyPy3" -> 71; // Python 3 안정 버전으로 대체
             case "PyPy2" -> 70; // Python 2로 대체
 
             // === R ===
@@ -180,19 +179,19 @@ public class Judge0Service {
     }
 
     /**
-     * 모든 테스트케이스에 대해 순차적으로 채점 실행
+     * AlgoTestcaseDto 목록으로 채점 실행
      *
      * @param sourceCode      제출할 소스 코드
      * @param dbLanguageName  DB 언어명 (예: "Python 3", "Java 17")
-     * @param testCases       테스트케이스 목록
+     * @param testCases       AlgoTestcaseDto 목록
      * @param timeLimit       시간 제한 (ms)
      * @param memoryLimit     메모리 제한 (KB)
-     * @return 채점 결과
+     * @return 채점 결과 (TestRunResponseDto)
      */
-    public CompletableFuture<JudgeResultDto> judgeCode(
+    public CompletableFuture<TestRunResponseDto> judgeCode(
             String sourceCode,
             String dbLanguageName,
-            List<TestCaseDto> testCases,
+            List<AlgoTestcaseDto> testCases,
             Integer timeLimit,
             Integer memoryLimit) {
 
@@ -200,24 +199,24 @@ public class Judge0Service {
             log.info("Judge0 채점 시작 - language: {}, testCases: {}, timeLimit: {}ms, memoryLimit: {}MB",
                     dbLanguageName, testCases.size(), timeLimit, memoryLimit);
 
-            List<TestCaseResultDto> results = new ArrayList<>();
+            List<TestRunResponseDto.TestCaseResultDto> results = new ArrayList<>();
             Integer languageId = getJudge0LanguageId(dbLanguageName);
             int passedCount = 0;
             int maxExecutionTime = 0;
             int maxMemoryUsage = 0;
 
             for (int i = 0; i < testCases.size(); i++) {
-                TestCaseDto testCase = testCases.get(i);
+                AlgoTestcaseDto testCase = testCases.get(i);
 
                 try {
                     log.debug("테스트케이스 {} 실행 중...", i + 1);
 
-                    TestCaseResultDto result = executeSingleTestCase(
+                    TestRunResponseDto.TestCaseResultDto result = executeSingleTestCase(
                             sourceCode, languageId, testCase, i + 1, timeLimit, memoryLimit);
 
                     results.add(result);
 
-                    if ("PASS".equals(result.getResult())) {
+                    if ("AC".equals(result.getResult()) || "PASS".equals(result.getResult())) {
                         passedCount++;
                     }
 
@@ -229,12 +228,17 @@ public class Judge0Service {
                         maxMemoryUsage = Math.max(maxMemoryUsage, result.getMemoryUsage());
                     }
 
+                    // Rate Limit 방지: 테스트케이스 간 딜레이 (RapidAPI 무료 요금제 제한)
+                    if (i < testCases.size() - 1) {
+                        Thread.sleep(1000); // 1초 대기
+                    }
+
                 } catch (Exception e) {
                     log.error("테스트케이스 {} 실행 중 오류", i + 1, e);
 
-                    results.add(TestCaseResultDto.builder()
+                    results.add(TestRunResponseDto.TestCaseResultDto.builder()
                             .testCaseNumber(i + 1)
-                            .input(testCase.getInput())
+                            .input(testCase.getInputData())
                             .expectedOutput(testCase.getExpectedOutput())
                             .result("ERROR")
                             .errorMessage("채점 서버 오류: " + e.getMessage())
@@ -248,10 +252,10 @@ public class Judge0Service {
             log.info("Judge0 채점 완료 - 총 {} 케이스, 통과 {} 케이스, 결과: {}",
                     results.size(), passedCount, overallResult);
 
-            return JudgeResultDto.builder()
+            return TestRunResponseDto.builder()
                     .overallResult(overallResult)
-                    .passedTestCount(passedCount)
-                    .totalTestCount(testCases.size())
+                    .passedCount(passedCount)
+                    .totalCount(testCases.size())
                     .testPassRate((double) passedCount / testCases.size() * 100.0)
                     .maxExecutionTime(maxExecutionTime)
                     .maxMemoryUsage(maxMemoryUsage)
@@ -264,10 +268,10 @@ public class Judge0Service {
      * 단일 테스트케이스 실행
      */
     @Retryable(retryFor = { Exception.class }, maxAttempts = 3, backoff = @Backoff(delay = 1000))
-    private TestCaseResultDto executeSingleTestCase(
+    private TestRunResponseDto.TestCaseResultDto executeSingleTestCase(
             String sourceCode,
             Integer languageId,
-            TestCaseDto testCase,
+            AlgoTestcaseDto testCase,
             Integer testCaseNumber,
             Integer timeLimit,
             Integer memoryLimit) {
@@ -281,7 +285,7 @@ public class Judge0Service {
         Judge0RequestDto request = Judge0RequestDto.builder()
                 .source_code(sourceCode)
                 .language_id(languageId)
-                .stdin(testCase.getInput())
+                .stdin(testCase.getInputData())
                 .expected_output(testCase.getExpectedOutput())
                 .cpu_time_limit(cpuTimeLimitSec)
                 .memory_limit(memoryLimitKb)
@@ -289,7 +293,11 @@ public class Judge0Service {
                 .enable_per_process_and_thread_memory_limit(true)
                 .build();
 
-        log.info("[Judge0 Request Check] {}", request);
+        log.info("[Judge0 Request Check] languageId={}, stdin='{}', expected_output='{}'",
+                request.getLanguage_id(),
+                truncateForLog(request.getStdin()),
+                truncateForLog(request.getExpected_output()));
+        log.debug("[Judge0 Source Code]\n{}", truncateForLog(request.getSource_code(), 500));
 
         try {
             // 2. WebClient로 Judge0에 제출
@@ -326,14 +334,15 @@ public class Judge0Service {
     /**
      * Judge0 응답 결과 해석
      */
-    private TestCaseResultDto interpretResult(
+    private TestRunResponseDto.TestCaseResultDto interpretResult(
             Judge0ResponseDto response,
-            TestCaseDto testCase,
+            AlgoTestcaseDto testCase,
             Integer testCaseNumber) {
 
-        TestCaseResultDto.TestCaseResultDtoBuilder builder = TestCaseResultDto.builder()
+        TestRunResponseDto.TestCaseResultDto.TestCaseResultDtoBuilder builder =
+                TestRunResponseDto.TestCaseResultDto.builder()
                 .testCaseNumber(testCaseNumber)
-                .input(testCase.getInput())
+                .input(testCase.getInputData())
                 .expectedOutput(testCase.getExpectedOutput())
                 .actualOutput(response.getStdout())
                 .executionTime(response.getTime() != null ? (int) Math.round(response.getTime() * 1000) : null)
@@ -342,7 +351,7 @@ public class Judge0Service {
         // 컴파일 에러 확인
         if (response.getCompile_output() != null && !response.getCompile_output().trim().isEmpty()) {
             return builder
-                    .result("ERROR")
+                    .result("CE")
                     .errorMessage("컴파일 에러: " + response.getCompile_output())
                     .build();
         }
@@ -350,7 +359,7 @@ public class Judge0Service {
         // 런타임 에러 확인
         if (response.getStderr() != null && !response.getStderr().trim().isEmpty()) {
             return builder
-                    .result("ERROR")
+                    .result("RE")
                     .errorMessage("런타임 에러: " + response.getStderr())
                     .build();
         }
@@ -360,31 +369,31 @@ public class Judge0Service {
 
         switch (judgeResult) {
             case AC:
-                return builder.result("PASS").build();
+                return builder.result("AC").build();
             case WA:
                 return builder
-                        .result("FAIL")
+                        .result("WA")
                         .errorMessage("출력이 예상 결과와 다릅니다")
                         .build();
             case TLE:
                 return builder
-                        .result("ERROR")
+                        .result("TLE")
                         .errorMessage("시간 초과")
                         .build();
             case MLE:
                 return builder
-                        .result("ERROR")
+                        .result("MLE")
                         .errorMessage("메모리 초과")
                         .build();
             case RE:
                 return builder
-                        .result("ERROR")
+                        .result("RE")
                         .errorMessage(
                                 "런타임 에러: " + (response.getMessage() != null ? response.getMessage() : "알 수 없는 오류"))
                         .build();
             case CE:
                 return builder
-                        .result("ERROR")
+                        .result("CE")
                         .errorMessage("컴파일 에러")
                         .build();
             default:
@@ -398,75 +407,59 @@ public class Judge0Service {
     /**
      * 전체 결과 판정
      */
-    private String determineOverallResult(List<TestCaseResultDto> results, int passedCount, int totalCount) {
+    private String determineOverallResult(List<TestRunResponseDto.TestCaseResultDto> results, int passedCount, int totalCount) {
         if (passedCount == totalCount) {
             return "AC"; // Accepted
         }
 
         // 컴파일 에러 확인
         boolean hasCompileError = results.stream()
-                .anyMatch(r -> "ERROR".equals(r.getResult()) &&
-                        r.getErrorMessage() != null && r.getErrorMessage().contains("컴파일 에러"));
+                .anyMatch(r -> "CE".equals(r.getResult()));
         if (hasCompileError) {
             return "CE";
         }
 
         // 런타임 에러 확인
         boolean hasRuntimeError = results.stream()
-                .anyMatch(r -> "ERROR".equals(r.getResult()) &&
-                        r.getErrorMessage() != null && r.getErrorMessage().contains("런타임 에러"));
+                .anyMatch(r -> "RE".equals(r.getResult()));
         if (hasRuntimeError) {
             return "RE";
         }
 
         // 시간 초과 확인
         boolean hasTimeLimit = results.stream()
-                .anyMatch(r -> "ERROR".equals(r.getResult()) &&
-                        r.getErrorMessage() != null && r.getErrorMessage().contains("시간 초과"));
+                .anyMatch(r -> "TLE".equals(r.getResult()));
         if (hasTimeLimit) {
             return "TLE";
+        }
+
+        // 메모리 초과 확인
+        boolean hasMemoryLimit = results.stream()
+                .anyMatch(r -> "MLE".equals(r.getResult()));
+        if (hasMemoryLimit) {
+            return "MLE";
         }
 
         return "WA"; // Wrong Answer
     }
 
-    // DTO 클래스들
-
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class TestCaseDto {
-        private String input;
-        private String expectedOutput;
+    /**
+     * 로그용 문자열 잘라내기 (기본 100자)
+     */
+    private String truncateForLog(String text) {
+        return truncateForLog(text, 100);
     }
 
-    @lombok.Data
-    @lombok.Builder
-    @lombok.NoArgsConstructor
-    @lombok.AllArgsConstructor
-    public static class JudgeResultDto {
-        private String overallResult;
-        private Integer passedTestCount;
-        private Integer totalTestCount;
-        private Double testPassRate;
-        private Integer maxExecutionTime;
-        private Integer maxMemoryUsage;
-        private List<TestCaseResultDto> testCaseResults;
-    }
-
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class TestCaseResultDto {
-        private Integer testCaseNumber;
-        private String input;
-        private String expectedOutput;
-        private String actualOutput;
-        private String result;
-        private Integer executionTime;
-        private Integer memoryUsage;
-        private String errorMessage;
+    /**
+     * 로그용 문자열 잘라내기
+     */
+    private String truncateForLog(String text, int maxLength) {
+        if (text == null) {
+            return "null";
+        }
+        if (text.length() <= maxLength) {
+            return text;
+        }
+        return text.substring(0, maxLength) + "...(총 " + text.length() + "자)";
     }
 }

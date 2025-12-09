@@ -66,6 +66,13 @@
         WHERE user_id = #{userId}
     </update>
 
+    <!-- 포인트 적립(보상) -->
+    <update id="addRewardPoint">
+        UPDATE user_points
+        SET balance = balance + #{rewardPoint}
+        WHERE user_id = #{userId}
+    </update>
+
     <!-- 포인트 내역 기록 -->
     <insert id="insertPointHistory"
             parameterType="kr.or.kosa.backend.pay.entity.PointHistory">

@@ -25,6 +25,10 @@
         <result property="algoUpdatedAt" column="ALGO_UPDATED_AT"/>
         <result property="algoProblemTags" column="ALGO_PROBLEM_TAGS"/>
         <result property="algoProblemStatus" column="ALGO_PROBLEM_STATUS"/>
+        <!-- LLM 생성 문제 전용 필드 (사용자에게 표시) -->
+        <result property="constraints" column="CONSTRAINTS"/>
+        <result property="inputFormat" column="INPUT_FORMAT"/>
+        <result property="outputFormat" column="OUTPUT_FORMAT"/>
     </resultMap>
 
     <!-- 기본 컬럼 정의 -->
@@ -42,7 +46,10 @@
         ALGO_CREATED_AT,
         ALGO_UPDATED_AT,
         ALGO_PROBLEM_TAGS,
-        ALGO_PROBLEM_STATUS
+        ALGO_PROBLEM_STATUS,
+        CONSTRAINTS,
+        INPUT_FORMAT,
+        OUTPUT_FORMAT
     </sql>
 
     <!-- 전체 문제 목록 조회 (페이징) -->
@@ -126,11 +133,13 @@
         INSERT INTO ALGO_PROBLEMS (
             ALGO_PROBLEM_TITLE, ALGO_PROBLEM_DESCRIPTION, ALGO_PROBLEM_DIFFICULTY, ALGO_PROBLEM_SOURCE,
             PROBLEM_TYPE, INIT_SCRIPT, TIMELIMIT, MEMORYLIMIT, ALGO_CREATER,
-            ALGO_CREATED_AT, ALGO_UPDATED_AT, ALGO_PROBLEM_TAGS, ALGO_PROBLEM_STATUS
+            ALGO_CREATED_AT, ALGO_UPDATED_AT, ALGO_PROBLEM_TAGS, ALGO_PROBLEM_STATUS,
+            CONSTRAINTS, INPUT_FORMAT, OUTPUT_FORMAT
         ) VALUES (
             #{algoProblemTitle}, #{algoProblemDescription}, #{algoProblemDifficulty}, #{algoProblemSource},
             #{problemType,typeHandler=org.apache.ibatis.type.EnumTypeHandler}, #{initScript}, #{timelimit}, #{memorylimit}, #{algoCreater},
-            #{algoCreatedAt}, #{algoUpdatedAt}, #{algoProblemTags}, #{algoProblemStatus}
+            #{algoCreatedAt}, #{algoUpdatedAt}, #{algoProblemTags}, #{algoProblemStatus},
+            #{constraints}, #{inputFormat}, #{outputFormat}
         )
     </insert>
 

@@ -1,15 +1,18 @@
-package kr.or.kosa.backend.algorithm.dto;
+package kr.or.kosa.backend.algorithm.dto.response;
 
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
 
 import java.math.BigDecimal;
 
+/**
+ * AI 피드백 상태 응답 DTO
+ */
 @Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
 @Builder
-public class SubmissionAiStatusDto {
+@AllArgsConstructor
+public class SubmissionAiStatusResponseDto {
     private Long submissionId;
 
     private String aiFeedbackStatus;  // PENDING / COMPLETED / FAILED

@@ -1,11 +1,15 @@
 package kr.or.kosa.backend.algorithm.controller;
 
 import kr.or.kosa.backend.algorithm.dto.AlgoProblemDto;
-import kr.or.kosa.backend.algorithm.dto.*;
+import kr.or.kosa.backend.algorithm.dto.request.ProblemGenerationRequestDto;
+import kr.or.kosa.backend.algorithm.dto.request.ProblemListRequestDto;
+import kr.or.kosa.backend.algorithm.dto.response.ProblemGenerationResponseDto;
+import kr.or.kosa.backend.algorithm.dto.response.ProblemStatisticsResponseDto;
 import kr.or.kosa.backend.algorithm.dto.enums.ProblemDifficulty;
 import kr.or.kosa.backend.algorithm.exception.AlgoErrorCode;
 import kr.or.kosa.backend.algorithm.service.AIProblemGeneratorService;
 import kr.or.kosa.backend.algorithm.service.AlgorithmProblemService;
+import kr.or.kosa.backend.algorithm.service.ProblemGenerationOrchestrator;
 import kr.or.kosa.backend.commons.exception.custom.CustomBusinessException;
 import kr.or.kosa.backend.commons.response.ApiResponse;
 import kr.or.kosa.backend.security.jwt.JwtAuthentication;
@@ -17,6 +21,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.HashMap;
 import java.util.List;
@@ -33,6 +39,8 @@ public class AlgorithmProblemController {
 
     private final AlgorithmProblemService algorithmProblemService;
     private final AIProblemGeneratorService aiProblemGeneratorService;
+    private final ProblemGenerationOrchestrator problemGenerationOrchestrator;
+    private final ObjectMapper objectMapper;
 
     /**
      * AI 문제 생성 및 DB 저장
@@ -136,6 +144,136 @@ public class AlgorithmProblemController {
                 })
                 .doOnComplete(() -> log.info("스트리밍 완료"))
                 .doOnCancel(() -> log.info("스트리밍 취소됨"));
+    }
+
+    /**
+     * AI 문제 생성 (검증 포함)
+     * POST /api/algo/problems/generate/validated
+     *
+     * 생성된 문제에 대해 구조 검증, 코드 실행 검증, 유사도 검사를 수행하고
+     * 실패 시 Self-Correction을 통해 자동 수정을 시도
+     */
+    @PostMapping("/generate/validated")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> generateValidatedProblem(
+            @RequestBody ProblemGenerationRequestDto request,
+            @AuthenticationPrincipal JwtAuthentication authentication) {
+
+        log.info("AI 문제 생성 (검증 포함) 요청 - 난이도: {}, 주제: {}", request.getDifficulty(), request.getTopic());
+
+        try {
+            if (request.getDifficulty() == null) {
+                throw new CustomBusinessException(AlgoErrorCode.INVALID_INPUT);
+            }
+
+            if (request.getTopic() == null) {
+                throw new CustomBusinessException(AlgoErrorCode.INVALID_INPUT);
+            }
+
+            Long userId = null;
+            if (authentication != null) {
+                JwtUserDetails userDetails = (JwtUserDetails) authentication.getPrincipal();
+                userId = userDetails.id().longValue();
+            }
+
+            // Orchestrator를 통한 검증 포함 문제 생성
+            ProblemGenerationResponseDto response = problemGenerationOrchestrator.generateProblem(
+                    request, userId, null);
+
+            log.info("AI 문제 생성 (검증 포함) 완료 - 문제 ID: {}, 제목: {}",
+                    response.getProblemId(),
+                    response.getProblem().getAlgoProblemTitle());
+
+            Map<String, Object> responseData = new HashMap<>();
+            responseData.put("problemId", response.getProblemId());
+            responseData.put("title", response.getProblem().getAlgoProblemTitle());
+            responseData.put("description", response.getProblem().getAlgoProblemDescription());
+            responseData.put("difficulty", response.getProblem().getAlgoProblemDifficulty());
+            responseData.put("testCaseCount", response.getTestCases() != null ? response.getTestCases().size() : 0);
+            responseData.put("validationResults", response.getValidationResults());
+            responseData.put("hasOptimalCode", response.getOptimalCode() != null);
+            responseData.put("hasNaiveCode", response.getNaiveCode() != null);
+
+            return ResponseEntity.ok(ApiResponse.success(responseData));
+
+        } catch (CustomBusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("AI 문제 생성 (검증 포함) 중 예외 발생", e);
+            throw new CustomBusinessException(AlgoErrorCode.PROBLEM_GENERATION_FAIL);
+        }
+    }
+
+    /**
+     * AI 문제 생성 (검증 포함, SSE 스트리밍)
+     * GET /api/algo/problems/generate/validated/stream
+     *
+     * 실시간으로 생성 및 검증 과정을 클라이언트에 전송
+     */
+    @GetMapping(value = "/generate/validated/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<String> generateValidatedProblemStream(
+            @RequestParam String difficulty,
+            @RequestParam String topic,
+            @RequestParam(required = false) String problemType,
+            @RequestParam(required = false) String additionalRequirements) {
+
+        log.info("AI 문제 생성 (검증 포함) 스트리밍 요청 - 난이도: {}, 주제: {}", difficulty, topic);
+
+        ProblemGenerationRequestDto request = ProblemGenerationRequestDto.builder()
+                .difficulty(ProblemDifficulty.valueOf(difficulty))
+                .topic(topic)
+                .problemType(problemType != null ? problemType : "ALGORITHM")
+                .additionalRequirements(additionalRequirements)
+                .build();
+
+        return Flux.create(sink -> {
+            reactor.core.scheduler.Schedulers.boundedElastic().schedule(() -> {
+                try {
+                    // Orchestrator를 통한 검증 포함 문제 생성 (진행률 콜백 사용)
+                    ProblemGenerationResponseDto response = problemGenerationOrchestrator.generateProblem(
+                            request,
+                            null,  // userId (인증 없이 사용)
+                            progressEvent -> {
+                                // 진행률 이벤트를 SSE로 전송
+                                try {
+                                    Map<String, Object> event = new HashMap<>();
+                                    event.put("type", "PROGRESS");
+                                    event.put("status", progressEvent.getStatus());
+                                    event.put("message", progressEvent.getMessage());
+                                    event.put("percentage", progressEvent.getPercentage());
+                                    sink.next("data: " + objectMapper.writeValueAsString(event) + "\n\n");
+                                } catch (Exception e) {
+                                    log.error("SSE 진행률 이벤트 전송 실패", e);
+                                }
+                            }
+                    );
+
+                    // 완료 이벤트 전송
+                    Map<String, Object> completeEvent = new HashMap<>();
+                    completeEvent.put("type", "COMPLETE");
+                    completeEvent.put("problemId", response.getProblemId());
+                    completeEvent.put("title", response.getProblem().getAlgoProblemTitle());
+                    completeEvent.put("testCaseCount", response.getTestCases() != null ? response.getTestCases().size() : 0);
+                    completeEvent.put("validationResults", response.getValidationResults());
+
+                    sink.next("data: " + objectMapper.writeValueAsString(completeEvent) + "\n\n");
+                    sink.complete();
+
+                    log.info("검증 포함 스트리밍 완료 - 문제 ID: {}", response.getProblemId());
+
+                } catch (Exception e) {
+                    log.error("검증 포함 스트리밍 문제 생성 실패", e);
+                    try {
+                        Map<String, Object> errorEvent = new HashMap<>();
+                        errorEvent.put("type", "ERROR");
+                        errorEvent.put("message", e.getMessage());
+                        sink.next("data: " + objectMapper.writeValueAsString(errorEvent) + "\n\n");
+                    } catch (Exception ex) {
+                        sink.next("data: {\"type\":\"ERROR\",\"message\":\"" + e.getMessage() + "\"}\n\n");
+                    }
+                    sink.complete();
+                }
+            });
+        });
     }
 
     /**
@@ -287,7 +425,7 @@ public class AlgorithmProblemController {
      * GET /api/algo/problems/statistics
      */
     @GetMapping("/statistics")
-    public ResponseEntity<ApiResponse<ProblemStatisticsDto>> getStatistics(
+    public ResponseEntity<ApiResponse<ProblemStatisticsResponseDto>> getStatistics(
             @AuthenticationPrincipal JwtAuthentication authentication) {
 
         log.info("통계 정보 조회");
@@ -301,7 +439,7 @@ public class AlgorithmProblemController {
             }
 
             // 통계 조회
-            ProblemStatisticsDto statistics = algorithmProblemService.getProblemStatistics(userId);
+            ProblemStatisticsResponseDto statistics = algorithmProblemService.getProblemStatistics(userId);
 
             log.info("통계 정보 조회 성공 - {}", statistics);
 

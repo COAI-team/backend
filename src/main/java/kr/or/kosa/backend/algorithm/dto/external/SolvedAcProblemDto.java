@@ -2,15 +2,24 @@ package kr.or.kosa.backend.algorithm.dto.external;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import lombok.Data;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.util.List;
 
 /**
  * solved.ac API 문제 응답 DTO
  * API: https://solved.ac/api/v3/problem/show
+ *
+ * 외부 API 수신용 DTO: JSON 역직렬화
+ * - @NoArgsConstructor: Jackson이 기본 생성자로 객체 생성
+ * - @Setter: Jackson이 값 주입
+ * - @Getter: 서비스에서 값 읽기
  */
-@Data
+@Getter
+@Setter
+@NoArgsConstructor
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class SolvedAcProblemDto {
 
@@ -32,7 +41,9 @@ public class SolvedAcProblemDto {
     @JsonProperty("isLevelLocked")
     private Boolean isLevelLocked;
 
-    @Data
+    @Getter
+    @Setter
+    @NoArgsConstructor
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class TagDto {
         @JsonProperty("key")
@@ -42,7 +53,9 @@ public class SolvedAcProblemDto {
         private List<DisplayNameDto> displayNames;
     }
 
-    @Data
+    @Getter
+    @Setter
+    @NoArgsConstructor
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class DisplayNameDto {
         @JsonProperty("language")

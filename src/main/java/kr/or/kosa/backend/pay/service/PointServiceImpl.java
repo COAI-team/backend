@@ -93,4 +93,37 @@ public class PointServiceImpl implements PointService {
             );
         }
     }
+
+    @Override
+    public void addRewardPoint(Long userId, int rewardPoints, String description) {
+        if (rewardPoints <= 0) {
+            return;
+        }
+
+        BigDecimal reward = BigDecimal.valueOf(rewardPoints);
+
+        // 유저 포인트 row가 없으면 생성
+        pointMapper.findUserPointByUserId(userId)
+                .orElseGet(() -> {
+                    UserPoint up = UserPoint.builder()
+                            .userId(userId)
+                            .balance(BigDecimal.ZERO)
+                            .build();
+                    pointMapper.insertUserPoint(up);
+                    return up;
+                });
+
+        // 포인트 적립
+        pointMapper.addRewardPoint(userId, reward);
+
+        // 이력 기록
+        PointHistory history = PointHistory.builder()
+                .userId(userId)
+                .changeAmount(reward)
+                .type("REWARD")
+                .description(description)
+                .build();
+
+        pointMapper.insertPointHistory(history);
+    }
 }

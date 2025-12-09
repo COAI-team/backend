@@ -1,6 +1,6 @@
 package kr.or.kosa.backend.algorithm.controller;
 
-import kr.or.kosa.backend.algorithm.dto.SubmissionAiStatusDto;
+import kr.or.kosa.backend.algorithm.dto.response.SubmissionAiStatusResponseDto;
 import kr.or.kosa.backend.algorithm.exception.AlgoErrorCode;
 import kr.or.kosa.backend.algorithm.service.AlgorithmEvaluationService;
 import kr.or.kosa.backend.commons.exception.custom.CustomBusinessException;
@@ -60,7 +60,7 @@ public class AlgorithmEvaluationController {
      * GET /api/algo/evaluation/status/{submissionId}
      */
     @GetMapping("/status/{submissionId}")
-    public ResponseEntity<ApiResponse<SubmissionAiStatusDto>> getEvaluationStatus(
+    public ResponseEntity<ApiResponse<SubmissionAiStatusResponseDto>> getEvaluationStatus(
             @PathVariable Long submissionId,
             @AuthenticationPrincipal JwtAuthentication authentication
     ) {
@@ -69,7 +69,7 @@ public class AlgorithmEvaluationController {
         log.info("평가 상태 조회 요청 - submissionId: {}, userId: {}", submissionId, userId);
 
         try {
-            SubmissionAiStatusDto status = evaluationService.getEvaluationStatus(submissionId);
+            SubmissionAiStatusResponseDto status = evaluationService.getEvaluationStatus(submissionId);
 
             return ResponseEntity.ok(ApiResponse.success(status));
 

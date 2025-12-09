@@ -38,7 +38,15 @@ public enum AlgoErrorCode implements ErrorCode {
     // ================================================================
     EVALUATION_NOT_FOUND("ALGO_4400", "해당 평가 정보를 찾을 수 없습니다."),
     EVALUATION_RETRY_FAIL("ALGO_4401", "AI 평가 재실행 중 오류가 발생했습니다."),
-    EVALUATION_PROCESSING_ERROR("ALGO_4402", "평가 처리 중 예외가 발생했습니다.");
+    EVALUATION_PROCESSING_ERROR("ALGO_4402", "평가 처리 중 예외가 발생했습니다."),
+
+    // ================================================================
+    // ✅ 미션(Mission) 관련 오류
+    // ================================================================
+    MISSION_NOT_FOUND("ALGO_4500", "해당 미션을 찾을 수 없습니다."),
+    MISSION_ALREADY_COMPLETED("ALGO_4501", "이미 완료된 미션입니다."),
+    MISSION_TYPE_INVALID("ALGO_4502", "잘못된 미션 유형입니다."),
+    LOGIN_REQUIRED("ALGO_4010", "로그인이 필요합니다.");
 
     // ================================================================
     // Fields + Getter

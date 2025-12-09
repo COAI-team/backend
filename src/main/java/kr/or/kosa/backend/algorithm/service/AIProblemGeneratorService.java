@@ -1,68 +1,119 @@
 package kr.or.kosa.backend.algorithm.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import kr.or.kosa.backend.algorithm.dto.AlgoProblemDto;
 import kr.or.kosa.backend.algorithm.dto.AlgoTestcaseDto;
+import kr.or.kosa.backend.algorithm.dto.LLMResponseDto;
+import kr.or.kosa.backend.algorithm.dto.request.ProblemGenerationRequestDto;
+import kr.or.kosa.backend.algorithm.dto.response.ProblemGenerationResponseDto;
+import kr.or.kosa.backend.algorithm.dto.ProblemValidationLogDto;
 import kr.or.kosa.backend.algorithm.dto.enums.ProblemDifficulty;
-import kr.or.kosa.backend.algorithm.dto.enums.ProblemSource;
-import kr.or.kosa.backend.algorithm.dto.enums.ProblemType;
-import kr.or.kosa.backend.algorithm.dto.ProblemGenerationRequestDto;
-import kr.or.kosa.backend.algorithm.dto.ProblemGenerationResponseDto;
 import kr.or.kosa.backend.algorithm.mapper.AlgorithmProblemMapper;
+import kr.or.kosa.backend.algorithm.mapper.ProblemValidationLogMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.prompt.Prompt;
-import org.springframework.ai.chat.prompt.PromptTemplate;
-import org.springframework.ai.openai.OpenAiChatModel;
+import org.springframework.ai.document.Document;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.scheduler.Schedulers;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class AIProblemGeneratorService {
 
-    private final OpenAiChatModel chatModel; // ✅ Spring AI 자동 주입
+    // === Phase 2 통합 서비스들 ===
+    private final LLMChatService llmChatService;
+    private final ProblemGenerationPromptBuilder promptBuilder;
+    private final AlgorithmSynonymDictionary synonymDictionary;
+    private final ProblemVectorStoreService vectorStoreService;
+    private final LLMResponseParser responseParser;
+
+    // === 기존 의존성 ===
     private final ObjectMapper objectMapper;
     private final AlgorithmProblemMapper algorithmProblemMapper;
+    private final ProblemValidationLogMapper validationLogMapper;
+
+    @Value("${algorithm.generation.rag-enabled:true}")
+    private boolean ragEnabled;
+
+    @Value("${algorithm.generation.few-shot-count:3}")
+    private int fewShotCount;
 
     /**
-     * AI 문제 생성
+     * AI 문제 생성 (Phase 2 통합 버전)
+     * - LLMChatService 사용
+     * - ProblemGenerationPromptBuilder로 구조화된 프롬프트 생성
+     * - AlgorithmSynonymDictionary로 주제 확장
+     * - RAG 기반 Few-shot 학습 지원
      */
     public ProblemGenerationResponseDto generateProblem(ProblemGenerationRequestDto request) {
         long startTime = System.currentTimeMillis();
 
         try {
-            log.info("AI 문제 생성 시작 - 난이도: {}, 주제: {}", request.getDifficulty(), request.getTopic());
+            log.info("AI 문제 생성 시작 - 난이도: {}, 주제: {}, RAG: {}",
+                    request.getDifficulty(), request.getTopic(), ragEnabled);
 
-            // 1. 프롬프트 생성
-            String prompt = buildPrompt(request);
+            // 1. 주제 확장 (동의어 사전 활용)
+            Set<String> expandedTopics = synonymDictionary.expand(request.getTopic());
+            log.debug("주제 확장: {} → {}", request.getTopic(), expandedTopics);
 
-            // 2. ✅ 실제 OpenAI API 호출
-            String aiResponse = callOpenAI(prompt);
+            // 2. RAG 기반 Few-shot 예시 검색 (활성화된 경우)
+            List<Document> fewShotExamples = null;
+            if (ragEnabled && !"SQL".equalsIgnoreCase(request.getProblemType())) {
+                try {
+                    String searchQuery = synonymDictionary.buildSearchQuery(
+                            request.getTopic(),
+                            request.getDifficulty().name()
+                    );
+                    fewShotExamples = vectorStoreService.getFewShotExamples(
+                            searchQuery,
+                            request.getDifficulty().name(),
+                            fewShotCount
+                    );
+                    log.info("RAG 검색 완료 - {}개 예시 문제 획득", fewShotExamples.size());
+                } catch (Exception e) {
+                    log.warn("RAG 검색 실패, 지침 기반으로 진행: {}", e.getMessage());
+                    fewShotExamples = null;
+                }
+            }
 
-            // 3. 응답 파싱
-            AlgoProblemDto problem = parseAIProblemResponse(aiResponse, request);
-            List<AlgoTestcaseDto> testCases = parseAITestCaseResponse(aiResponse);
+            // 3. 프롬프트 생성 (Phase 2 통합)
+            String systemPrompt = promptBuilder.buildSystemPrompt();
+            String userPrompt = (fewShotExamples != null && !fewShotExamples.isEmpty())
+                    ? promptBuilder.buildUserPrompt(request, fewShotExamples)
+                    : buildLegacyPrompt(request);
+
+            // 4. LLM 호출 (LLMChatService 사용)
+            LLMResponseDto llmResponse = llmChatService.generateWithMetadata(systemPrompt, userPrompt);
+            String aiResponse = llmResponse.getContent();
+
+            log.info("LLM 응답 완료 - 토큰: {}, 응답시간: {}ms",
+                    llmResponse.getTotalTokens(), llmResponse.getResponseTimeMs());
+
+            // 5. 응답 파싱 및 DTO 생성 (LLMResponseParser 사용)
+            LLMResponseParser.ParsedResult parsedData = responseParser.parse(aiResponse, request);
+            AlgoProblemDto problem = parsedData.problem();
+            List<AlgoTestcaseDto> testCases = parsedData.testCases();
 
             double generationTime = (System.currentTimeMillis() - startTime) / 1000.0;
 
-            log.info("AI 문제 생성 완료 - 제목: {}, 소요시간: {}초",
-                    problem.getAlgoProblemTitle(), generationTime);
+            log.info("AI 문제 생성 완료 - 제목: {}, 테스트케이스: {}개, 소요시간: {}초",
+                    problem.getAlgoProblemTitle(), testCases.size(), generationTime);
 
             return ProblemGenerationResponseDto.builder()
                     .problem(problem)
                     .testCases(testCases)
+                    .optimalCode(parsedData.optimalCode())
+                    .naiveCode(parsedData.naiveCode())
                     .generationTime(generationTime)
                     .generatedAt(LocalDateTime.now())
                     .status(ProblemGenerationResponseDto.GenerationStatus.SUCCESS)
@@ -83,7 +134,20 @@ public class AIProblemGeneratorService {
     }
 
     /**
-     * AI 문제 생성 (스트리밍 버전)
+     * 레거시 프롬프트 생성 (RAG 없이 지침만 사용)
+     */
+    private String buildLegacyPrompt(ProblemGenerationRequestDto request) {
+        // DATABASE 문제인 경우
+        if ("SQL".equalsIgnoreCase(request.getProblemType())) {
+            return buildDatabasePrompt(getDifficultyDescription(request.getDifficulty()), request, "");
+        }
+
+        // ALGORITHM 문제인 경우
+        return promptBuilder.buildUserPromptWithoutRag(request);
+    }
+
+    /**
+     * AI 문제 생성 (스트리밍 버전 - Phase 2 통합)
      * SSE를 통해 실시간으로 생성 과정을 클라이언트에 전송
      */
     public Flux<String> generateProblemStream(ProblemGenerationRequestDto request) {
@@ -93,25 +157,53 @@ public class AIProblemGeneratorService {
                 long startTime = System.currentTimeMillis();
 
                 try {
-                    // 1단계: 시작 알림
+                    // 1단계: 주제 확장
+                    emitStep(sink, "주제 분석 중...");
+                    Set<String> expandedTopics = synonymDictionary.expand(request.getTopic());
+                    log.debug("주제 확장: {} → {}", request.getTopic(), expandedTopics);
+
+                    // 2단계: RAG 검색 (알고리즘 문제인 경우)
+                    List<Document> fewShotExamples = null;
+                    if (ragEnabled && !"SQL".equalsIgnoreCase(request.getProblemType())) {
+                        emitStep(sink, "유사 문제 검색 중...");
+                        try {
+                            String searchQuery = synonymDictionary.buildSearchQuery(
+                                    request.getTopic(),
+                                    request.getDifficulty().name()
+                            );
+                            fewShotExamples = vectorStoreService.getFewShotExamples(
+                                    searchQuery,
+                                    request.getDifficulty().name(),
+                                    fewShotCount
+                            );
+                            log.info("RAG 검색 완료 - {}개 예시 문제 획득", fewShotExamples.size());
+                        } catch (Exception e) {
+                            log.warn("RAG 검색 실패, 지침 기반으로 진행: {}", e.getMessage());
+                        }
+                    }
+
+                    // 3단계: 프롬프트 생성
                     emitStep(sink, "프롬프트 생성 중...");
-                    Thread.sleep(300); // 시각적 피드백을 위한 짧은 대기
+                    String systemPrompt = promptBuilder.buildSystemPrompt();
+                    String userPrompt = (fewShotExamples != null && !fewShotExamples.isEmpty())
+                            ? promptBuilder.buildUserPrompt(request, fewShotExamples)
+                            : buildLegacyPrompt(request);
 
-                    // 2단계: 프롬프트 생성
-                    String prompt = buildPrompt(request);
+                    // 4단계: LLM 호출
                     emitStep(sink, "AI에게 문제 생성 요청 중...");
+                    LLMResponseDto llmResponse = llmChatService.generateWithMetadata(systemPrompt, userPrompt);
+                    String aiResponse = llmResponse.getContent();
 
-                    // 3단계: OpenAI API 호출
-                    String aiResponse = callOpenAI(prompt);
-                    emitStep(sink, "응답 분석 중...");
-                    Thread.sleep(200);
+                    log.info("LLM 응답 완료 - 토큰: {}, 응답시간: {}ms",
+                            llmResponse.getTotalTokens(), llmResponse.getResponseTimeMs());
 
-                    // 4단계: 파싱
+                    // 5단계: 파싱 (LLMResponseParser 사용)
                     emitStep(sink, "문제 정보 파싱 중...");
-                    AlgoProblemDto problem = parseAIProblemResponse(aiResponse, request);
-                    List<AlgoTestcaseDto> testCases = parseAITestCaseResponse(aiResponse);
+                    LLMResponseParser.ParsedResult parsedData = responseParser.parse(aiResponse, request);
+                    AlgoProblemDto problem = parsedData.problem();
+                    List<AlgoTestcaseDto> testCases = parsedData.testCases();
 
-                    // 5단계: DB 저장
+                    // 6단계: DB 저장
                     emitStep(sink, "데이터베이스에 저장 중...");
 
                     // 문제 저장 (MyBatis useGeneratedKeys로 ID 자동 설정)
@@ -124,9 +216,21 @@ public class AIProblemGeneratorService {
                         algorithmProblemMapper.insertTestcase(tc);
                     }
 
+                    // 7단계: 검증 로그 저장 (검증 코드가 있는 경우)
+                    log.info("검증 로그 저장 조건 확인 - optimalCode: {}, naiveCode: {}",
+                            parsedData.optimalCode() != null ? "있음(" + parsedData.optimalCode().length() + "자)" : "null",
+                            parsedData.naiveCode() != null ? "있음(" + parsedData.naiveCode().length() + "자)" : "null");
+
+                    if (parsedData.optimalCode() != null || parsedData.naiveCode() != null) {
+                        emitStep(sink, "검증 로그 저장 중...");
+                        saveValidationLog(problemId, parsedData);
+                    } else {
+                        log.warn("검증 코드가 없어 검증 로그를 저장하지 않습니다. 문제 ID: {}", problemId);
+                    }
+
                     double generationTime = (System.currentTimeMillis() - startTime) / 1000.0;
 
-                    // 6단계: 완료 이벤트 전송
+                    // 8단계: 완료 이벤트 전송
                     Map<String, Object> completeData = new HashMap<>();
                     completeData.put("problemId", problemId);
                     completeData.put("title", problem.getAlgoProblemTitle());
@@ -134,6 +238,7 @@ public class AIProblemGeneratorService {
                     completeData.put("difficulty", problem.getAlgoProblemDifficulty());
                     completeData.put("testCaseCount", testCases.size());
                     completeData.put("generationTime", generationTime);
+                    completeData.put("hasValidationCode", parsedData.optimalCode() != null);
 
                     emitComplete(sink, completeData);
 
@@ -145,6 +250,30 @@ public class AIProblemGeneratorService {
                 }
             });
         });
+    }
+
+    /**
+     * 검증 로그 저장
+     */
+    private void saveValidationLog(Long problemId, LLMResponseParser.ParsedResult data) {
+        try {
+            ProblemValidationLogDto validationLog = ProblemValidationLogDto.builder()
+                    .algoProblemId(problemId)
+                    .optimalCode(data.optimalCode())
+                    .naiveCode(data.naiveCode())
+                    .expectedTimeComplexity(data.expectedTimeComplexity())
+                    .validationStatus("PENDING")
+                    .correctionAttempts(0)
+                    .createdAt(LocalDateTime.now())
+                    .build();
+
+            validationLogMapper.insertValidationLog(validationLog);
+            log.info("검증 로그 저장 완료 - 문제 ID: {}, 검증 ID: {}",
+                    problemId, validationLog.getValidationId());
+        } catch (Exception e) {
+            log.error("검증 로그 저장 실패 - 문제 ID: {}", problemId, e);
+            // 검증 로그 저장 실패는 전체 프로세스를 중단하지 않음
+        }
     }
 
     /**
@@ -190,69 +319,6 @@ public class AIProblemGeneratorService {
         } catch (JsonProcessingException e) {
             log.error("에러 이벤트 JSON 변환 실패", e);
             sink.complete();
-        }
-    }
-
-    /**
-     * ✅ 실제 OpenAI API 호출 (Spring AI 사용)
-     */
-    private String callOpenAI(String prompt) {
-        try {
-            log.debug("OpenAI API 호출 시작 - 프롬프트 길이: {}", prompt.length());
-
-            // ChatClient 사용 (Spring AI 3.0+ 스타일)
-            ChatClient chatClient = ChatClient.create(chatModel);
-
-            String response = chatClient.prompt()
-                    .user(prompt)
-                    .call()
-                    .content();
-
-            log.debug("OpenAI API 호출 완료 - 응답 길이: {}", response.length());
-
-            return response;
-
-        } catch (Exception e) {
-            log.error("OpenAI API 호출 실패", e);
-            throw new RuntimeException("AI 문제 생성 중 오류가 발생했습니다: " + e.getMessage(), e);
-        }
-    }
-
-    /**
-     * 프롬프트 생성 (개선된 버전 - DATABASE 문제 지원 + 중복 방지)
-     */
-    private String buildPrompt(ProblemGenerationRequestDto request) {
-        String difficultyDesc = getDifficultyDescription(request.getDifficulty());
-
-        // 기존 문제 제목 목록 조회
-        List<String> existingTitles = getExistingProblemTitles();
-        String existingTitlesStr = existingTitles.isEmpty()
-                ? ""
-                : "\n\n## 중복 방지\n다음 문제 제목들과 중복되지 않도록 새로운 문제를 만들어주세요:\n"
-                        + String.join(", ", existingTitles.stream().limit(20).toList());
-
-        // DATABASE 문제인 경우
-        if ("SQL".equalsIgnoreCase(request.getProblemType())) {
-            return buildDatabasePrompt(difficultyDesc, request, existingTitlesStr);
-        }
-
-        // ALGORITHM 문제인 경우
-        return buildAlgorithmPrompt(difficultyDesc, request, existingTitlesStr);
-    }
-
-    /**
-     * 기존 문제 제목 목록 조회
-     */
-    private List<String> getExistingProblemTitles() {
-        try {
-            List<AlgoProblemDto> problems = algorithmProblemMapper.selectProblems(0, 100); // 최근 100개 문제
-            return problems.stream()
-                    .map(AlgoProblemDto::getAlgoProblemTitle)
-                    .filter(title -> title != null && !title.isEmpty())
-                    .toList();
-        } catch (Exception e) {
-            log.warn("기존 문제 제목 조회 실패, 빈 목록 반환", e);
-            return List.of();
         }
     }
 
@@ -308,53 +374,6 @@ public class AIProblemGeneratorService {
     }
 
     /**
-     * ALGORITHM 문제 프롬프트 생성
-     */
-    private String buildAlgorithmPrompt(String difficultyDesc, ProblemGenerationRequestDto request,
-            String existingTitlesStr) {
-        return String.format("""
-                당신은 알고리즘 문제 출제 전문가입니다.
-                다음 조건에 맞는 알고리즘 문제를 **반드시 JSON 형식으로만** 생성해주세요.
-
-                ## 요구사항
-                - 난이도: %s
-                - 주제: %s
-                %s
-                %s
-
-                ## 중요 규칙
-                1. 문제는 실제 코딩 테스트 수준으로 작성
-                2. 테스트케이스는 최소 3개 이상 포함
-                3. 입출력 예제는 명확하게 작성
-                4. **JSON 형식 외 다른 텍스트 절대 포함 금지**
-
-                ## 응답 형식 (반드시 이 JSON 구조로만 응답)
-                {
-                  "title": "문제 제목",
-                  "description": "문제 설명 (자세하게)",
-                  "constraints": "제약 조건",
-                  "inputFormat": "입력 형식 설명",
-                  "outputFormat": "출력 형식 설명",
-                  "sampleInput": "1 2",
-                  "sampleOutput": "3",
-                  "testCases": [
-                    {"input": "3 4", "output": "7"},
-                    {"input": "5 7", "output": "12"},
-                    {"input": "10 20", "output": "30"}
-                  ]
-                }
-
-                **주의**: JSON만 출력하고 다른 설명은 절대 포함하지 마세요!
-                """,
-                difficultyDesc,
-                request.getTopic(),
-                request.getAdditionalRequirements() != null
-                        ? "- 추가 요구사항: " + request.getAdditionalRequirements()
-                        : "",
-                existingTitlesStr);
-    }
-
-    /**
      * 난이도 설명
      */
     private String getDifficultyDescription(ProblemDifficulty difficulty) {
@@ -363,240 +382,6 @@ public class AIProblemGeneratorService {
             case SILVER -> "초중급 (기본 알고리즘, 자료구조)";
             case GOLD -> "중급 (고급 알고리즘, 최적화)";
             case PLATINUM -> "고급 (복잡한 알고리즘, 수학적 사고)";
-        };
-    }
-
-    /**
-     * AI 응답 JSON 정제
-     * - 마크다운 코드 블록 제거
-     * - 유효하지 않은 JSON 이스케이프 시퀀스 처리 (정규식 패턴 등)
-     */
-    private String sanitizeJsonResponse(String aiResponse) {
-        // null 또는 빈 문자열 체크
-        if (aiResponse == null || aiResponse.trim().isEmpty()) {
-            log.warn("AI 응답이 null이거나 비어있습니다.");
-            return "{}";
-        }
-
-        // 1. 마크다운 코드 블록 제거
-        String cleanedJson = aiResponse
-                .replaceAll("```json\\s*", "")
-                .replaceAll("```\\s*$", "")
-                .replaceAll("```", "")  // 추가: 남은 ``` 제거
-                .trim();
-
-        if (cleanedJson.isEmpty()) {
-            log.warn("마크다운 제거 후 JSON이 비어있습니다.");
-            return "{}";
-        }
-
-        // 2. 유효하지 않은 JSON 이스케이프 시퀀스를 이중 백슬래시로 변환
-        // JSON 유효 이스케이프: 큰따옴표, 백슬래시, 슬래시, b, f, n, r, t, 유니코드(u+4자리hex)
-        // 그 외 정규식 패턴(w, d, s 등)은 유효하지 않으므로 백슬래시를 이중으로 변환
-        StringBuilder result = new StringBuilder();
-        int i = 0;
-        int escapesFixed = 0;
-
-        while (i < cleanedJson.length()) {
-            char c = cleanedJson.charAt(i);
-
-            if (c == '\\') {
-                // 다음 문자가 있는지 확인
-                if (i + 1 < cleanedJson.length()) {
-                    char next = cleanedJson.charAt(i + 1);
-
-                    // 유효한 JSON 이스케이프 시퀀스 확인
-                    if (next == '"' || next == '\\' || next == '/' ||
-                        next == 'b' || next == 'f' || next == 'n' ||
-                        next == 'r' || next == 't') {
-                        // 유효한 이스케이프 - 그대로 유지
-                        result.append(c);
-                        result.append(next);
-                        i += 2;
-                    } else if (next == 'u' && i + 5 < cleanedJson.length()) {
-                        // \ uXXXX 유니코드 이스케이프 확인
-                        String hex = cleanedJson.substring(i + 2, i + 6);
-                        if (hex.matches("[0-9a-fA-F]{4}")) {
-                            result.append(cleanedJson, i, i + 6);
-                            i += 6;
-                        } else {
-                            // 유효하지 않은 유니코드 - 백슬래시 이스케이프
-                            result.append("\\\\");
-                            escapesFixed++;
-                            i += 1;
-                        }
-                    } else {
-                        // 유효하지 않은 이스케이프 - 백슬래시를 이중으로
-                        result.append("\\\\");
-                        escapesFixed++;
-                        i += 1;
-                    }
-                } else {
-                    // 문자열 끝에 단독 백슬래시 - 이스케이프 처리
-                    result.append("\\\\");
-                    escapesFixed++;
-                    i += 1;
-                }
-            } else {
-                result.append(c);
-                i += 1;
-            }
-        }
-
-        if (escapesFixed > 0) {
-            log.info("JSON 이스케이프 시퀀스 {} 개 수정됨", escapesFixed);
-        }
-
-        return result.toString();
-    }
-
-    /**
-     * 문제 정보 파싱
-     */
-    private AlgoProblemDto parseAIProblemResponse(String aiResponse, ProblemGenerationRequestDto request)
-            throws JsonProcessingException {
-
-        // JSON 전처리 (```json ``` 제거 + 유효하지 않은 이스케이프 시퀀스 처리)
-        String cleanedJson = sanitizeJsonResponse(aiResponse);
-
-        JsonNode jsonNode = objectMapper.readTree(cleanedJson);
-
-        // problemType 결정
-        ProblemType problemType = "SQL".equalsIgnoreCase(request.getProblemType())
-                ? ProblemType.SQL
-                : ProblemType.ALGORITHM;
-
-        // initScript 파싱 (DATABASE 문제인 경우)
-        String initScript = null;
-        if (problemType == ProblemType.SQL) {
-            JsonNode initScriptNode = jsonNode.get("initScript");
-            if (initScriptNode != null && !initScriptNode.isNull()) {
-                initScript = initScriptNode.asText();
-            }
-        }
-
-        return AlgoProblemDto.builder()
-                .algoProblemTitle(jsonNode.get("title").asText())
-                .algoProblemDescription(buildFullDescription(jsonNode))
-                .algoProblemDifficulty(request.getDifficulty())
-                .algoProblemSource(ProblemSource.AI_GENERATED)
-                .problemType(problemType)
-                .initScript(initScript) // DATABASE 문제인 경우 초기화 스크립트 설정
-                .timelimit(request.getTimeLimit() != null
-                        ? request.getTimeLimit()
-                        : getDefaultTimeLimit(request.getDifficulty()))
-                .memorylimit(request.getMemoryLimit())
-                .algoProblemTags(buildTagsJson(request.getTopic()))
-                .algoProblemStatus(true)
-                .algoCreatedAt(LocalDateTime.now())
-                .algoUpdatedAt(LocalDateTime.now())
-                .build();
-    }
-
-    /**
-     * 태그를 JSON 배열 형식으로 변환
-     */
-    private String buildTagsJson(String topic) {
-        if (topic == null || topic.trim().isEmpty()) {
-            return "[]"; // 빈 JSON 배열
-        }
-
-        try {
-            // 쉼표로 구분된 태그를 JSON 배열로 변환
-            String[] tags = topic.split(",");
-            List<String> tagList = new ArrayList<>();
-
-            for (String tag : tags) {
-                String trimmed = tag.trim();
-                if (!trimmed.isEmpty()) {
-                    tagList.add(trimmed);
-                }
-            }
-
-            // ObjectMapper로 JSON 배열 생성
-            return objectMapper.writeValueAsString(tagList);
-
-        } catch (Exception e) {
-            log.error("태그 JSON 변환 실패, 기본값 사용: {}", topic, e);
-            // 실패 시 단일 태그로 JSON 배열 생성
-            return "[\"" + topic.replace("\"", "\\\"") + "\"]";
-        }
-    }
-
-    /**
-     * 문제 설명 전체 구성
-     */
-    private String buildFullDescription(JsonNode jsonNode) {
-        return String.format("""
-                %s
-
-                **입력**
-                %s
-
-                **출력**
-                %s
-
-                **제한 사항**
-                %s
-
-                **예제 입력**
-                %s
-
-                **예제 출력**
-                %s
-                """,
-                jsonNode.get("description").asText(),
-                jsonNode.get("inputFormat").asText(),
-                jsonNode.get("outputFormat").asText(),
-                jsonNode.get("constraints").asText(),
-                jsonNode.get("sampleInput").asText(),
-                jsonNode.get("sampleOutput").asText());
-    }
-
-    /**
-     * 테스트케이스 파싱
-     */
-    private List<AlgoTestcaseDto> parseAITestCaseResponse(String aiResponse) throws JsonProcessingException {
-
-        // JSON 전처리 (유효하지 않은 이스케이프 시퀀스 처리 포함)
-        String cleanedJson = sanitizeJsonResponse(aiResponse);
-
-        JsonNode jsonNode = objectMapper.readTree(cleanedJson);
-        JsonNode testCasesNode = jsonNode.get("testCases");
-
-        List<AlgoTestcaseDto> testCases = new ArrayList<>();
-
-        // 샘플 테스트케이스 (첫 번째)
-        testCases.add(AlgoTestcaseDto.builder()
-                .inputData(jsonNode.get("sampleInput").asText())
-                .expectedOutput(jsonNode.get("sampleOutput").asText())
-                .isSample(true)
-                .build());
-
-        // 히든 테스트케이스
-        if (testCasesNode != null && testCasesNode.isArray()) {
-            for (JsonNode testCase : testCasesNode) {
-                testCases.add(
-                        AlgoTestcaseDto.builder()
-                                .inputData(testCase.get("input").asText())
-                                .expectedOutput(testCase.get("output").asText())
-                                .isSample(false)
-                                .build());
-            }
-        }
-
-        return testCases;
-    }
-
-    /**
-     * 기본 시간 제한
-     */
-    private Integer getDefaultTimeLimit(ProblemDifficulty difficulty) {
-        return switch (difficulty) {
-            case BRONZE -> 1000;
-            case SILVER -> 2000;
-            case GOLD -> 3000;
-            case PLATINUM -> 5000;
         };
     }
 }

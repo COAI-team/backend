@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="kr.or.kosa.backend.algorithm.mapper.ProblemValidationLogMapper">
+
+    <!-- ResultMap 정의 -->
+    <resultMap id="ValidationLogResultMap" type="kr.or.kosa.backend.algorithm.dto.ProblemValidationLogDto">
+        <id property="validationId" column="VALIDATION_ID"/>
+        <result property="algoProblemId" column="ALGO_PROBLEM_ID"/>
+        <result property="optimalCode" column="OPTIMAL_CODE"/>
+        <result property="naiveCode" column="NAIVE_CODE"/>
+        <result property="expectedTimeComplexity" column="EXPECTED_TIME_COMPLEXITY"/>
+        <result property="optimalCodeResult" column="OPTIMAL_CODE_RESULT"/>
+        <result property="naiveCodeResult" column="NAIVE_CODE_RESULT"/>
+        <result property="optimalExecutionTime" column="OPTIMAL_EXECUTION_TIME"/>
+        <result property="naiveExecutionTime" column="NAIVE_EXECUTION_TIME"/>
+        <result property="timeRatio" column="TIME_RATIO"/>
+        <result property="timeRatioValid" column="TIME_RATIO_VALID"/>
+        <result property="similarityScore" column="SIMILARITY_SCORE"/>
+        <result property="similarityValid" column="SIMILARITY_VALID"/>
+        <result property="validationStatus" column="VALIDATION_STATUS"/>
+        <result property="correctionAttempts" column="CORRECTION_ATTEMPTS"/>
+        <result property="failureReasons" column="FAILURE_REASONS"/>
+        <result property="createdAt" column="CREATED_AT"/>
+        <result property="completedAt" column="COMPLETED_AT"/>
+    </resultMap>
+
+    <!-- 검증 로그 저장 -->
+    <insert id="insertValidationLog"
+            parameterType="kr.or.kosa.backend.algorithm.dto.ProblemValidationLogDto"
+            useGeneratedKeys="true"
+            keyProperty="validationId"
+            keyColumn="VALIDATION_ID">
+        INSERT INTO PROBLEM_VALIDATION_LOGS (
+            ALGO_PROBLEM_ID, OPTIMAL_CODE, NAIVE_CODE, EXPECTED_TIME_COMPLEXITY,
+            VALIDATION_STATUS, CORRECTION_ATTEMPTS, CREATED_AT
+        ) VALUES (
+            #{algoProblemId}, #{optimalCode}, #{naiveCode}, #{expectedTimeComplexity},
+            #{validationStatus}, #{correctionAttempts}, #{createdAt}
+        )
+    </insert>
+
+    <!-- 검증 로그 업데이트 -->
+    <update id="updateValidationLog">
+        UPDATE PROBLEM_VALIDATION_LOGS
+        SET OPTIMAL_CODE = #{optimalCode},
+            NAIVE_CODE = #{naiveCode},
+            EXPECTED_TIME_COMPLEXITY = #{expectedTimeComplexity},
+            OPTIMAL_CODE_RESULT = #{optimalCodeResult},
+            NAIVE_CODE_RESULT = #{naiveCodeResult},
+            OPTIMAL_EXECUTION_TIME = #{optimalExecutionTime},
+            NAIVE_EXECUTION_TIME = #{naiveExecutionTime},
+            TIME_RATIO = #{timeRatio},
+            TIME_RATIO_VALID = #{timeRatioValid},
+            SIMILARITY_SCORE = #{similarityScore},
+            SIMILARITY_VALID = #{similarityValid},
+            VALIDATION_STATUS = #{validationStatus},
+            CORRECTION_ATTEMPTS = #{correctionAttempts},
+            FAILURE_REASONS = #{failureReasons},
+            COMPLETED_AT = #{completedAt}
+        WHERE VALIDATION_ID = #{validationId}
+    </update>
+
+    <!-- 문제 ID로 검증 로그 조회 -->
+    <select id="selectByProblemId" resultMap="ValidationLogResultMap">
+        SELECT * FROM PROBLEM_VALIDATION_LOGS
+        WHERE ALGO_PROBLEM_ID = #{algoProblemId}
+        ORDER BY CREATED_AT DESC
+        LIMIT 1
+    </select>
+
+    <!-- 검증 ID로 조회 -->
+    <select id="selectById" resultMap="ValidationLogResultMap">
+        SELECT * FROM PROBLEM_VALIDATION_LOGS
+        WHERE VALIDATION_ID = #{validationId}
+    </select>
+
+    <!-- 검증 상태별 로그 조회 -->
+    <select id="selectByStatus" resultMap="ValidationLogResultMap">
+        SELECT * FROM PROBLEM_VALIDATION_LOGS
+        WHERE VALIDATION_STATUS = #{status}
+        ORDER BY CREATED_AT DESC
+        LIMIT #{limit}
+    </select>
+
+    <!-- 검증 실패 로그 조회 (Self-Correction 대상) -->
+    <select id="selectFailedForCorrection" resultMap="ValidationLogResultMap">
+        SELECT * FROM PROBLEM_VALIDATION_LOGS
+        WHERE VALIDATION_STATUS = 'FAILED'
+        AND CORRECTION_ATTEMPTS &lt; #{maxAttempts}
+        ORDER BY CREATED_AT ASC
+    </select>
+
+    <!-- 검증 상태 업데이트 -->
+    <update id="updateStatus">
+        UPDATE PROBLEM_VALIDATION_LOGS
+        SET VALIDATION_STATUS = #{status},
+            COMPLETED_AT = CASE WHEN #{status} IN ('PASSED', 'FAILED') THEN NOW() ELSE COMPLETED_AT END
+        WHERE VALIDATION_ID = #{validationId}
+    </update>
+
+    <!-- 코드 실행 결과 업데이트 -->
+    <update id="updateExecutionResults">
+        UPDATE PROBLEM_VALIDATION_LOGS
+        SET OPTIMAL_CODE_RESULT = #{optimalCodeResult},
+            NAIVE_CODE_RESULT = #{naiveCodeResult},
+            OPTIMAL_EXECUTION_TIME = #{optimalExecutionTime},
+            NAIVE_EXECUTION_TIME = #{naiveExecutionTime},
+            TIME_RATIO = #{timeRatio},
+            TIME_RATIO_VALID = #{timeRatioValid}
+        WHERE VALIDATION_ID = #{validationId}
+    </update>
+
+    <!-- 유사도 검사 결과 업데이트 -->
+    <update id="updateSimilarityResults">
+        UPDATE PROBLEM_VALIDATION_LOGS
+        SET SIMILARITY_SCORE = #{similarityScore},
+            SIMILARITY_VALID = #{similarityValid}
+        WHERE VALIDATION_ID = #{validationId}
+    </update>
+
+    <!-- Self-Correction 시도 횟수 증가 -->
+    <update id="incrementCorrectionAttempts">
+        UPDATE PROBLEM_VALIDATION_LOGS
+        SET CORRECTION_ATTEMPTS = CORRECTION_ATTEMPTS + 1
+        WHERE VALIDATION_ID = #{validationId}
+    </update>
+</mapper>
