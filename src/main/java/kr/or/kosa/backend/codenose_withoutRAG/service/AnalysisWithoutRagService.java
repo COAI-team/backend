@@ -10,8 +10,7 @@ import kr.or.kosa.backend.codenose.mapper.AnalysisMapper;
 import kr.or.kosa.backend.codenose.service.PromptGenerator;
 import kr.or.kosa.backend.codenose.service.PromptManager;
 import kr.or.kosa.backend.codenose.service.agent.AgenticWorkflowService;
-import kr.or.kosa.backend.codenose.service.pipeline.PipelineContext;
-import kr.or.kosa.backend.codenose.service.pipeline.StyleExtractorModule;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
@@ -38,7 +37,7 @@ public class AnalysisWithoutRagService {
     private final ObjectMapper objectMapper;
     private final ChatClient chatClient;
     private final AgenticWorkflowService agenticWorkflowService;
-    private final StyleExtractorModule styleExtractorModule;
+
     private final PromptManager promptManager;
     private final PromptGenerator promptGenerator;
 
@@ -48,14 +47,12 @@ public class AnalysisWithoutRagService {
             AnalysisMapper analysisMapper,
             ObjectMapper objectMapper,
             AgenticWorkflowService agenticWorkflowService,
-            StyleExtractorModule styleExtractorModule,
             PromptManager promptManager,
             PromptGenerator promptGenerator) {
         this.chatClient = chatClientBuilder.build();
         this.analysisMapper = analysisMapper;
         this.objectMapper = objectMapper;
         this.agenticWorkflowService = agenticWorkflowService;
-        this.styleExtractorModule = styleExtractorModule;
         this.promptManager = promptManager;
         this.promptGenerator = promptGenerator;
     }
@@ -141,79 +138,6 @@ public class AnalysisWithoutRagService {
             log.error("파일 분석 실패 (No RAG): {}", e.getMessage(), e);
             throw new RuntimeException("파일 분석에 실패했습니다 (No RAG): " + e.getMessage());
         }
-    }
-
-    /**
-     * 저장된 GitHub 파일을 조회하여 AI 분석 수행 (스트리밍 버전) - RAG 제외
-     */
-    public reactor.core.publisher.Flux<String> analyzeStoredFileStream(AnalysisRequestDTO requestDto) {
-        System.out.println(
-                "[TRACE] AnalysisWithoutRagService.analyzeStoredFileStream called with requestDto: " + requestDto);
-        return reactor.core.publisher.Mono.fromCallable(() -> {
-            try {
-                // 1. DB에서 저장된 GitHub 파일 내용 조회
-                GithubFileDTO storedFile = analysisMapper.findFileById(requestDto.getAnalysisId());
-
-                if (storedFile == null) {
-                    throw new RuntimeException("저장된 파일을 찾을 수 없습니다. repositoryUrl: "
-                            + ", filePath: " + requestDto.getFilePath() + ", analysisId: "
-                            + requestDto.getAnalysisId());
-                }
-
-                log.info("파일 조회 완료 (스트림, No RAG) - fileId: {}, fileName: {}, contentLength: {}",
-                        storedFile.getFileId(),
-                        storedFile.getFileName(),
-                        storedFile.getFileContent().length());
-
-                // 2. 사용자 컨텍스트 조회 (RAG 제외)
-                String userContext = "No prior history available (RAG Disabled).";
-
-                // 3. 스타일 추출 (Pipeline) - 스타일 추출은 유지 (RAG와 무관한 경우)
-                // 하지만 스타일 추출도 이전 기록을 참조한다면 제외해야 할 수도 있음.
-                // 여기서는 "RAG를 제외한 pipeline"이라고 했으므로, VectorDB 검색을 통한 컨텍스트만 제외.
-                // StyleExtractorModule이 내부적으로 무엇을 하는지 확인 필요하지만, 일단 유지.
-                // 만약 StyleExtractorModule이 RAG를 쓴다면 이것도 빈 값으로 처리해야 함.
-                // StyleExtractorModule은 userContext를 입력으로 받으므로, userContext가 비어있으면 스타일도 추출되지 않을
-                // 것임.
-
-                PipelineContext pipelineContext = PipelineContext.builder()
-                        .userContext(userContext)
-                        .build();
-                pipelineContext = styleExtractorModule.extractStyle(pipelineContext);
-                String styleRules = pipelineContext.getStyleRules();
-                log.info("Extracted Style Rules (No RAG): {}", styleRules);
-
-                // 4. 프롬프트 생성
-                String customReqWithStyle = requestDto.getCustomRequirements() + "\n\n[Style Rules]\n" + styleRules;
-                String systemPromptWithTone = promptGenerator.createSystemPrompt(
-                        requestDto.getAnalysisTypes(),
-                        requestDto.getToneLevel(),
-                        customReqWithStyle,
-                        userContext);
-
-                // 5. Agentic Workflow 실행
-                log.info("Starting Agentic Workflow for Stream (No RAG)...");
-                String aiResponseContent = agenticWorkflowService.executeWorkflow(storedFile.getFileContent(),
-                        systemPromptWithTone);
-
-                // 6. 결과 저장 및 후처리
-                String cleanedResponse = cleanMarkdownCodeBlock(aiResponseContent);
-
-                // DB 저장
-                String analysisId = saveAnalysisResult(storedFile, requestDto, cleanedResponse);
-
-                // 패턴 업데이트
-                updateUserPatterns(requestDto.getUserId(), objectMapper.readTree(cleanedResponse).path("codeSmells"));
-
-                // RAG 저장 로직 제거
-
-                return aiResponseContent;
-
-            } catch (Exception e) {
-                log.error("Error in Agentic Workflow Stream (No RAG)", e);
-                throw new RuntimeException(e);
-            }
-        }).flatMapMany(result -> reactor.core.publisher.Flux.just(result));
     }
 
     // Helper methods (copied from AnalysisService)

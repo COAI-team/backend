@@ -3,6 +3,9 @@ package kr.or.kosa.backend.codeboard.mapper;
 import kr.or.kosa.backend.codeboard.domain.Codeboard;
 import kr.or.kosa.backend.codeboard.dto.CodeboardDetailResponseDto;
 import kr.or.kosa.backend.codeboard.dto.CodeboardListResponseDto;
+import kr.or.kosa.backend.commons.pagination.PageRequest;
+import kr.or.kosa.backend.commons.pagination.SearchCondition;
+import kr.or.kosa.backend.commons.pagination.SortCondition;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -21,15 +24,11 @@ public interface CodeboardMapper {
 
     void increaseClick(Long codeboardId);
 
-    int countAll();
-
-    int countPosts(@Param("keyword") String keyword);
+    long countPosts(@Param("search") SearchCondition searchCondition);
 
     List<CodeboardListResponseDto> findPosts(
-            @Param("offset") int offset,
-            @Param("pageSize") int pageSize,
-            @Param("sortField") String sortField,
-            @Param("sortDirection") String sortDirection,
-            @Param("keyword") String keyword
+            @Param("page") PageRequest pageRequest,
+            @Param("search") SearchCondition searchCondition,
+            @Param("sort") SortCondition sortCondition
     );
 }

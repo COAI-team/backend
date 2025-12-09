@@ -5,6 +5,7 @@ import java.util.List;
 import kr.or.kosa.backend.security.jwt.JwtAuthenticationFilter;
 import kr.or.kosa.backend.security.jwt.JwtProvider;
 import lombok.RequiredArgsConstructor;
+
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -20,71 +21,82 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.http.HttpMethod;
 
 @Configuration
 @RequiredArgsConstructor
 public class SecurityConfig {
 
-        private final JwtProvider jwtProvider;
+    private final JwtProvider jwtProvider;
 
-        @Bean
-        public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-                http
-                                .cors(Customizer.withDefaults())
-                                .csrf(AbstractHttpConfigurer::disable)
-                                .sessionManagement(session -> session
-                                                .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                                .authorizeHttpRequests(auth -> auth
-                                                .requestMatchers(
-                                                                "/",
-                                                                "/auth/github/**",
-                                                                "/oauth2/**",
-                                                                "/users/register",
-                                                                "/users/login",
-                                                                "/users/github/link",
-                                                                "/email/**",
-                                                                "/algo/**",
-                                                                "/users/password/**")
-                                                .permitAll()
-                                                .anyRequest().authenticated())
-                                .addFilterBefore(
-                                                new JwtAuthenticationFilter(jwtProvider),
-                                                UsernamePasswordAuthenticationFilter.class);
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
 
-                return http.build();
-        }
+        http
+                .cors(Customizer.withDefaults())
+                .csrf(AbstractHttpConfigurer::disable)
+                .sessionManagement(session ->
+                        session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+                )
+                .authorizeHttpRequests(auth -> auth
 
-        // @Bean
-        // public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        //
-        // http
-        // .cors(Customizer.withDefaults())
-        // .csrf(AbstractHttpConfigurer::disable)
-        // .sessionManagement(session ->
-        // session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-        //
-        // .authorizeHttpRequests(auth -> auth
-        // // .requestMatchers(
-        // // "/**"
-        // // )
-        // // .permitAll()
-        // .anyRequest().permitAll());
-        //
-        // // .addFilterBefore(
-        // // new JwtAuthenticationFilter(jwtProvider),
-        // // UsernamePasswordAuthenticationFilter.class
-        // // );
-        //
-        // return http.build();
-        // }
-        @Bean
-        public PasswordEncoder passwordEncoder() {
-                return new BCryptPasswordEncoder();
-        }
+                        // 인증 없이 접근 허용
+                        .requestMatchers(
+                                "/",
+                                "/auth/github/**",
+                                "/oauth2/**",
+                                "/users/register",
+                                "/users/login",
+                                "/users/github/link",
+                                "/users/password/**",
+                                "/email/**",
+                                "/algo/**",
+                                "/admin/**",
+                                "/codeAnalysis/**",
+                                "/api/analysis/**"
+                        ).permitAll()
 
-        @Bean
-        public AuthenticationManager authenticationManager(AuthenticationConfiguration config)
-                        throws Exception {
-                return config.getAuthenticationManager();
-        }
+                        // 게시글 / 댓글 / 좋아요 조회는 비로그인 허용
+                        .requestMatchers(HttpMethod.GET, "/freeboard/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/codeboard/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/comment", "/comment/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/like/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/analysis/**").permitAll()
+
+                        // 나머지는 전부 인증 필요
+                        .anyRequest().authenticated()
+                )
+                // JWT 인증 필터 (한 번만 등록)
+                .addFilterBefore(
+                        new JwtAuthenticationFilter(jwtProvider),
+                        UsernamePasswordAuthenticationFilter.class
+                );
+
+        return http.build();
+    }
+
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+
+    @Bean
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration config)
+            throws Exception {
+        return config.getAuthenticationManager();
+    }
+
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+        configuration.setAllowedOrigins(List.of("http://localhost:5173"));
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
+        configuration.setAllowedHeaders(List.of("*"));
+        configuration.setAllowCredentials(true);
+        configuration.setExposedHeaders(List.of("Authorization"));
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
+    }
 }

@@ -17,6 +17,7 @@ public class InsightsController {
 
     private final InsightsService insightsService;
     private final WordCloudService wordCloudService;
+    private final kr.or.kosa.backend.codenose.service.AnalysisService analysisService;
 
     @GetMapping("/history/{userId}")
     public ResponseEntity<List<CodeResultDTO>> getAnalysisHistory(@PathVariable Long userId) {
@@ -60,5 +61,12 @@ public class InsightsController {
             return ResponseEntity.noContent().build();
         }
         return ResponseEntity.ok(base64Image);
+    }
+
+    @PostMapping("/metadata/backfill")
+    public ResponseEntity<String> runMetadataBackfill() {
+        // In real dev, might need admin check
+        int count = analysisService.runMetadataBackfill();
+        return ResponseEntity.ok("Metadata backfill completed. Updated " + count + " records.");
     }
 }

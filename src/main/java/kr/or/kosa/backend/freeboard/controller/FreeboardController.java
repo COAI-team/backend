@@ -22,27 +22,7 @@ public class FreeboardController {
 
     private final FreeboardService freeboardService;
 
-    // 게시글 작성
-    @PostMapping
-    public ResponseEntity<ApiResponse<Map<String, Object>>> create(
-            @Valid @RequestBody FreeboardCreateRequest request,
-            @RequestAttribute("userId") Long userId
-    ) {
-        Long freeboardId = freeboardService.write(request.toDto(), userId);
-        return ResponseEntity.ok(ApiResponse.success(Map.of("freeboardId", freeboardId)));
-    }
-
-    // 게시글 상세 조회
-    @GetMapping("/{freeboardId}")
-    public ResponseEntity<ApiResponse<FreeboardDetailResponseDto>> get(
-            @PathVariable Long freeboardId,
-            @RequestAttribute(value = "userId", required = false) Long userId
-    ) {
-        FreeboardDetailResponseDto freeboard = freeboardService.detail(freeboardId, userId);
-        return ResponseEntity.ok(ApiResponse.success(freeboard));
-    }
-
-    // 게시글 목록 조회 (검색/정렬 포함)
+    // 게시글 목록 조회 (검색/정렬 포함) - PathVariable보다 먼저 선언
     @GetMapping
     public ResponseEntity<ApiResponse<PageResponse<FreeboardListResponseDto>>> getList(
             @RequestParam(defaultValue = "1") int page,
@@ -56,6 +36,26 @@ public class FreeboardController {
                 freeboardService.getList(page, size, sortType, direction, keyword);
 
         return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    // 게시글 작성
+    @PostMapping
+    public ResponseEntity<ApiResponse<Map<String, Object>>> create(
+            @Valid @RequestBody FreeboardCreateRequest request,
+            @RequestAttribute("userId") Long userId
+    ) {
+        Long freeboardId = freeboardService.write(request.toDto(), userId);
+        return ResponseEntity.ok(ApiResponse.success(Map.of("freeboardId", freeboardId)));
+    }
+
+    // 게시글 상세 조회 - PathVariable은 나중에 선언
+    @GetMapping("/{freeboardId}")
+    public ResponseEntity<ApiResponse<FreeboardDetailResponseDto>> get(
+            @PathVariable Long freeboardId,
+            @RequestAttribute(value = "userId", required = false) Long userId
+    ) {
+        FreeboardDetailResponseDto freeboard = freeboardService.detail(freeboardId, userId);
+        return ResponseEntity.ok(ApiResponse.success(freeboard));
     }
 
     // 게시글 수정

@@ -18,6 +18,7 @@ public class RagDto {
         // New metadata fields
         private String majorChanges;
         private String desiredAnalysis;
+        private String analysisId;
     }
 
     @Data

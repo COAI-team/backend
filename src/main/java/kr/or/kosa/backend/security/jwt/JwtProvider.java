@@ -15,7 +15,7 @@ public class JwtProvider {
 
     private final SecretKey key;
 
-    private static final long ACCESS_TOKEN_EXP = 1000L * 60 * 30;        // 30분
+    private static final long ACCESS_TOKEN_EXP = 1000L * 60 * 30; // 30분
     private static final long REFRESH_TOKEN_EXP = 1000L * 60 * 60 * 24 * 7; // 7일
 
     public JwtProvider(@Value("${jwt.secret}") String secretKey) {
@@ -54,9 +54,18 @@ public class JwtProvider {
                     .parseClaimsJws(token);
 
             return true;
-        } catch (JwtException | IllegalArgumentException e) {
-            return false;
+        } catch (io.jsonwebtoken.security.SecurityException | MalformedJwtException e) {
+            System.out.println("[JwtProvider] Invalid JWT signature: " + e.getMessage());
+        } catch (ExpiredJwtException e) {
+            System.out.println("[JwtProvider] Expired JWT token: " + e.getMessage());
+        } catch (UnsupportedJwtException e) {
+            System.out.println("[JwtProvider] Unsupported JWT token: " + e.getMessage());
+        } catch (IllegalArgumentException e) {
+            System.out.println("[JwtProvider] JWT claims string is empty: " + e.getMessage());
+        } catch (JwtException e) {
+            System.out.println("[JwtProvider] JWT Error: " + e.getMessage());
         }
+        return false;
     }
 
     // =======================

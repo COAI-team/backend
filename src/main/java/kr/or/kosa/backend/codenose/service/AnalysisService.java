@@ -10,24 +10,17 @@ import kr.or.kosa.backend.codenose.dto.dtoReal.UserCodePatternDTO;
 import kr.or.kosa.backend.codenose.mapper.AnalysisMapper;
 import kr.or.kosa.backend.codenose.service.agent.AgenticWorkflowService;
 
-import kr.or.kosa.backend.codenose.service.pipeline.PipelineContext;
-import kr.or.kosa.backend.codenose.service.pipeline.StyleExtractorModule;
 import kr.or.kosa.backend.codenose.service.search.HybridSearchService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.messages.Message;
-import org.springframework.ai.chat.messages.UserMessage;
-import org.springframework.ai.chat.model.ChatResponse;
-import org.springframework.ai.chat.prompt.Prompt;
-import org.springframework.ai.chat.prompt.SystemPromptTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Slf4j
@@ -41,7 +34,7 @@ public class AnalysisService {
     private final RagService ragService;
     private final HybridSearchService hybridSearchService;
     private final AgenticWorkflowService agenticWorkflowService;
-    private final StyleExtractorModule styleExtractorModule;
+
     private final PromptManager promptManager;
     private final PromptGenerator promptGenerator;
 
@@ -53,7 +46,6 @@ public class AnalysisService {
             RagService ragService,
             HybridSearchService hybridSearchService,
             AgenticWorkflowService agenticWorkflowService,
-            StyleExtractorModule styleExtractorModule,
             PromptManager promptManager,
             PromptGenerator promptGenerator) {
         this.chatClient = chatClientBuilder.build();
@@ -63,7 +55,6 @@ public class AnalysisService {
         this.hybridSearchService = hybridSearchService;
 
         this.agenticWorkflowService = agenticWorkflowService;
-        this.styleExtractorModule = styleExtractorModule;
         this.promptManager = promptManager;
         this.promptGenerator = promptGenerator;
     }
@@ -102,6 +93,29 @@ public class AnalysisService {
                     .map(org.springframework.ai.document.Document::getText)
                     .collect(java.util.stream.Collectors.joining("\n\n---\n\n"));
 
+            // Capture related analysis IDs from context documents
+            List<Map<String, String>> relatedIds = contextDocs.stream()
+                    .map(doc -> {
+                        Map<String, Object> meta = doc.getMetadata();
+                        String id = (String) meta.get("analysisId");
+                        if (id != null && !id.isEmpty()) {
+                            return Map.of(
+                                    "id", id,
+                                    "timestamp", (String) meta.getOrDefault("timestamp", ""),
+                                    "fileName", (String) meta.getOrDefault("problemTitle", "Unknown File"));
+                        }
+                        return null;
+                    })
+                    .filter(java.util.Objects::nonNull)
+                    .toList();
+
+            String relatedAnalysisIdsJson = "[]";
+            try {
+                relatedAnalysisIdsJson = objectMapper.writeValueAsString(relatedIds);
+            } catch (Exception e) {
+                log.error("Failed to serialize related analysis IDs", e);
+            }
+
             if (userContext.isEmpty()) {
                 userContext = "No prior history available.";
             }
@@ -116,6 +130,11 @@ public class AnalysisService {
                     requestDto.getCustomRequirements(),
                     userContext);
 
+            // 3.1. 메타데이터 추출 (Metadata Extraction)
+            String metadataPrompt = promptGenerator.createMetadataPrompt(storedFile.getFileContent());
+            String metadataJson = extractMetadata(metadataPrompt);
+            log.info("Metadata extracted: {}", metadataJson != null ? "Success" : "Failed");
+
             // 4. Agentic Workflow 실행
             // Instead of direct ChatClient call, we use the Agentic Workflow
             String aiResponseContent = agenticWorkflowService.executeWorkflow(storedFile.getFileContent(),
@@ -125,7 +144,8 @@ public class AnalysisService {
             System.out.println(aiResponseContent);
 
             // 5. 분석 결과를 CODE_ANALYSIS_HISTORY 테이블에 저장
-            String analysisId = saveAnalysisResult(storedFile, requestDto, cleanedResponse);
+            String analysisId = saveAnalysisResult(storedFile, requestDto, cleanedResponse, metadataJson,
+                    relatedAnalysisIdsJson);
 
             // 6. 사용자 코드 패턴 업데이트
             updateUserPatterns(requestDto.getUserId(), objectMapper.readTree(cleanedResponse).path("codeSmells"));
@@ -137,14 +157,15 @@ public class AnalysisService {
             try {
                 RagDto.IngestRequest ingestRequest = new RagDto.IngestRequest(
                         String.valueOf(requestDto.getUserId()),
-                        storedFile.getFileContent(),
+                        metadataJson, // content (Now storing Metadata instead of raw code)
                         cleanedResponse,
                         storedFile.getFileName().substring(storedFile.getFileName().lastIndexOf(".") + 1), // Simple
                                                                                                            // extension
                                                                                                            // check
                         storedFile.getFilePath(),
-                        "Stored File Analysis",
-                        requestDto.getCustomRequirements());
+                        "Stored File Metadata",
+                        requestDto.getCustomRequirements(),
+                        analysisId); // Pass analysisId
                 ragService.ingestCode(ingestRequest);
             } catch (Exception e) {
                 log.error("Failed to ingest stored file analysis to RAG system", e);
@@ -167,7 +188,7 @@ public class AnalysisService {
      * @return 저장된 analysisId
      */
     private String saveAnalysisResult(GithubFileDTO storedFile, AnalysisRequestDTO requestDto,
-            String aiResponseContent) {
+            String aiResponseContent, String metadataJson, String relatedAnalysisIdsJson) {
         try {
             JsonNode jsonNode = objectMapper.readTree(aiResponseContent);
 
@@ -186,6 +207,8 @@ public class AnalysisService {
             System.out.println(jsonNode.path("codeSmells"));
             result.setSuggestions(objectMapper.writeValueAsString(jsonNode.path("suggestions")));
             System.out.println(jsonNode.path("suggestions"));
+            result.setMetadata(metadataJson);
+            result.setRelatedAnalysisIds(relatedAnalysisIdsJson);
             result.setCreatedAt(Timestamp.valueOf(LocalDateTime.now()));
 
             analysisMapper.saveCodeResult(result);
@@ -287,101 +310,47 @@ public class AnalysisService {
     }
 
     /**
+     * 기존 분석 결과에 대한 메타데이터 백필 실행
+     * (Admin or Migration purpose)
+     */
+    public int runMetadataBackfill() {
+        List<CodeResultDTO> targets = analysisMapper.findAnalysisWithoutMetadata();
+        log.info("Found {} analysis records without metadata", targets.size());
+
+        int successCount = 0;
+        for (CodeResultDTO result : targets) {
+            try {
+                // 1. 해당 파일의 내용을 찾음 (GitHub 파일)
+                // Result stores repoUrl and filePath.
+                // We try to find the LATEST content for this path.
+                GithubFileDTO file = analysisMapper.findLatestFileContent(result.getRepositoryUrl(),
+                        result.getFilePath());
+                if (file == null) {
+                    log.warn("File content not found for analysisId: {}", result.getAnalysisId());
+                    continue;
+                }
+
+                // 2. 메타데이터 생성
+                String metadataPrompt = promptGenerator.createMetadataPrompt(file.getFileContent());
+                String metadataJson = extractMetadata(metadataPrompt);
+
+                // 3. 업데이트
+                analysisMapper.updateAnalysisMetadata(result.getAnalysisId(), metadataJson);
+                successCount++;
+                log.info("Backfilled metadata for analysisId: {}", result.getAnalysisId());
+
+            } catch (Exception e) {
+                log.error("Failed to backfill metadata for analysisId: " + result.getAnalysisId(), e);
+            }
+        }
+        return successCount;
+    }
+
+    /**
      * 사용자 코드 패턴 조회
      */
     public List<UserCodePatternDTO> getUserPatterns(Long userId) {
         return analysisMapper.findAllPatternsByUserId(userId);
-    }
-
-    /**
-     * 저장된 GitHub 파일을 조회하여 AI 분석 수행 (스트리밍 버전)
-     *
-     * @param requestDto 분석 요청 DTO
-     * @return AI 분석 결과 스트림 (Flux<String>)
-     */
-    public reactor.core.publisher.Flux<String> analyzeStoredFileStream(AnalysisRequestDTO requestDto) {
-        System.out.println("[TRACE] AnalysisService.analyzeStoredFileStream called with requestDto: " + requestDto);
-        return reactor.core.publisher.Mono.fromCallable(() -> {
-            try {
-                // 1. DB에서 저장된 GitHub 파일 내용 조회
-                GithubFileDTO storedFile = analysisMapper.findFileById(requestDto.getAnalysisId());
-
-                if (storedFile == null) {
-                    throw new RuntimeException("저장된 파일을 찾을 수 없습니다. repositoryUrl: "
-                            + ", filePath: " + requestDto.getFilePath() + ", analysisId: "
-                            + requestDto.getAnalysisId());
-                }
-
-                log.info("파일 조회 완료 (스트림) - fileId: {}, fileName: {}, contentLength: {}",
-                        storedFile.getFileId(),
-                        storedFile.getFileName(),
-                        storedFile.getFileContent().length());
-
-                // 2. 사용자 컨텍스트 조회 (Hybrid Search)
-                // Using Hybrid Search to get relevant context documents
-                String language = getLanguageFromExtension(storedFile.getFileName());
-                List<org.springframework.ai.document.Document> contextDocs = hybridSearchService.search(
-                        "mistakes patterns errors improvement",
-                        storedFile.getFileContent(),
-                        3,
-                        language);
-
-                String userContext = contextDocs.stream()
-                        .map(org.springframework.ai.document.Document::getText)
-                        .collect(java.util.stream.Collectors.joining("\n\n---\n\n"));
-
-                if (userContext.isEmpty()) {
-                    userContext = "No prior history available.";
-                }
-
-                // 3. 스타일 추출 (Pipeline)
-                PipelineContext pipelineContext = PipelineContext.builder()
-                        .userContext(userContext)
-                        .build();
-                pipelineContext = styleExtractorModule.extractStyle(pipelineContext);
-                String styleRules = pipelineContext.getStyleRules();
-                log.info("Extracted Style Rules: {}", styleRules);
-
-                // 4. 프롬프트 생성 (Style Rules 포함)
-                String customReqWithStyle = requestDto.getCustomRequirements() + "\n\n[Style Rules]\n" + styleRules;
-                String systemPromptWithTone = promptGenerator.createSystemPrompt(
-                        requestDto.getAnalysisTypes(),
-                        requestDto.getToneLevel(),
-                        customReqWithStyle,
-                        userContext);
-
-                // 5. Agentic Workflow 실행
-                log.info("Starting Agentic Workflow for Stream...");
-                String aiResponseContent = agenticWorkflowService.executeWorkflow(storedFile.getFileContent(),
-                        systemPromptWithTone);
-
-                // 6. 결과 저장 및 후처리
-                String cleanedResponse = cleanMarkdownCodeBlock(aiResponseContent);
-
-                // DB 저장
-                String analysisId = saveAnalysisResult(storedFile, requestDto, cleanedResponse);
-
-                // 패턴 업데이트
-                updateUserPatterns(requestDto.getUserId(), objectMapper.readTree(cleanedResponse).path("codeSmells"));
-
-                // RAG 저장
-                RagDto.IngestRequest ingestRequest = new RagDto.IngestRequest(
-                        String.valueOf(requestDto.getUserId()),
-                        storedFile.getFileContent(),
-                        cleanedResponse,
-                        storedFile.getFileName().substring(storedFile.getFileName().lastIndexOf(".") + 1),
-                        storedFile.getFilePath(),
-                        "Stored File Analysis (Agentic Stream)",
-                        requestDto.getCustomRequirements());
-                ragService.ingestCode(ingestRequest);
-
-                return aiResponseContent;
-
-            } catch (Exception e) {
-                log.error("Error in Agentic Workflow Stream", e);
-                throw new RuntimeException(e);
-            }
-        }).flatMapMany(result -> reactor.core.publisher.Flux.just(result));
     }
 
     /**
@@ -405,6 +374,20 @@ public class AnalysisService {
         }
 
         return cleaned;
+    }
+
+    /**
+     * 메타데이터 추출 실행
+     */
+    private String extractMetadata(String prompt) {
+        try {
+            String response = chatClient.prompt(prompt).call().content();
+            return cleanMarkdownCodeBlock(response);
+        } catch (Exception e) {
+            log.error("Metadata extraction failed", e);
+            // 실패 시 빈 JSON 반환하여 진행은 되도록 함
+            return "{}";
+        }
     }
 
     private String getLanguageFromExtension(String fileName) {

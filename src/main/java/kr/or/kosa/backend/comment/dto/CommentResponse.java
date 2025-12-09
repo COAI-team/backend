@@ -1,6 +1,7 @@
 package kr.or.kosa.backend.comment.dto;
 
 import kr.or.kosa.backend.comment.domain.Comment;
+import kr.or.kosa.backend.commons.pagination.Identifiable;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -12,7 +13,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class CommentResponse {
+public class CommentResponse implements Identifiable {
 
     private Long commentId;
     private Long boardId;
@@ -27,6 +28,11 @@ public class CommentResponse {
     private Boolean isDeleted;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+
+    @Override
+    public Long getId() {
+        return commentId;
+    }
 
     public static CommentResponse from(Comment comment) {
         return CommentResponse.builder()

@@ -7,7 +7,13 @@ import kr.or.kosa.backend.codeboard.dto.CodeboardDto;
 import kr.or.kosa.backend.codeboard.dto.CodeboardListResponseDto;
 import kr.or.kosa.backend.codeboard.exception.CodeboardErrorCode;
 import kr.or.kosa.backend.codeboard.mapper.CodeboardMapper;
+import kr.or.kosa.backend.codeboard.sort.CodeboardSortType;
 import kr.or.kosa.backend.commons.exception.custom.CustomBusinessException;
+import kr.or.kosa.backend.commons.pagination.PageRequest;
+import kr.or.kosa.backend.commons.pagination.PageResponse;
+import kr.or.kosa.backend.commons.pagination.SearchCondition;
+import kr.or.kosa.backend.commons.pagination.SortCondition;
+import kr.or.kosa.backend.commons.pagination.SortDirection;
 import kr.or.kosa.backend.like.domain.Like;
 import kr.or.kosa.backend.like.domain.ReferenceType;
 import kr.or.kosa.backend.like.mapper.LikeMapper;
@@ -18,9 +24,6 @@ import kr.or.kosa.backend.toolbar.block.BlockShape;
 import kr.or.kosa.backend.toolbar.block.BlockTextExtractor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,82 +40,27 @@ public class CodeboardService {
     private final TagService tagService;
     private final LikeMapper likeMapper;
 
-    public Page<CodeboardListResponseDto> getList(Pageable pageable, String keyword) {
-        int offset = (int) pageable.getOffset();
-        int pageSize = pageable.getPageSize();
-        String sortField = getSortField(pageable);
-        String sortDirection = getSortDirection(pageable);
+    // 코드 게시판 목록 조회 (검색 + 정렬 + 페이지네이션)
+    public PageResponse<CodeboardListResponseDto> getList(
+            int page,
+            int size,
+            CodeboardSortType sortType,
+            SortDirection direction,
+            String keyword
+    ) {
+        PageRequest pageRequest = new PageRequest(page, size);
+        SearchCondition searchCondition = new SearchCondition(keyword);
+        SortCondition sortCondition = new SortCondition(sortType, direction);
 
-        int totalCount = mapper.countPosts(keyword);
+        List<CodeboardListResponseDto> boards =
+                mapper.findPosts(pageRequest, searchCondition, sortCondition);
 
-        List<CodeboardListResponseDto> posts = mapper.findPosts(
-                offset,
-                pageSize,
-                sortField,
-                sortDirection,
-                keyword
-        );
+        long totalCount = mapper.countPosts(searchCondition);
 
-        return new PageImpl<>(posts, pageable, totalCount);
+        return new PageResponse<>(boards, pageRequest, totalCount);
     }
 
-    private String getSortField(Pageable pageable) {
-        if (pageable.getSort().isEmpty()) {
-            return "created_at";
-        }
-
-        String property = pageable.getSort().iterator().next().getProperty();
-
-        switch (property) {
-            case "commentCount":
-                return "comment_count";
-            case "likeCount":
-                return "like_count";
-            case "viewCount":
-            case "click":
-                return "view_count";
-            case "createdAt":
-            default:
-                return "created_at";
-        }
-    }
-
-    private String getSortDirection(Pageable pageable) {
-        if (pageable.getSort().isEmpty()) {
-            return "DESC";
-        }
-
-        return pageable.getSort().iterator().next().getDirection().name();
-    }
-
-    @Transactional
-    public CodeboardDetailResponseDto detail(Long id, Long userId) {
-        mapper.increaseClick(id);
-
-        CodeboardDetailResponseDto codeboard = mapper.selectById(id);
-        if (codeboard == null) {
-            throw new CustomBusinessException(CodeboardErrorCode.NOT_FOUND);
-        }
-
-        List<String> tags = tagService.getCodeboardTags(id);
-        Like existingLike = likeMapper.selectLike(userId, ReferenceType.POST_CODEBOARD, id);
-        boolean isLiked = existingLike != null;
-
-        return CodeboardDetailResponseDto.builder()
-                .codeboardId(codeboard.getCodeboardId())
-                .userId(codeboard.getUserId())
-                .userNickname(codeboard.getUserNickname())
-                .analysisId(codeboard.getAnalysisId())
-                .codeboardTitle(codeboard.getCodeboardTitle())
-                .codeboardContent(codeboard.getCodeboardContent())
-                .codeboardClick(codeboard.getCodeboardClick())
-                .likeCount(codeboard.getLikeCount() != null ? codeboard.getLikeCount() : 0)
-                .codeboardCreatedAt(codeboard.getCodeboardCreatedAt())
-                .tags(tags)
-                .isLiked(isLiked)
-                .build();
-    }
-
+    // 코드 게시글 작성
     @Transactional
     public Long write(CodeboardDto dto, Long userId) {
         // 블록 변환
@@ -166,6 +114,43 @@ public class CodeboardService {
         return codeboardId;
     }
 
+    // 코드 게시글 상세 조회
+    @Transactional
+    public CodeboardDetailResponseDto detail(Long id, Long userId) {
+        mapper.increaseClick(id);
+
+        CodeboardDetailResponseDto codeboard = mapper.selectById(id);
+        if (codeboard == null) {
+            throw new CustomBusinessException(CodeboardErrorCode.NOT_FOUND);
+        }
+
+        log.info("조회된 좋아요 수: {}", codeboard.getLikeCount());
+
+        List<String> tags = tagService.getCodeboardTags(id);
+
+        boolean isLiked = false;
+        if (userId != null) {
+            Like existingLike = likeMapper.selectLike(userId, ReferenceType.POST_CODEBOARD, id);
+            isLiked = existingLike != null;
+            log.info("사용자 {}의 좋아요 여부: {}", userId, isLiked);
+        }
+
+        return CodeboardDetailResponseDto.builder()
+                .codeboardId(codeboard.getCodeboardId())
+                .userId(codeboard.getUserId())
+                .userNickname(codeboard.getUserNickname())
+                .analysisId(codeboard.getAnalysisId())
+                .codeboardTitle(codeboard.getCodeboardTitle())
+                .codeboardContent(codeboard.getCodeboardContent())
+                .codeboardClick(codeboard.getCodeboardClick())
+                .likeCount(codeboard.getLikeCount() != null ? codeboard.getLikeCount() : 0)
+                .codeboardCreatedAt(codeboard.getCodeboardCreatedAt())
+                .tags(tags)
+                .isLiked(isLiked)
+                .build();
+    }
+
+    // 코드 게시글 수정
     @Transactional
     public void edit(Long id, CodeboardDto dto, Long userId) {
         CodeboardDetailResponseDto existing = mapper.selectById(id);
@@ -221,6 +206,7 @@ public class CodeboardService {
         }
     }
 
+    // 코드 게시글 삭제
     @Transactional
     public void delete(Long id, Long userId) {
         CodeboardDetailResponseDto existing = mapper.selectById(id);

@@ -12,7 +12,9 @@ public enum CodeboardErrorCode implements ErrorCode {
     NO_DELETE_PERMISSION("CB006", "게시글 삭제 권한이 없습니다."),
 
     JSON_PARSE_ERROR("CB007", "블록 내용을 JSON으로 변환할 수 없습니다."),
-    INVALID_BLOCK_CONTENT("CB008", "허용되지 않는 블록 콘텐츠가 포함되어 있습니다.");
+    INVALID_BLOCK_CONTENT("CB008", "허용되지 않는 블록 콘텐츠가 포함되어 있습니다."),
+
+    INVALID_SORT("CB009", "허용되지 않은 정렬 조건입니다.");
 
     private final String code;
     private final String message;

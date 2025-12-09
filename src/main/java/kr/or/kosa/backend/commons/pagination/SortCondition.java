@@ -42,4 +42,9 @@ public class SortCondition {
     public String getDirectionSql() {
         return direction.name();
     }
+
+    // MyBatis XML에서 ${sort.orderByClause} 사용을 위한 getter
+    public String getOrderByClause() {
+        return column + " " + direction.name();
+    }
 }
