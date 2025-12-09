@@ -373,6 +373,11 @@ public class AlgorithmSolvingService {
                 .submissionId(submission.getAlgosubmissionId())
                 .problemId(submission.getAlgoProblemId())
                 .problemTitle(problem != null ? problem.getAlgoProblemTitle() : "Unknown")
+                .problemDescription(problem != null ? problem.getAlgoProblemDescription() : null)
+                .difficulty(problem != null && problem.getAlgoProblemDifficulty() != null
+                        ? problem.getAlgoProblemDifficulty().name() : null)
+                .timeLimit(problem != null ? problem.getTimelimit() : null)
+                .memoryLimit(problem != null ? problem.getMemorylimit() : null)
                 .language(submission.getLanguage())
                 .sourceCode(submission.getSourceCode())
                 .judgeResult(submission.getJudgeResult() != null ? submission.getJudgeResult().name() : "PENDING")
