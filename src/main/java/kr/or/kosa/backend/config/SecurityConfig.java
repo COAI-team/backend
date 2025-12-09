@@ -44,7 +44,8 @@ public class SecurityConfig {
                                                                 "/users/github/link",
                                                                 "/email/**",
                                                                 "/algo/**",
-                                                                "/users/password/**")
+                                                                "/users/password/**",
+                                                                "/admin/**")
                                                 .permitAll()
                                                 .anyRequest().authenticated())
                                 .addFilterBefore(
