@@ -69,8 +69,13 @@ public class DailyMissionService {
         String difficulty = level.getMatchingDifficulty().name();
         int rewardPoints = level.getRewardPoints();
 
-        // 난이도에 맞는 랜덤 문제 조회
-        Long problemId = missionMapper.findRandomProblemIdByDifficulty(difficulty);
+        // 오늘 같은 난이도로 이미 할당된 문제가 있는지 확인 (같은 레벨 유저에게 같은 문제 배정)
+        Long problemId = missionMapper.findTodayProblemIdByDifficulty(today, difficulty);
+
+        // 없으면 새로 랜덤 선택
+        if (problemId == null) {
+            problemId = missionMapper.findRandomProblemIdByDifficulty(difficulty);
+        }
 
         // 미션 1: AI 문제 생성 미션
         DailyMissionDto generateMission = new DailyMissionDto();
@@ -153,6 +158,22 @@ public class DailyMissionService {
     @Transactional(readOnly = true)
     public UserAlgoLevelDto getUserLevel(Long userId) {
         return missionMapper.findUserLevel(userId);
+    }
+
+    /**
+     * 오늘자의 문제 풀이 미션 문제 ID를 반환합니다. 없으면 null.
+     * 미션이 생성되어 있지 않다면 생성 후 조회합니다.
+     */
+    @Transactional
+    public Long getTodaySolveMissionProblemId(Long userId) {
+        LocalDate today = LocalDate.now();
+        List<DailyMissionDto> missions = missionMapper.findTodayMissions(userId, today);
+        if (missions.isEmpty()) {
+            createDailyMissionsForUser(userId);
+            missions = missionMapper.findTodayMissions(userId, today);
+        }
+        DailyMissionDto solveMission = missionMapper.findMission(userId, today, MissionType.PROBLEM_SOLVE);
+        return solveMission != null ? solveMission.getProblemId() : null;
     }
 
     /**

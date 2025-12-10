@@ -20,6 +20,10 @@ public class SubmissionResponseDto {
     private Long submissionId;
     private Long problemId;
     private String problemTitle;
+    private String problemDescription; // 문제 설명 (제출 결과 페이지에서 문제 확인용)
+    private String difficulty;         // 난이도 (BRONZE, SILVER, GOLD, PLATINUM)
+    private Integer timeLimit;         // 시간 제한 (ms)
+    private Integer memoryLimit;       // 메모리 제한 (MB)
     private String language; // DB 언어명 (예: "Python 3", "Java 17")
     private String sourceCode;
 
@@ -43,6 +47,7 @@ public class SubmissionResponseDto {
     // 풀이 모드 및 모니터링
     private String solveMode; // BASIC, FOCUS
     private String monitoringSessionId;
+    private MonitoringStatsDto monitoringStats; // 집중 모드 모니터링 통계
 
     // 점수 정보 (focusScore 제거됨 - 모니터링은 점수에 미반영)
     private BigDecimal timeEfficiencyScore;
@@ -83,5 +88,24 @@ public class SubmissionResponseDto {
         private BigDecimal timeScore;       // 시간 효율성 (30%)
         // focusScore 제거됨 - 모니터링은 점수에 미반영
         private String scoreWeights;        // 가중치 설명
+    }
+
+    /**
+     * 집중 모드 모니터링 통계 DTO
+     * 제출 결과 페이지에서 위반 현황 표시용
+     */
+    @Getter
+    @Builder
+    @AllArgsConstructor
+    public static class MonitoringStatsDto {
+        private Integer fullscreenExitCount;    // 전체화면 이탈 횟수
+        private Integer tabSwitchCount;         // 탭 전환 횟수
+        private Integer mouseLeaveCount;        // 마우스 이탈 횟수
+        private Integer noFaceCount;            // 얼굴 미검출 횟수
+        private Integer gazeAwayCount;          // 시선 이탈 횟수
+        private Integer totalViolations;        // 총 위반 횟수
+        private Integer warningShownCount;      // 경고 표시 횟수
+        private Boolean autoSubmitted;          // 자동 제출 여부
+        private String sessionStatus;           // 세션 상태 (ACTIVE, COMPLETED, TIMEOUT)
     }
 }

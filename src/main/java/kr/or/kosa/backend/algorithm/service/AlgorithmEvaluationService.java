@@ -71,14 +71,22 @@ public class AlgorithmEvaluationService {
             throw new IllegalArgumentException("제출 정보를 찾을 수 없습니다: " + submissionId);
         }
 
-        // 2. AI 평가 호출 (CompletableFuture)
+        // 2. AI 평가 호출 (고도화된 프롬프트 버전)
         log.info("🔄 AI 코드 평가 서비스 호출 중...");
+
+        // 문제 토픽 추출 (태그에서 첫 번째 항목 사용)
+        String problemTopic = extractPrimaryTopic(problem.getAlgoProblemTags());
+
         CompletableFuture<AICodeEvaluationResult> aiFuture =
                 codeEvaluationService.evaluateCode(
                         submission.getSourceCode(),
                         problem.getAlgoProblemDescription(),
                         submission.getLanguage(),
-                        judgeResult.getOverallResult()
+                        judgeResult.getOverallResult(),
+                        problemTopic,
+                        problem.getExpectedTimeComplexity(),
+                        judgeResult.getPassedCount(),
+                        judgeResult.getTotalCount()
                 );
 
         // 3. 평가 완료 대기
@@ -204,6 +212,19 @@ public class AlgorithmEvaluationService {
         submissionMapper.updateSubmission(submission);
 
         return CompletableFuture.completedFuture(null);
+    }
+
+    /**
+     * 문제 태그에서 주요 토픽 추출
+     * 태그 형식: "dp,greedy,array" → 첫 번째 항목 "dp" 반환
+     */
+    private String extractPrimaryTopic(String tags) {
+        if (tags == null || tags.isBlank()) {
+            return "algorithm";
+        }
+        // 쉼표로 구분된 태그 중 첫 번째 항목 반환
+        String[] tagArray = tags.split(",");
+        return tagArray[0].trim().toLowerCase();
     }
 
 }

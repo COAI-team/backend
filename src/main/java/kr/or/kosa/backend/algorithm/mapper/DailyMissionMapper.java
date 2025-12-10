@@ -51,6 +51,11 @@ public interface DailyMissionMapper {
      */
     Long findRandomProblemIdByDifficulty(@Param("difficulty") String difficulty);
 
+    /**
+     * 오늘 날짜 + 난이도로 이미 할당된 문제 ID 조회 (같은 레벨 유저에게 같은 문제 배정용)
+     */
+    Long findTodayProblemIdByDifficulty(@Param("date") LocalDate date, @Param("difficulty") String difficulty);
+
     // ===== 사용자 레벨 =====
 
     /**

@@ -2,6 +2,7 @@ package kr.or.kosa.backend.users.service;
 
 import kr.or.kosa.backend.auth.github.dto.GithubLoginResult;
 import kr.or.kosa.backend.commons.exception.custom.CustomBusinessException;
+import kr.or.kosa.backend.commons.util.EncryptionUtil; // Import added
 import kr.or.kosa.backend.infra.s3.S3Uploader;
 import kr.or.kosa.backend.security.jwt.JwtProvider;
 import kr.or.kosa.backend.users.domain.Users;
@@ -36,6 +37,7 @@ public class UserServiceImpl implements UserService {
     private final StringRedisTemplate redisTemplate;
     private final S3Uploader s3Uploader;
     private final PasswordResetTokenService passwordResetTokenService;
+    private final EncryptionUtil encryptionUtil; // Injected
 
     private static final long REFRESH_TOKEN_EXPIRE_DAYS = 14;
     private static final String REFRESH_KEY_PREFIX = "auth:refresh:";
@@ -44,7 +46,6 @@ public class UserServiceImpl implements UserService {
 
     private static final String KEY_ACCESS_TOKEN = "accessToken";
     private static final String KEY_REFRESH_TOKEN = "refreshToken";
-
 
     private Map<String, String> issueTokens(Users user) {
 
@@ -56,13 +57,11 @@ public class UserServiceImpl implements UserService {
                 REFRESH_KEY_PREFIX + user.getUserId(),
                 refreshToken,
                 REFRESH_TOKEN_EXPIRE_DAYS,
-                TimeUnit.DAYS
-        );
+                TimeUnit.DAYS);
 
         return Map.of(
                 KEY_ACCESS_TOKEN, accessToken,
-                KEY_REFRESH_TOKEN, refreshToken
-        );
+                KEY_REFRESH_TOKEN, refreshToken);
     }
 
     // ---------------------------------------------------------
@@ -137,8 +136,7 @@ public class UserServiceImpl implements UserService {
                 REFRESH_KEY_PREFIX + users.getUserId(),
                 refreshToken,
                 REFRESH_TOKEN_EXPIRE_DAYS,
-                TimeUnit.DAYS
-        );
+                TimeUnit.DAYS);
 
         UserResponseDto userDto = UserResponseDto.builder()
                 .userId(users.getUserId())
@@ -149,6 +147,8 @@ public class UserServiceImpl implements UserService {
                 .userGrade(users.getUserGrade())
                 .userRole(users.getUserRole())
                 .userEnabled(users.getUserEnabled())
+                .githubId(users.getGithubId())
+                .hasGithubToken(users.getGithubToken() != null && !users.getGithubToken().isBlank())
                 .build();
 
         return UserLoginResponseDto.builder()
@@ -159,7 +159,7 @@ public class UserServiceImpl implements UserService {
     }
 
     // ---------------------------------------------------------
-    // Access Token 재발급  (Redis + DB 검증)
+    // Access Token 재발급 (Redis + DB 검증)
     // ---------------------------------------------------------
     @Override
     public String refresh(String bearerToken) {
@@ -190,7 +190,8 @@ public class UserServiceImpl implements UserService {
         try {
             String token = bearerToken.replace("Bearer ", "");
 
-            if (!jwtProvider.validateToken(token)) return false;
+            if (!jwtProvider.validateToken(token))
+                return false;
 
             Long userId = jwtProvider.getUserId(token);
 
@@ -205,8 +206,7 @@ public class UserServiceImpl implements UserService {
                         BLACKLIST_KEY_PREFIX + token,
                         "logout",
                         expireAt,
-                        TimeUnit.MILLISECONDS
-                );
+                        TimeUnit.MILLISECONDS);
             }
 
             return true;
@@ -236,8 +236,7 @@ public class UserServiceImpl implements UserService {
                 "[서비스명] 비밀번호 재설정 안내",
                 "아래 링크를 클릭하여 비밀번호를 재설정하세요.\n\n" +
                         resetUrl + "\n\n" +
-                        "본 링크는 15분 동안 유효합니다."
-        );
+                        "본 링크는 15분 동안 유효합니다.");
 
         if (!sent) {
             throw new CustomBusinessException(UserErrorCode.EMAIL_SEND_FAIL);
@@ -253,7 +252,8 @@ public class UserServiceImpl implements UserService {
     public boolean resetPassword(String token, String newPassword) {
 
         Long userId = passwordResetTokenService.validateToken(token);
-        if (userId == null) return false;
+        if (userId == null)
+            return false;
 
         String encryptedPassword = passwordEncoder.encode(newPassword);
 
@@ -284,10 +284,12 @@ public class UserServiceImpl implements UserService {
 
         // ⚡ 빈 문자열 처리 (name, nickname)
         String name = (dto.getUserName() != null && dto.getUserName().trim().isEmpty())
-                ? null : dto.getUserName();
+                ? null
+                : dto.getUserName();
 
         String nickname = (dto.getUserNickname() != null && dto.getUserNickname().trim().isEmpty())
-                ? null : dto.getUserNickname();
+                ? null
+                : dto.getUserNickname();
 
         // ⚡ 닉네임 중복 체크
         if (nickname != null) {
@@ -313,8 +315,23 @@ public class UserServiceImpl implements UserService {
         }
 
         // ⚡ DB 업데이트
-        userMapper.updateUserInfo(userId, newName, newNickname);
-        userMapper.updateUserImage(userId, newImage);
+        // userMapper.updateUserInfo(userId, newName, newNickname); // 기존 코드 주석 처리 또는 제거
+
+        // GitHub 정보 및 암호화 처리
+        if (dto.getGithubId() != null) {
+            users.setGithubId(dto.getGithubId());
+        }
+        if (dto.getGithubToken() != null && !dto.getGithubToken().isBlank()) {
+            String encryptedToken = encryptionUtil.encrypt(dto.getGithubToken());
+            users.setGithubToken(encryptedToken);
+        }
+
+        // Users 객체 업데이트 (mapper.updateUser 사용 권장 - 모든 필드 업데이트 가능하도록 수정됨)
+        users.setUserName(newName);
+        users.setUserNickname(newNickname);
+        users.setUserImage(newImage);
+
+        userMapper.updateUser(users); // 기존 updateUserInfo 대신 updateUser 사용
 
         // ⚡ 변경된 정보 다시 조회
         Users updated = userMapper.findById(userId);
@@ -328,6 +345,8 @@ public class UserServiceImpl implements UserService {
                 .userGrade(updated.getUserGrade())
                 .userRole(updated.getUserRole())
                 .userEnabled(updated.getUserEnabled())
+                .githubId(updated.getGithubId())
+                .hasGithubToken(updated.getGithubToken() != null && !updated.getGithubToken().isBlank())
                 .build();
     }
 
@@ -360,6 +379,8 @@ public class UserServiceImpl implements UserService {
                 .userGrade(users.getUserGrade())
                 .userRole(users.getUserRole())
                 .userEnabled(users.getUserEnabled())
+                .githubId(users.getGithubId())
+                .hasGithubToken(users.getGithubToken() != null && !users.getGithubToken().isBlank())
                 .build();
     }
 
@@ -530,8 +551,7 @@ public class UserServiceImpl implements UserService {
                 newUser.getUserId(),
                 PROVIDER_GITHUB,
                 providerId,
-                email
-        );
+                email);
 
         return newUser;
     }
@@ -565,8 +585,7 @@ public class UserServiceImpl implements UserService {
                 currentUserId,
                 PROVIDER_GITHUB,
                 providerId,
-                email
-        );
+                email);
 
         return true;
     }

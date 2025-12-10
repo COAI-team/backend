@@ -51,14 +51,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
                 if (isValid) {
                     Long userId = jwtProvider.getUserId(token);
-                    JwtUserDetails userDetails = new JwtUserDetails(userId, jwtProvider.getEmail(token));
+                    String email = jwtProvider.getEmail(token);
+
+                    JwtUserDetails userDetails = new JwtUserDetails(userId, email);
 
                     JwtAuthentication auth = new JwtAuthentication(userDetails);
                     SecurityContextHolder.getContext().setAuthentication(auth);
-
-                    // 컨트롤러에서 @RequestAttribute로 userId를 받을 수 있도록 설정
                     request.setAttribute("userId", userId);
-                    log.info("[JwtFilter] Authentication set for userId: {}", userId);
                 }
             }
 

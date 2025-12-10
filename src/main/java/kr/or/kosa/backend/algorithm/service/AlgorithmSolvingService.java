@@ -18,6 +18,8 @@ import kr.or.kosa.backend.algorithm.dto.response.SubmissionResponseDto;
 import kr.or.kosa.backend.algorithm.dto.response.TestRunResponseDto;
 import kr.or.kosa.backend.algorithm.mapper.AlgorithmProblemMapper;
 import kr.or.kosa.backend.algorithm.mapper.AlgorithmSubmissionMapper;
+import kr.or.kosa.backend.algorithm.mapper.MonitoringMapper;
+import kr.or.kosa.backend.algorithm.dto.MonitoringSessionDto;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -49,6 +51,7 @@ public class AlgorithmSolvingService {
 
     private final AlgorithmProblemMapper problemMapper;
     private final AlgorithmSubmissionMapper submissionMapper;
+    private final MonitoringMapper monitoringMapper;  // 모니터링 세션 데이터 조회용
     private final CodeExecutorService codeExecutorService;  // Judge0 또는 Piston 선택
     private final AlgorithmJudgingService judgingService;
     private final LanguageConstantService languageConstantService;
@@ -369,10 +372,22 @@ public class AlgorithmSolvingService {
     private SubmissionResponseDto convertToSubmissionResponse(AlgoSubmissionDto submission,
             AlgoProblemDto problem,
             List<TestRunResponseDto.TestCaseResultDto> testCaseResults) {
+
+        // 집중 모드일 경우 모니터링 통계 조회
+        SubmissionResponseDto.MonitoringStatsDto monitoringStats = null;
+        if (submission.getSolveMode() == SolveMode.FOCUS && submission.getMonitoringSessionId() != null) {
+            monitoringStats = fetchMonitoringStats(submission.getMonitoringSessionId());
+        }
+
         return SubmissionResponseDto.builder()
                 .submissionId(submission.getAlgosubmissionId())
                 .problemId(submission.getAlgoProblemId())
                 .problemTitle(problem != null ? problem.getAlgoProblemTitle() : "Unknown")
+                .problemDescription(problem != null ? problem.getAlgoProblemDescription() : null)
+                .difficulty(problem != null && problem.getAlgoProblemDifficulty() != null
+                        ? problem.getAlgoProblemDifficulty().name() : null)
+                .timeLimit(problem != null ? problem.getTimelimit() : null)
+                .memoryLimit(problem != null ? problem.getMemorylimit() : null)
                 .language(submission.getLanguage())
                 .sourceCode(submission.getSourceCode())
                 .judgeResult(submission.getJudgeResult() != null ? submission.getJudgeResult().name() : "PENDING")
@@ -389,6 +404,7 @@ public class AlgorithmSolvingService {
                 // focusScore 제거됨 - 모니터링은 점수에 미반영
                 .solveMode(submission.getSolveMode() != null ? submission.getSolveMode().name() : "BASIC")
                 .monitoringSessionId(submission.getMonitoringSessionId())
+                .monitoringStats(monitoringStats)
                 .timeEfficiencyScore(submission.getTimeEfficiencyScore())
                 .finalScore(submission.getFinalScore())
                 .scoreBreakdown(createScoreBreakdown(submission))
@@ -399,6 +415,34 @@ public class AlgorithmSolvingService {
                 .isShared(submission.getIsShared())
                 .submittedAt(submission.getSubmittedAt())
                 .build();
+    }
+
+    /**
+     * 모니터링 세션에서 통계 데이터를 조회하여 DTO로 변환
+     */
+    private SubmissionResponseDto.MonitoringStatsDto fetchMonitoringStats(String sessionId) {
+        try {
+            MonitoringSessionDto session = monitoringMapper.findSessionById(sessionId);
+            if (session == null) {
+                log.warn("Monitoring session not found: {}", sessionId);
+                return null;
+            }
+
+            return SubmissionResponseDto.MonitoringStatsDto.builder()
+                    .fullscreenExitCount(session.getFullscreenExitCount())
+                    .tabSwitchCount(session.getTabSwitchCount())
+                    .mouseLeaveCount(session.getMouseLeaveCount())
+                    .noFaceCount(session.getNoFaceCount())
+                    .gazeAwayCount(session.getGazeAwayCount())
+                    .totalViolations(session.getTotalViolations())
+                    .warningShownCount(session.getWarningShownCount())
+                    .autoSubmitted(Boolean.TRUE.equals(session.getAutoSubmitted()))
+                    .sessionStatus(session.getSessionStatus() != null ? session.getSessionStatus().name() : null)
+                    .build();
+        } catch (Exception e) {
+            log.error("Failed to fetch monitoring stats for session: {}", sessionId, e);
+            return null;
+        }
     }
 
     private String determineJudgeStatus(AlgoSubmissionDto submission) {

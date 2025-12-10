@@ -29,17 +29,28 @@ public class AlgorithmSolvingController {
 
     private final AlgorithmSolvingService solvingService;
 
-    // 테스트용
+    /**
+     * SecurityContext에서 직접 사용자 ID 추출
+     * @AuthenticationPrincipal이 JwtUserDetails를 JwtAuthentication으로 캐스팅 실패하므로
+     * SecurityContextHolder에서 직접 Authentication을 가져옴
+     */
     private Long extractUserId(JwtAuthentication authentication) {
-        if (authentication == null) {
-            log.warn("🧪 테스트 모드: authentication이 null이므로 기본 userId=1 사용");
-            return 1L;  // ✅ 예외 대신 기본값 반환
+        // @AuthenticationPrincipal이 null인 경우 SecurityContextHolder에서 직접 조회
+        org.springframework.security.core.Authentication auth = authentication;
+        if (auth == null) {
+            auth = org.springframework.security.core.context.SecurityContextHolder
+                    .getContext().getAuthentication();
         }
 
-        Object principal = authentication.getPrincipal();
+        if (auth == null) {
+            log.warn("❌ 인증 정보가 없습니다.");
+            throw new CustomBusinessException(AlgoErrorCode.LOGIN_REQUIRED);
+        }
+
+        Object principal = auth.getPrincipal();
         if (!(principal instanceof JwtUserDetails userDetails)) {
-            log.warn("🧪 테스트 모드: principal이 JwtUserDetails가 아니므로 기본 userId=1 사용: {}", principal);
-            return 1L;  // ✅ 예외 대신 기본값 반환
+            log.warn("❌ 유효하지 않은 인증 정보입니다: {}", principal);
+            throw new CustomBusinessException(AlgoErrorCode.LOGIN_REQUIRED);
         }
 
         Long userId = userDetails.id().longValue();
