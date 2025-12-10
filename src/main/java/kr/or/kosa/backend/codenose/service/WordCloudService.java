@@ -9,7 +9,7 @@ import com.kennycason.kumo.bg.PixelBoundaryBackground;
 import com.kennycason.kumo.font.scale.LinearFontScalar;
 import com.kennycason.kumo.nlp.FrequencyAnalyzer;
 import com.kennycason.kumo.palette.ColorPalette;
-import kr.or.kosa.backend.codenose.dto.dtoReal.CodeResultDTO;
+import kr.or.kosa.backend.codenose.dto.CodeResultDTO;
 import kr.or.kosa.backend.codenose.mapper.AnalysisMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,6 +29,13 @@ import java.util.*;
 import java.util.List;
 import java.util.stream.Collectors;
 
+/**
+ * 워드 클라우드 서비스 (WordCloudService)
+ * 
+ * 역할:
+ * Kumo 라이브러리를 사용하여, 사용자의 코드 분석 결과에서 자주 등장한 문제점(Code Smell)들을
+ * 시각적인 워드 클라우드 이미지로 생성합니다.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -37,9 +44,23 @@ public class WordCloudService {
     private final AnalysisMapper analysisMapper;
     private final ObjectMapper objectMapper;
 
+    /**
+     * 월별 워드 클라우드 이미지 생성
+     * 
+     * 1. 해당 년/월의 사용자 분석 기록을 조회합니다.
+     * 2. 분석 결과(JSON Code Smell)를 파싱하여 키워드 빈도수를 계산합니다.
+     * 3. Kumo 라이브러리를 사용해 워드 클라우드 이미지를 생성합니다.
+     * (랜덤 마스크 이미지를 적용하여 모양을 다양화합니다)
+     * 4. 생성된 이미지를 Base64 문자열로 변환하여 반환합니다.
+     * 
+     * @param userId 사용자 ID
+     * @param year   조회할 연도
+     * @param month  조회할 월
+     * @return Base64 인코딩된 PNG 이미지 데이터 (데이터가 없으면 null)
+     */
     public String generateWordCloud(Long userId, int year, int month) {
         try {
-            // 1. Fetch data for the given month
+            // 1. 해당 월의 데이터 조회 기간 설정
             YearMonth yearMonth = YearMonth.of(year, month);
             LocalDateTime startDateTime = yearMonth.atDay(1).atStartOfDay();
             LocalDateTime endDateTime = yearMonth.atEndOfMonth().atTime(23, 59, 59);
@@ -50,10 +71,10 @@ public class WordCloudService {
                     Timestamp.valueOf(endDateTime));
 
             if (results.isEmpty()) {
-                return null; // No data
+                return null; // 데이터 없음
             }
 
-            // 2. Aggregate frequencies
+            // 2. 빈도수 집계 (Aggregation)
             Map<String, Integer> frequencyMap = new HashMap<>();
             for (CodeResultDTO result : results) {
                 String codeSmellsJson = result.getCodeSmells();
@@ -69,7 +90,7 @@ public class WordCloudService {
                             }
                         }
                     } catch (Exception e) {
-                        log.warn("Failed to parse code smells JSON for analysisId: {}", result.getAnalysisId());
+                        log.warn("Code Smell JSON 파싱 실패 analysisId: {}", result.getAnalysisId());
                     }
                 }
             }
@@ -82,19 +103,20 @@ public class WordCloudService {
                     .map(entry -> new WordFrequency(entry.getKey(), entry.getValue()))
                     .collect(Collectors.toList());
 
-            // 3. Configure Kumo WordCloud
+            // 3. Kumo 라이브러리 설정 (워드 클라우드 옵션)
             Dimension dimension = new Dimension(600, 600);
             WordCloud wordCloud = new WordCloud(dimension, CollisionMode.PIXEL_PERFECT);
             wordCloud.setPadding(2);
-            wordCloud.setBackground(new com.kennycason.kumo.bg.CircleBackground(300)); // Default fallback
-                                                                                       // fallback
+            wordCloud.setBackground(new com.kennycason.kumo.bg.CircleBackground(300)); // 기본 배경 (원형)
+
+            // 색상 팔레트 설정 (파란색 계열)
             wordCloud.setColorPalette(new ColorPalette(new Color(0x4055F1), new Color(0x408DF1), new Color(0x40AAF1),
                     new Color(0x40C5F1), new Color(0x40D3F1), new Color(0xFFFFFF)));
             wordCloud.setFontScalar(new LinearFontScalar(10, 40));
 
-            // 4. Load Random Mask
+            // 4. 랜덤 마스크 이미지 적용 (모양 변경)
             try {
-                int randomMaskIndex = new Random().nextInt(2) + 1; // 1 or 2
+                int randomMaskIndex = new Random().nextInt(2) + 1; // 1 또는 2
                 String maskPath = "codenose/wordcloudbackgrounds/mask" + randomMaskIndex + ".png";
                 ClassPathResource maskResource = new ClassPathResource(maskPath);
                 if (maskResource.exists()) {
@@ -102,19 +124,19 @@ public class WordCloudService {
                         wordCloud.setBackground(new PixelBoundaryBackground(is));
                     }
                 } else {
-                    log.warn("Mask file not found: {}", maskPath);
+                    log.warn("마스크 파일을 찾을 수 없음: {}", maskPath);
                     // Fallback to circle if mask not found
                     wordCloud.setBackground(new com.kennycason.kumo.bg.CircleBackground(300));
                 }
             } catch (Exception e) {
-                log.error("Failed to load mask image", e);
+                log.error("마스크 이미지 로드 실패 (기본 원형 사용)", e);
                 wordCloud.setBackground(new com.kennycason.kumo.bg.CircleBackground(300));
             }
 
-            // 5. Build Word Cloud
+            // 5. 워드 클라우드 생성 (Build)
             wordCloud.build(wordFrequencies);
 
-            // 6. Convert to Base64
+            // 6. Base64 변환
             BufferedImage bufferedImage = wordCloud.getBufferedImage();
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             ImageIO.write(bufferedImage, "png", baos);
@@ -123,8 +145,8 @@ public class WordCloudService {
             return Base64.getEncoder().encodeToString(imageBytes);
 
         } catch (Exception e) {
-            log.error("Error generating word cloud", e);
-            throw new RuntimeException("Failed to generate word cloud", e);
+            log.error("워드 클라우드 생성 중 오류 발생", e);
+            throw new RuntimeException("워드 클라우드 생성 실패", e);
         }
     }
 }

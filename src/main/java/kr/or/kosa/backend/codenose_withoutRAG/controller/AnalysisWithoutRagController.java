@@ -1,7 +1,7 @@
 package kr.or.kosa.backend.codenose_withoutRAG.controller;
 
-import kr.or.kosa.backend.codenose.dto.dtoReal.AnalysisRequestDTO;
-import kr.or.kosa.backend.codenose.dto.dtoReal.CodeResultDTO;
+import kr.or.kosa.backend.codenose.dto.AnalysisRequestDTO;
+import kr.or.kosa.backend.codenose.dto.CodeResultDTO;
 import kr.or.kosa.backend.codenose_withoutRAG.service.AnalysisWithoutRagService;
 import kr.or.kosa.backend.commons.response.ApiResponse;
 import lombok.RequiredArgsConstructor;

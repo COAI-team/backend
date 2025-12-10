@@ -20,6 +20,10 @@
         <result property="userUpdatedat" column="USER_UPDATEDAT"/>
         <result property="userEnabled" column="USER_ENABLED"/>
         <result property="userIssubscribed" column="USER_ISSUBSCRIBED"/>
+        <result property="userEnabled" column="USER_ENABLED"/>
+        <result property="userIssubscribed" column="USER_ISSUBSCRIBED"/>
+        <result property="githubId" column="GITHUB_ID"/>
+        <result property="githubToken" column="GITHUB_TOKEN"/>
     </resultMap>
 
     <!-- ========= SELECT ========= -->
@@ -98,6 +102,8 @@
         SET USER_NAME = #{userName},
             USER_NICKNAME = #{userNickname},
             USER_IMAGE = #{userImage},
+            GITHUB_ID = #{githubId},
+            GITHUB_TOKEN = #{githubToken},
             USER_UPDATEDAT = NOW()
         WHERE USER_ID = #{userId}
     </update>

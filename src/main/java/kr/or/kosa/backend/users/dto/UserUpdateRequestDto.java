@@ -8,4 +8,6 @@ import lombok.Setter;
 public class UserUpdateRequestDto {
     private String userName;
     private String userNickname;
+    private String githubId;
+    private String githubToken;
 }
