@@ -7,7 +7,7 @@
     <!-- ========== ResultMap 정의 ========== -->
 
     <!-- GITHUB_FILES ResultMap -->
-    <resultMap id="GithubFileResultMap" type="kr.or.kosa.backend.codenose.dto.dtoReal.GithubFileDTO">
+    <resultMap id="GithubFileResultMap" type="kr.or.kosa.backend.codenose.dto.GithubFileDTO">
         <id property="fileId" column="FILE_ID"/>
         <result property="userId" column="USER_ID"/>
         <result property="repositoryUrl" column="REPOSITORY_URL"/>
@@ -23,7 +23,7 @@
     </resultMap>
 
     <!-- CODE_ANALYSIS_HISTORY ResultMap -->
-    <resultMap id="CodeResultResultMap" type="kr.or.kosa.backend.codenose.dto.dtoReal.CodeResultDTO">
+    <resultMap id="CodeResultResultMap" type="kr.or.kosa.backend.codenose.dto.CodeResultDTO">
         <id property="analysisId" column="ANALYSIS_ID"/>
         <result property="userId" column="USER_ID"/>
         <result property="repositoryUrl" column="REPOSITORY_URL"/>
@@ -42,7 +42,7 @@
     <!-- ========== GITHUB_FILES 관련 쿼리 ========== -->
 
     <!-- GitHub 파일 저장 -->
-    <insert id="saveFileContent" parameterType="kr.or.kosa.backend.codenose.dto.dtoReal.GithubFileDTO">
+    <insert id="saveFileContent" parameterType="kr.or.kosa.backend.codenose.dto.GithubFileDTO">
         INSERT INTO GITHUB_FILES (
             FILE_ID,
             USER_ID,
@@ -116,7 +116,7 @@
     <!-- ========== CODE_ANALYSIS_HISTORY 관련 쿼리 ========== -->
 
     <!-- 코드 분석 결과 저장 -->
-    <insert id="saveCodeResult" parameterType="kr.or.kosa.backend.codenose.dto.dtoReal.CodeResultDTO">
+    <insert id="saveCodeResult" parameterType="kr.or.kosa.backend.codenose.dto.CodeResultDTO">
         INSERT INTO CODE_ANALYSIS_HISTORY (
             ANALYSIS_ID,
             USER_ID,
@@ -237,7 +237,7 @@
     <!-- ========== 사용자 코드 패턴 관련 쿼리 ========== -->
 
     <!-- 사용자 코드 패턴 저장 -->
-    <insert id="saveUserCodePattern" parameterType="kr.or.kosa.backend.codenose.dto.dtoReal.UserCodePatternDTO">
+    <insert id="saveUserCodePattern" parameterType="kr.or.kosa.backend.codenose.dto.UserCodePatternDTO">
         INSERT INTO USER_CODE_PATTERNS (
             PATTERN_ID,
             USER_ID,
@@ -256,7 +256,7 @@
     </insert>
 
     <!-- 사용자별 특정 패턴 조회 -->
-    <select id="findUserCodePattern" resultType="kr.or.kosa.backend.codenose.dto.dtoReal.UserCodePatternDTO">
+    <select id="findUserCodePattern" resultType="kr.or.kosa.backend.codenose.dto.UserCodePatternDTO">
         SELECT
             PATTERN_ID as patternId,
             USER_ID as userId,
@@ -270,7 +270,7 @@
     </select>
 
     <!-- 사용자 코드 패턴 업데이트 -->
-    <update id="updateUserCodePattern" parameterType="kr.or.kosa.backend.codenose.dto.dtoReal.UserCodePatternDTO">
+    <update id="updateUserCodePattern" parameterType="kr.or.kosa.backend.codenose.dto.UserCodePatternDTO">
         UPDATE USER_CODE_PATTERNS
         SET
             FREQUENCY = #{frequency},
@@ -280,7 +280,7 @@
     </update>
 
     <!-- 사용자별 모든 패턴 조회 -->
-    <select id="findAllPatternsByUserId" resultType="kr.or.kosa.backend.codenose.dto.dtoReal.UserCodePatternDTO">
+    <select id="findAllPatternsByUserId" resultType="kr.or.kosa.backend.codenose.dto.UserCodePatternDTO">
         SELECT
             PATTERN_ID as patternId,
             USER_ID as userId,

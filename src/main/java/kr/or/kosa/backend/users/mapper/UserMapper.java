@@ -11,66 +11,61 @@ import java.util.Map;
 @Mapper
 public interface UserMapper {
 
-    Users findById(Long userId);
+        Users findById(Long userId);
 
-    Users findByEmail(@Param("userEmail") String userEmail);
+        Users findByEmail(@Param("userEmail") String userEmail);
 
-    Users findByNickname(@Param("userNickname") String userNickname);
+        Users findByNickname(@Param("userNickname") String userNickname);
 
-    int insertUser(Users users);
+        int insertUser(Users users);
 
-    int updateUserImage(
-            @Param("userId") Long userId,
-            @Param("userImage") String userImage
-    );
+        int updateUserImage(
+                        @Param("userId") Long userId,
+                        @Param("userImage") String userImage);
 
-    int updatePassword(
-            @Param("userId") Long userId,
-            @Param("userPw") String userPw
-    );
+        int updatePassword(
+                        @Param("userId") Long userId,
+                        @Param("userPw") String userPw);
 
-    int updateUserInfo(
-            @Param("userId") Long userId,
-            @Param("userName") String userName,
-            @Param("userNickname") String userNickname
-    );
+        int updateUserInfo(
+                        @Param("userId") Long userId,
+                        @Param("userName") String userName,
+                        @Param("userNickname") String userNickname);
 
-    int scheduleDelete(
-            @Param("userId") Long userId,
-            @Param("userDeletedat") LocalDateTime userDeletedat
-    );
+        int updateUser(Users users);
 
-    int restoreUser(Long userId);
+        int scheduleDelete(
+                        @Param("userId") Long userId,
+                        @Param("userDeletedat") LocalDateTime userDeletedat);
 
-    Users findBySocialProvider(
-            @Param("provider") String provider,
-            @Param("providerId") String providerId
-    );
+        int restoreUser(Long userId);
 
-    int insertSocialAccount(
-            @Param("userId") Long userId,
-            @Param("provider") String provider,
-            @Param("providerId") String providerId,
-            @Param("userEmail") String userEmail
-    );
+        Users findBySocialProvider(
+                        @Param("provider") String provider,
+                        @Param("providerId") String providerId);
 
-    List<Users> selectUsersByIds(@Param("userIds") List<Long> userIds);
+        int insertSocialAccount(
+                        @Param("userId") Long userId,
+                        @Param("provider") String provider,
+                        @Param("providerId") String providerId,
+                        @Param("userEmail") String userEmail);
 
-    List<Users> findUsersToDelete(@Param("now") LocalDateTime now);
+        List<Users> selectUsersByIds(@Param("userIds") List<Long> userIds);
 
-    int softDeleteUser(@Param("userId") Long userId);
+        List<Users> findUsersToDelete(@Param("now") LocalDateTime now);
 
-    int anonymizeUser(
-            @Param("userId") Long userId,
-            @Param("userEmail") String userEmail,
-            @Param("userName") String userName
-    );
+        int softDeleteUser(@Param("userId") Long userId);
 
-    int deleteSocialAccount(Long userId, String provider);
+        int anonymizeUser(
+                        @Param("userId") Long userId,
+                        @Param("userEmail") String userEmail,
+                        @Param("userName") String userName);
 
-    Integer countSocialAccount(Long userId, String provider);
+        int deleteSocialAccount(Long userId, String provider);
 
-    Map<String, Object> getGithubUserInfo(@Param("userId") Long userId);
+        Integer countSocialAccount(Long userId, String provider);
 
-    String findSocialProviderByUserId(@Param("userId") Long userId);
+        Map<String, Object> getGithubUserInfo(@Param("userId") Long userId);
+
+        String findSocialProviderByUserId(@Param("userId") Long userId);
 }

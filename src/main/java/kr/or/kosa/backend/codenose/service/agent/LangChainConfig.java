@@ -6,6 +6,13 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+/**
+ * LangChain 설정 (LangChainConfig)
+ * 
+ * 역할:
+ * LangChain4j에서 사용할 LLM(Large Language Model) 인스턴스를 빈으로 등록합니다.
+ * 현재 OpenAI의 GPT-4o 모델을 사용하도록 설정되어 있습니다.
+ */
 @Configuration
 public class LangChainConfig {
 
@@ -16,7 +23,7 @@ public class LangChainConfig {
     public ChatLanguageModel chatLanguageModel() {
         return OpenAiChatModel.builder()
                 .apiKey(openAiApiKey)
-                .modelName("gpt-4o") // Use a capable model
+                .modelName("gpt-4o") // 고성능 모델 사용
                 .build();
     }
 }
