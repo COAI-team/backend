@@ -61,6 +61,12 @@
                 f.FREEBOARD_TITLE LIKE CONCAT('%', #{search.keyword}, '%')
                 OR f.FREEBOARD_PLAIN_TEXT LIKE CONCAT('%', #{search.keyword}, '%')
                 OR u.USER_NICKNAME LIKE CONCAT('%', #{search.keyword}, '%')
+                OR EXISTS (
+                SELECT 1
+                FROM FREEBOARD_TAG ft
+                WHERE ft.FREEBOARD_ID = f.FREEBOARD_ID
+                AND ft.TAG_DISPLAY_NAME LIKE CONCAT('%', #{search.keyword}, '%')
+                )
                 )
             </if>
         </where>
@@ -94,6 +100,12 @@
                 f.FREEBOARD_TITLE LIKE CONCAT('%', #{search.keyword}, '%')
                 OR f.FREEBOARD_PLAIN_TEXT LIKE CONCAT('%', #{search.keyword}, '%')
                 OR u.USER_NICKNAME LIKE CONCAT('%', #{search.keyword}, '%')
+                OR EXISTS (
+                SELECT 1
+                FROM FREEBOARD_TAG ft
+                WHERE ft.FREEBOARD_ID = f.FREEBOARD_ID
+                AND ft.TAG_DISPLAY_NAME LIKE CONCAT('%', #{search.keyword}, '%')
+                )
                 )
             </if>
         </where>
