@@ -161,6 +161,22 @@ public class DailyMissionService {
     }
 
     /**
+     * 오늘자의 문제 풀이 미션 문제 ID를 반환합니다. 없으면 null.
+     * 미션이 생성되어 있지 않다면 생성 후 조회합니다.
+     */
+    @Transactional
+    public Long getTodaySolveMissionProblemId(Long userId) {
+        LocalDate today = LocalDate.now();
+        List<DailyMissionDto> missions = missionMapper.findTodayMissions(userId, today);
+        if (missions.isEmpty()) {
+            createDailyMissionsForUser(userId);
+            missions = missionMapper.findTodayMissions(userId, today);
+        }
+        DailyMissionDto solveMission = missionMapper.findMission(userId, today, MissionType.PROBLEM_SOLVE);
+        return solveMission != null ? solveMission.getProblemId() : null;
+    }
+
+    /**
      * 사용자 통계 업데이트 (문제 풀이 완료 시)
      */
     @Transactional
