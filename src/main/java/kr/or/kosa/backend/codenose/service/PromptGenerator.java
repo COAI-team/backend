@@ -1,10 +1,20 @@
 package kr.or.kosa.backend.codenose.service;
 
+import kr.or.kosa.backend.codenose.config.PromptManager;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 
+/**
+ * 프롬프트 생성기 (PromptGenerator)
+ * 
+ * 역할:
+ * AI 모델에게 전달할 시스템 프롬프트(System Prompt)를 동적으로 생성합니다.
+ * 사용자가 선택한 페르소나(Tone Level)와 요구사항(Custom Requirements),
+ * 그리고 이전 분석 문맥(User Context)을 조합하여 최적의 지시사항을 만듭니다.
+ */
 @Service
 @RequiredArgsConstructor
 public class PromptGenerator {
@@ -12,21 +22,26 @@ public class PromptGenerator {
   private final PromptManager promptManager;
 
   /**
-   * 분석 타입, 톤 레벨, 커스텀 요구사항을 기반으로 시스템 프롬프트 생성
+   * 시스템 프롬프트 생성 (핵심 메서드)
    * 
-   * @param analysisTypes      분석 타입 리스트
-   * @param toneLevel          톤 레벨 (1~5)
-   * @param customRequirements 사용자 커스텀 요구사항
-   * @param userContext        사용자 과거 분석 이력 (RAG)
-   * @return 완성된 시스템 프롬프트
+   * 분석 유형, 톤(페르소나), 사용자 요구사항, 문맥 정보를 모두 종합하여
+   * 최종적으로 AI가 수행해야 할 역할과 규칙을 정의한 텍스트를 반환합니다.
+   * 
+   * @param analysisTypes      사용자가 요청한 분석 유형 (예: "버그 찾기", "성능 개선" 등)
+   * @param toneLevel          답변 스타일/강도 (1: 부드러움 ~ 5: 매우 혹독함)
+   * @param customRequirements 사용자가 직접 입력한 추가 요구사항
+   * @param userContext        RAG를 통해 검색된 사용자의 과거 분석 이력 (문맥)
+   * @return 완성된 시스템 프롬프트 문자열
    */
   public String createSystemPrompt(List<String> analysisTypes, int toneLevel, String customRequirements,
       String userContext) {
-    System.out.println("[TRACE] PromptGenerator.createSystemPrompt called with analysisTypes: " + analysisTypes);
+
+    // 분석 유형이 없으면 기본값 설정
     String analysisTypesStr = analysisTypes != null && !analysisTypes.isEmpty()
         ? String.join(", ", analysisTypes)
         : "general code quality";
 
+    // 톤 레벨에 따른 상세 지침 가져오기
     String tone = getToneDescription(toneLevel);
 
     String requirements = (customRequirements != null && !customRequirements.isEmpty())
@@ -37,6 +52,7 @@ public class PromptGenerator {
         ? userContext
         : "No prior history available.";
 
+    // 템플릿 로드 후 값 주입
     String template = promptManager.getPrompt("CODENOSE_SYSTEM_PROMPT");
     return String.format(template, analysisTypesStr, tone, requirements, context);
   }
@@ -44,24 +60,29 @@ public class PromptGenerator {
   /**
    * 메타데이터 추출용 프롬프트 생성
    * 
+   * 코드의 구조적 정보(언어, 프레임워크, 주요 변경점 등)만 빠르게 파악하기 위한 프롬프트를 생성합니다.
+   * 
    * @param codeContent 분석할 코드 본문
-   * @return 완성된 메타데이터 추출 프롬프트
+   * @return 메타데이터 추출 프롬프트
    */
   public String createMetadataPrompt(String codeContent) {
     String template = promptManager.getPrompt("METADATA_EXTRACTION_PROMPT");
     return String.format(template, codeContent);
   }
 
-  // Overload for backward compatibility if needed, though we will update callers
+  // 하위 호환성을 위한 오버로딩 (Context가 없는 경우)
   public String createSystemPrompt(List<String> analysisTypes, int toneLevel, String customRequirements) {
     return createSystemPrompt(analysisTypes, toneLevel, customRequirements, null);
   }
 
   /**
-   * 톤 레벨에 따른 설명 반환
+   * 톤 레벨(페르소나) 정의
    * 
-   * @param level 톤 레벨 (1: 매우 부드러움 ~ 5: 매우 엄격함)
-   * @return 톤 설명
+   * 사용자가 선택한 강도(1~5)에 따라 AI의 답변 스타일을 결정합니다.
+   * 각 레벨은 고유한 캐릭터성(Persona)과 말투 지침을 가지고 있습니다.
+   * 
+   * @param level 톤 레벨 (1: 츤데레 ~ 5: 재앙)
+   * @return 해당 레벨의 시스템 프롬프트 지침
    */
   private String getToneDescription(int level) {
     return switch (level) {
