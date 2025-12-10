@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Duration;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -31,6 +32,7 @@ public class AlgorithmJudgingService {
     private final CodeExecutorService codeExecutorService;  // Judge0 또는 Piston 선택
     private final AlgorithmEvaluationService evaluationService;
     private final LanguageConstantService languageConstantService;
+    private final DailyQuizBonusService dailyQuizBonusService;
 
     /**
      * 통합 채점 및 평가 프로세스 (비동기)
@@ -63,10 +65,18 @@ public class AlgorithmJudgingService {
             TestRunResponseDto judgeResult = judgeFuture.get();
 
             // 4. Judge 결과만으로 기본 제출 정보 업데이트
-            updateSubmissionWithJudgeResult(submissionId, judgeResult, request);
+            AlgoSubmissionDto updatedSubmission = updateSubmissionWithJudgeResult(submissionId, judgeResult, request);
 
             log.info("Judge0 채점 완료 - submissionId: {}, result: {}",
                     submissionId, judgeResult.getOverallResult());
+
+            if (updatedSubmission != null && updatedSubmission.getJudgeResult() == JudgeResult.AC) {
+                dailyQuizBonusService.handleDailyQuizSolved(
+                        updatedSubmission.getUserId(),
+                        updatedSubmission.getAlgoProblemId(),
+                        LocalDate.now()
+                );
+            }
 
             // 5. AI 평가 및 점수 계산 비동기 시작 (분리된 서비스)
             log.info("🤖 AI 평가 서비스 호출 시작 - submissionId: {}, 현재 스레드: {}",
@@ -88,11 +98,11 @@ public class AlgorithmJudgingService {
     /**
      * Judge 결과로만 제출 업데이트 (기본 점수)
      */
-    private void updateSubmissionWithJudgeResult(Long submissionId, TestRunResponseDto judgeResult,
+    private AlgoSubmissionDto updateSubmissionWithJudgeResult(Long submissionId, TestRunResponseDto judgeResult,
             SubmissionRequestDto request) {
         AlgoSubmissionDto submission = submissionMapper.selectSubmissionById(submissionId);
         if (submission == null)
-            return;
+            return null;
 
         // Judge 결과 설정
         submission.setJudgeResult(JudgeResult.valueOf(judgeResult.getOverallResult()));
@@ -115,6 +125,7 @@ public class AlgorithmJudgingService {
         submission.setFinalScore(basicScore);
 
         submissionMapper.updateSubmission(submission);
+        return submission;
     }
 
     /**
