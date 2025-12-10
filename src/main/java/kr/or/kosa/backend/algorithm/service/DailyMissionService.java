@@ -69,8 +69,13 @@ public class DailyMissionService {
         String difficulty = level.getMatchingDifficulty().name();
         int rewardPoints = level.getRewardPoints();
 
-        // 난이도에 맞는 랜덤 문제 조회
-        Long problemId = missionMapper.findRandomProblemIdByDifficulty(difficulty);
+        // 오늘 같은 난이도로 이미 할당된 문제가 있는지 확인 (같은 레벨 유저에게 같은 문제 배정)
+        Long problemId = missionMapper.findTodayProblemIdByDifficulty(today, difficulty);
+
+        // 없으면 새로 랜덤 선택
+        if (problemId == null) {
+            problemId = missionMapper.findRandomProblemIdByDifficulty(difficulty);
+        }
 
         // 미션 1: AI 문제 생성 미션
         DailyMissionDto generateMission = new DailyMissionDto();
