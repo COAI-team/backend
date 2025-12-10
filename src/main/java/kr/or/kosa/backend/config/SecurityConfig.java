@@ -31,7 +31,6 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-
         http
                 .cors(Customizer.withDefaults())
                 .csrf(AbstractHttpConfigurer::disable)
@@ -53,20 +52,19 @@ public class SecurityConfig {
                                 "/algo/**",
                                 "/admin/**",
                                 "/codeAnalysis/**",
-                                "/api/analysis/**"
+                                "/api/analysis/**",
+                                "/chat/messages"
                         ).permitAll()
-
-                        // 게시글 / 댓글 / 좋아요 조회는 비로그인 허용
-                        .requestMatchers(HttpMethod.GET, "/freeboard/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/codeboard/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/comment", "/comment/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/like/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/analysis/**").permitAll()
-
-                        // 나머지는 전부 인증 필요
+                        .requestMatchers(HttpMethod.GET,
+                                "/freeboard/**",
+                                "/codeboard/**",
+                                "/comment",
+                                "/comment/**",
+                                "/like/**",
+                                "/analysis/**"
+                                ).permitAll()
                         .anyRequest().authenticated()
                 )
-                // JWT 인증 필터 (한 번만 등록)
                 .addFilterBefore(
                         new JwtAuthenticationFilter(jwtProvider),
                         UsernamePasswordAuthenticationFilter.class

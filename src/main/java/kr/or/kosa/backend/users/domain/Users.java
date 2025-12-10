@@ -17,14 +17,17 @@ public class Users {
     private String userNickname;
     private String userImage;
     private Integer userGrade;
-    private String userRole;        // ENUM → String으로 매핑
+    private String userRole; // ENUM → String으로 매핑
     private Boolean userIsdeleted;
     private LocalDateTime userDeletedat;
     private LocalDateTime userCreatedat;
     private LocalDateTime userUpdatedat;
     private Boolean userEnabled;
     private Boolean userIssubscribed;
-
+    private String githubId;
+    private String githubToken; // Encrypted
+    
+    @Builder.Default
     private Boolean needLink = false;
 
     public UserResponseDto toDto() {

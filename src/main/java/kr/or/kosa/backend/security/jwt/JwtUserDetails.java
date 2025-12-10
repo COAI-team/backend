@@ -42,4 +42,8 @@ public record JwtUserDetails(Long id, String email) implements UserDetails {
     public boolean isEnabled() {
         return true;
     }
+
+    public JwtUserDetails getDetails() {
+        return this;
+    }
 }

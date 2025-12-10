@@ -2,13 +2,13 @@ package kr.or.kosa.backend.codenose_withoutRAG.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import kr.or.kosa.backend.codenose.dto.dtoReal.AnalysisRequestDTO;
-import kr.or.kosa.backend.codenose.dto.dtoReal.CodeResultDTO;
-import kr.or.kosa.backend.codenose.dto.dtoReal.GithubFileDTO;
-import kr.or.kosa.backend.codenose.dto.dtoReal.UserCodePatternDTO;
+import kr.or.kosa.backend.codenose.dto.AnalysisRequestDTO;
+import kr.or.kosa.backend.codenose.dto.CodeResultDTO;
+import kr.or.kosa.backend.codenose.dto.GithubFileDTO;
+import kr.or.kosa.backend.codenose.dto.UserCodePatternDTO;
 import kr.or.kosa.backend.codenose.mapper.AnalysisMapper;
 import kr.or.kosa.backend.codenose.service.PromptGenerator;
-import kr.or.kosa.backend.codenose.service.PromptManager;
+import kr.or.kosa.backend.codenose.config.PromptManager;
 import kr.or.kosa.backend.codenose.service.agent.AgenticWorkflowService;
 
 import lombok.RequiredArgsConstructor;

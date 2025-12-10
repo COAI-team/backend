@@ -2,15 +2,21 @@ package kr.or.kosa.backend.security.jwt;
 
 import org.springframework.security.authentication.AbstractAuthenticationToken;
 
+import java.io.Serial;
 import java.util.Objects;
 
 public class JwtAuthentication extends AbstractAuthenticationToken {
 
-    private final JwtUserDetails principal;
+    @Serial
+    private static final long serialVersionUID = 1L;
 
-    public JwtAuthentication(JwtUserDetails principal) {
-        super(null);  // 권한 없음
-        this.principal = principal;
+    private final JwtUserDetails principal;  // ✔ principal = JwtUserDetails
+    private final JwtUserDetails details;    // ✔ details = JwtUserDetails
+
+    public JwtAuthentication(JwtUserDetails userDetails) {
+        super(null); // 권한 없음
+        this.principal = userDetails;
+        this.details = userDetails;
         setAuthenticated(true);
     }
 
@@ -20,13 +26,20 @@ public class JwtAuthentication extends AbstractAuthenticationToken {
     }
 
     @Override
-    public Object getPrincipal() {
+    public JwtUserDetails getPrincipal() {
         return principal;
     }
 
-    // ======================================
-    // equals & hashCode 추가 (경고 제거)
-    // ======================================
+    @Override
+    public JwtUserDetails getDetails() {
+        return details;
+    }
+
+    @Override
+    public String getName() {
+        return String.valueOf(principal.id());
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;

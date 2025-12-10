@@ -1,63 +1,41 @@
-create table USERS
-(
-    USER_ID           bigint auto_increment
-        primary key,
-    USER_EMAIL        varchar(255)                                               not null,
-    USER_PW           varchar(255)                                               not null,
-    USER_NAME         varchar(100)                                               not null,
-    USER_NICKNAME     varchar(50)                                                not null,
-    USER_IMAGE        varchar(500)                                               null,
-    USER_GRADE        int                              default 1                 not null,
-    USER_ROLE         enum ('ROLE_USER', 'ROLE_ADMIN') default 'ROLE_USER'       not null,
-    USER_ISDELETED    tinyint(1)                       default 0                 not null,
-    USER_DELETEDAT    datetime                                                   null,
-    USER_CREATEDAT    datetime                         default CURRENT_TIMESTAMP not null,
-    USER_UPDATEDAT    datetime                         default CURRENT_TIMESTAMP null on update CURRENT_TIMESTAMP,
-    USER_ENABLED      tinyint(1)                       default 1                 not null,
-    USER_ISSUBSCRIBED tinyint(1)                       default 0                 not null,
-    constraint UQ_USERS_EMAIL
-        unique (USER_EMAIL),
-    constraint UQ_USERS_NICKNAME
-        unique (USER_NICKNAME)
+create table USERS (
+    USER_ID bigint auto_increment primary key,
+    USER_EMAIL varchar(255) not null,
+    USER_PW varchar(255) not null,
+    USER_NAME varchar(100) not null,
+    USER_NICKNAME varchar(50) not null,
+    USER_IMAGE varchar(500) null,
+    USER_GRADE int default 1 not null,
+    USER_ROLE enum ('ROLE_USER', 'ROLE_ADMIN') default 'ROLE_USER' not null,
+    USER_ISDELETED tinyint(1) default 0 not null,
+    USER_DELETEDAT datetime null,
+    USER_CREATEDAT datetime default CURRENT_TIMESTAMP not null,
+    USER_UPDATEDAT datetime default CURRENT_TIMESTAMP null on update CURRENT_TIMESTAMP,
+    USER_ENABLED tinyint(1) default 1 not null,
+    USER_ISSUBSCRIBED tinyint(1) default 0 not null,
+    GITHUB_ID varchar(255) null,
+    GITHUB_TOKEN text null,
+    constraint UQ_USERS_EMAIL unique (USER_EMAIL),
+    constraint UQ_USERS_NICKNAME unique (USER_NICKNAME)
 );
-
 -- 필수 아님 !!! 필요시 users FK 재연결에 사용
 ALTER TABLE ALGO_SUBMISSIONS
-    ADD CONSTRAINT FK_ALGO_SUBMISSION_USER
-    FOREIGN KEY (USER_ID) REFERENCES USERS(USER_ID);
-
+ADD CONSTRAINT FK_ALGO_SUBMISSION_USER FOREIGN KEY (USER_ID) REFERENCES USERS(USER_ID);
 ALTER TABLE CODEBOARD
-    ADD CONSTRAINT FK_CODEBOARD_USER
-    FOREIGN KEY (USER_ID) REFERENCES USERS(USER_ID);
-
+ADD CONSTRAINT FK_CODEBOARD_USER FOREIGN KEY (USER_ID) REFERENCES USERS(USER_ID);
 ALTER TABLE COMMENT
-    ADD CONSTRAINT FK_COMMENT_USER
-    FOREIGN KEY (USER_ID) REFERENCES USERS(USER_ID);
-
+ADD CONSTRAINT FK_COMMENT_USER FOREIGN KEY (USER_ID) REFERENCES USERS(USER_ID);
 ALTER TABLE FOCUS_SESSIONS
-    ADD CONSTRAINT FK_FOCUS_SESSION_USER
-    FOREIGN KEY (USER_ID) REFERENCES USERS(USER_ID);
-
+ADD CONSTRAINT FK_FOCUS_SESSION_USER FOREIGN KEY (USER_ID) REFERENCES USERS(USER_ID);
 ALTER TABLE FOCUS_SUMMARY
-    ADD CONSTRAINT FK_FOCUS_SUMMARY_USER
-    FOREIGN KEY (USER_ID) REFERENCES USERS(USER_ID);
-
+ADD CONSTRAINT FK_FOCUS_SUMMARY_USER FOREIGN KEY (USER_ID) REFERENCES USERS(USER_ID);
 ALTER TABLE FREEBOARD
-    ADD CONSTRAINT FK_FREEBOARD_USER
-    FOREIGN KEY (USER_ID) REFERENCES USERS(USER_ID);
-
+ADD CONSTRAINT FK_FREEBOARD_USER FOREIGN KEY (USER_ID) REFERENCES USERS(USER_ID);
 ALTER TABLE GITHUB_COMMITS
-    ADD CONSTRAINT FK_GITHUB_COMMIT_USER
-    FOREIGN KEY (USER_ID) REFERENCES USERS(USER_ID);
-
+ADD CONSTRAINT FK_GITHUB_COMMIT_USER FOREIGN KEY (USER_ID) REFERENCES USERS(USER_ID);
 ALTER TABLE LIKE_RECORD
-    ADD CONSTRAINT FK_LIKE_USER
-    FOREIGN KEY (USER_ID) REFERENCES USERS(USER_ID);
-
+ADD CONSTRAINT FK_LIKE_USER FOREIGN KEY (USER_ID) REFERENCES USERS(USER_ID);
 ALTER TABLE NOTIFICATION
-    ADD CONSTRAINT FK_NOTIFICATION_RECIPIENT
-    FOREIGN KEY (RECIPIENT_ID) REFERENCES USERS(USER_ID);
-
+ADD CONSTRAINT FK_NOTIFICATION_RECIPIENT FOREIGN KEY (RECIPIENT_ID) REFERENCES USERS(USER_ID);
 ALTER TABLE NOTIFICATION
-    ADD CONSTRAINT FK_NOTIFICATION_SENDER
-    FOREIGN KEY (SENDER_ID) REFERENCES USERS(USER_ID);
+ADD CONSTRAINT FK_NOTIFICATION_SENDER FOREIGN KEY (SENDER_ID) REFERENCES USERS(USER_ID);

@@ -128,7 +128,7 @@ public class UserController {
      */
     @GetMapping("/me")
     public ResponseEntity<UserResponseDto> getMyInfo(
-            @AuthenticationPrincipal JwtUserDetails user
+            @AuthenticationPrincipal(expression = "details") JwtUserDetails user
     ) {
         if (user == null) {
             return ResponseEntity.status(401).build();

@@ -14,5 +14,7 @@ public class UserResponseDto {
     private Integer userGrade;
     private String userRole;
     private Boolean userEnabled;
-    private Boolean userIssubscribed;  // 스키마에 존재하므로 반드시 포함
+    private Boolean userIssubscribed;
+    private String githubId;
+    private Boolean hasGithubToken;
 }
