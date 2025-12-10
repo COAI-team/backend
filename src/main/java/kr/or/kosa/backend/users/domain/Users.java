@@ -24,10 +24,9 @@ public class Users {
     private LocalDateTime userUpdatedat;
     private Boolean userEnabled;
     private Boolean userIssubscribed;
-
     private String githubId;
     private String githubToken; // Encrypted
-
+    
     @Builder.Default
     private Boolean needLink = false;
 

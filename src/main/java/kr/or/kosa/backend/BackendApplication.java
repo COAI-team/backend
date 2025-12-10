@@ -21,7 +21,7 @@ public class BackendApplication {
                 .ignoreIfMissing()
                 .load();
 
-        // 2) 환경변수를 시스템 프로퍼티에 적용
+        // 2) 환경변수를 시스템 프로퍼티로 등록
         dotenv.entries().forEach(entry ->
                 System.setProperty(entry.getKey(), entry.getValue())
         );

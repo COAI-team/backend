@@ -6,7 +6,7 @@
 <mapper namespace="kr.or.kosa.backend.admin.mapper.AdminUserMapper">
 
 <!--                 유저 검색                -->
-    <resultMap id="findCondition"
+    <resultMap id="findConditionMap"
                type="kr.or.kosa.backend.admin.dto.response.UserFindResponseDto">
         <id     column="USER_ID"            property="userId"/>
         <result column="USER_EMAIL"         property="userEmail"/>
@@ -16,7 +16,7 @@
     </resultMap>
 
     <select id="findCondition"
-            resultMap="findCondition">
+            resultMap="findConditionMap">
         SELECT USER_ID, USER_EMAIL, USER_NICKNAME, USER_GRADE, USER_ROLE
         FROM USERS
         <where>
@@ -29,8 +29,7 @@
                 </when>
             </choose>
 
-
-            <if test="userEmail != null and userEmail != ''">
+            <if test="userEmail != null &amp;&amp; userEmail != ''">
                 AND USER_EMAIL LIKE CONCAT('%', #{userEmail}, '%')
             </if>
         </where>
@@ -80,7 +79,7 @@
         <result column="end_date"   property="userSubscribeEnd"/>
     </resultMap>
 
-    <select id="findOneUserByUseerId" resultType="kr.or.kosa.backend.admin.dto.response.AdminUserDetailResponseDto">
+    <select id="findOneUserByUserId" resultType="kr.or.kosa.backend.admin.dto.response.AdminUserDetailResponseDto">
         SELECT
         u.USER_ID,
         u.USER_EMAIL,
@@ -109,9 +108,18 @@
     </select>
 
 
-<!--    <select id="">-->
-<!--        select user_id, plan_code, amount, approved_at from payments-->
-<!--        where user_id = #{userId} and status = 'DONE'-->
-<!--    </select>-->
+    <select id="findOneUserPaymentDetailByUserId" resultType="kr.or.kosa.backend.admin.dto.UserPaymentDetailDto">
+        SELECT
+        order_id, user_id, plan_code, payment_key,original_amount, used_point, amount, approved_at
+        FROM payments
+        WHERE user_id = 102 AND status = 'DONE'
+        ORDER BY approved_at DESC
+        LIMIT 1
+    </select>
+
+    <select id="checkUsedPoint" resultType="boolean">
+        select COUNT(*) > 0 from point_history ph
+        where user_id = #{userId} and ph.payment_order_id = #{orderId} and change_amount = #{usedPoint}
+    </select>
 
 </mapper>

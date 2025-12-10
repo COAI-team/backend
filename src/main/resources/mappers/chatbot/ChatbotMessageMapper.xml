@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="kr.or.kosa.backend.chatbot.mapper.ChatbotMessageMapper">
+
+    <!-- 기존 resultMap 유지 -->
+    <resultMap id="ChatbotMessageMap"
+               type="kr.or.kosa.backend.chatbot.domain.ChatbotMessage">
+        <id     property="chatbotMessageId" column="CHATBOT_MESSAGE_ID"/>
+        <result property="sessionId"        column="SESSION_ID"/>
+        <result property="userId"           column="USER_ID"/>
+        <result property="role"             column="ROLE"/>
+        <result property="content"          column="CONTENT"/>
+        <result property="createdAt"        column="CREATED_AT"/>
+        <result property="updatedAt"        column="UPDATED_AT"/>
+    </resultMap>
+
+    <insert id="insertMessage" parameterType="kr.or.kosa.backend.chatbot.domain.ChatbotMessage">
+        INSERT INTO CHATBOT_MESSAGE
+            (SESSION_ID, USER_ID, ROLE, CONTENT)
+        VALUES
+            (#{sessionId}, #{userId}, #{role}, #{content})
+    </insert>
+
+    <select id="selectMessages" resultMap="ChatbotMessageMap">
+        SELECT *
+        FROM CHATBOT_MESSAGE
+        WHERE SESSION_ID = #{sessionId}
+        ORDER BY CREATED_AT DESC
+            LIMIT #{limit}
+    </select>
+
+        <select id="selectMessagesByUser" resultMap="ChatbotMessageMap">
+        SELECT *
+        FROM CHATBOT_MESSAGE
+        WHERE SESSION_ID = #{sessionId}
+          AND (USER_ID = #{userId} OR USER_ID IS NULL)
+        ORDER BY CREATED_AT ASC
+            LIMIT #{limit}
+    </select>
+
+    <select id="countUserMessages" resultType="long">
+        SELECT COUNT(*)
+        FROM CHATBOT_MESSAGE
+        WHERE SESSION_ID = #{sessionId}
+          AND USER_ID = #{userId}
+    </select>
+
+</mapper>
