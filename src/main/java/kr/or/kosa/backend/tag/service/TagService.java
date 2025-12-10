@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -116,6 +117,21 @@ public class TagService {
         }
 
         log.info("자유게시판 태그 저장 완료: freeboardId={}, 태그 수={}", freeboardId, tagInputs.size());
+    }
+
+    // 여러 자유게시판 게시글의 태그를 한번에 조회 (N+1 방지)
+    public Map<Long, List<String>> getFreeboardTagsMap(List<Long> freeboardIds) {
+        if (freeboardIds == null || freeboardIds.isEmpty()) {
+            return new HashMap<>();
+        }
+
+        List<FreeboardTag> freeboardTags = freeboardTagMapper.findByFreeboardIdIn(freeboardIds);
+
+        return freeboardTags.stream()
+                .collect(Collectors.groupingBy(
+                        FreeboardTag::getFreeboardId,
+                        Collectors.mapping(FreeboardTag::getTagDisplayName, Collectors.toList())
+                ));
     }
 
     // 코드게시판 게시글의 태그 조회

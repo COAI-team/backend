@@ -53,7 +53,9 @@ public class SecurityConfig {
                                 "/algo/**",
                                 "/admin/**",
                                 "/codeAnalysis/**",
-                                "/api/analysis/**"
+                                "/api/analysis/**",
+                                "/api/**",           // 임시추가
+                                "/analysis/**"       // 임시추가 
                         ).permitAll()
 
                         // 게시글 / 댓글 / 좋아요 조회는 비로그인 허용

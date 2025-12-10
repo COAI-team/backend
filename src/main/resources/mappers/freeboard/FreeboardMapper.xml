@@ -10,6 +10,7 @@
         <result property="userId" column="USER_ID"/>
         <result property="userNickname" column="USER_NICKNAME"/>
         <result property="freeboardTitle" column="FREEBOARD_TITLE"/>
+        <result property="freeboardSummary" column="FREEBOARD_SUMMARY"/>
         <result property="freeboardClick" column="FREEBOARD_CLICK"/>
         <result property="likeCount" column="LIKE_COUNT"/>
         <result property="commentCount" column="COMMENT_COUNT"/>
@@ -38,6 +39,7 @@
         f.USER_ID,
         u.USER_NICKNAME,
         f.FREEBOARD_TITLE,
+        SUBSTRING(f.FREEBOARD_PLAIN_TEXT, 1, 200) as FREEBOARD_SUMMARY,
         f.FREEBOARD_CLICK,
         f.FREEBOARD_REPRESENT_IMAGE,
         f.FREEBOARD_CREATED_AT,

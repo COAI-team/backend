@@ -23,7 +23,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -51,9 +54,40 @@ public class FreeboardService {
         List<FreeboardListResponseDto> boards =
                 mapper.findPosts(pageRequest, searchCondition, sortCondition);
 
+        // 게시글 ID 목록 추출
+        List<Long> boardIds = boards.stream()
+                .map(FreeboardListResponseDto::getFreeboardId)
+                .collect(Collectors.toList());
+
+        // 태그 일괄 조회 (N+1 방지)
+        List<FreeboardListResponseDto> boardsWithTags = boards;
+        if (!boardIds.isEmpty()) {
+            Map<Long, List<String>> tagsMap = tagService.getFreeboardTagsMap(boardIds);
+
+            // 불변 객체 유지하면서 태그 추가된 새 객체 생성
+            boardsWithTags = boards.stream()
+                    .map(board -> {
+                        List<String> tags = tagsMap.getOrDefault(board.getFreeboardId(), new ArrayList<>());
+                        return FreeboardListResponseDto.builder()
+                                .freeboardId(board.getFreeboardId())
+                                .userId(board.getUserId())
+                                .userNickname(board.getUserNickname())
+                                .freeboardTitle(board.getFreeboardTitle())
+                                .freeboardSummary(board.getFreeboardSummary())
+                                .freeboardRepresentImage(board.getFreeboardRepresentImage())
+                                .freeboardClick(board.getFreeboardClick())
+                                .likeCount(board.getLikeCount())
+                                .commentCount(board.getCommentCount())
+                                .tags(tags)
+                                .freeboardCreatedAt(board.getFreeboardCreatedAt())
+                                .build();
+                    })
+                    .collect(Collectors.toList());
+        }
+
         long totalCount = mapper.countPosts(searchCondition);
 
-        return new PageResponse<>(boards, pageRequest, totalCount);
+        return new PageResponse<>(boardsWithTags, pageRequest, totalCount);
     }
 
     @Transactional
