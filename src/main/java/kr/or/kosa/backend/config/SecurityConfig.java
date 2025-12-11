@@ -54,7 +54,7 @@ public class SecurityConfig {
                                 "/admin/**",
                                 "/codeAnalysis/**",
                                 "/api/analysis/**",
-                                "/api/**",           // 임시추가
+                                "/api/**",            // 임시추가
                                 "/analysis/**",       // 임시추가
                                 "/api/analysis/**",
                                 "/chat/messages"

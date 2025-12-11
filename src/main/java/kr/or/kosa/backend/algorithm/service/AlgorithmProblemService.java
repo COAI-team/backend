@@ -51,31 +51,31 @@ public class AlgorithmProblemService {
     }
 
     /**
-     * 문제 목록 조회 (필터 포함)
-     *
-     * @param offset     시작 위치
-     * @param limit      조회 개수
-     * @param difficulty 난이도 필터 (nullable)
-     * @param source     출처 필터 (nullable)
-     * @param keyword    검색어 (nullable)
-     * @param topic      주제 필터 (nullable)
-     * @return 문제 목록
-     */
+    * 문제 목록 조회 (필터 포함)
+    * @param offset     시작 위치
+    * @param limit      조회 개수
+    * @param difficulty 난이도 필터 (nullable)
+    * @param source     출처 필터 (nullable)
+    * @param keyword    검색어 (nullable)
+    * @param topic      주제 필터 (nullable)
+    * @param problemType 문제 유형 필터 (nullable)
+    * @return 문제 목록
+    */
     public List<AlgoProblemDto> getProblemsWithFilter(int offset, int limit, String difficulty, String source,
-            String keyword, String topic) {
-        log.debug("문제 목록 조회 (필터) - offset: {}, limit: {}, difficulty: {}, source: {}, keyword: {}, topic: {}",
-                offset, limit, difficulty, source, keyword, topic);
+                                                      String keyword, String topic, String problemType) {
+        log.debug("문제 목록 조회 (필터) - offset: {}, limit: {}, difficulty: {}, source: {}, keyword: {}, topic: {}, problemType: {}",
+                offset, limit, difficulty, source, keyword, topic, problemType);
 
         try {
             List<AlgoProblemDto> problems = algorithmProblemMapper.selectProblemsWithFilter(offset, limit, difficulty,
-                    source, keyword);
+                    source, keyword, problemType);
             log.debug("문제 목록 조회 완료 - 조회된 문제 수: {}", problems.size());
 
             return problems;
 
         } catch (Exception e) {
-            log.error("문제 목록 조회 실패 - offset: {}, limit: {}, difficulty: {}, source: {}, keyword: {}, topic: {}",
-                    offset, limit, difficulty, source, keyword, topic, e);
+            log.error("문제 목록 조회 실패 - offset: {}, limit: {}, difficulty: {}, source: {}, keyword: {}, topic: {}, problemType: {}",
+                    offset, limit, difficulty, source, keyword, topic, problemType, e);
             throw new RuntimeException("문제 목록 조회 중 오류가 발생했습니다.", e);
         }
     }
@@ -87,21 +87,22 @@ public class AlgorithmProblemService {
      * @param source     출처 필터 (nullable)
      * @param keyword    검색어 (nullable)
      * @param topic      주제 필터 (nullable)
+     * @param problemType 문제 유형 필터 (nullable)
      * @return 필터링된 문제 개수
      */
-    public int getTotalProblemsCountWithFilter(String difficulty, String source, String keyword, String topic) {
-        log.debug("전체 문제 수 조회 (필터) - difficulty: {}, source: {}, keyword: {}, topic: {}",
-                difficulty, source, keyword, topic);
+    public int getTotalProblemsCountWithFilter(String difficulty, String source, String keyword, String topic, String problemType) {
+        log.debug("전체 문제 수 조회 (필터) - difficulty: {}, source: {}, keyword: {}, topic: {}, problemType: {}",
+                difficulty, source, keyword, topic, problemType);
 
         try {
-            int count = algorithmProblemMapper.countProblemsWithFilter(difficulty, source, keyword);
+            int count = algorithmProblemMapper.countProblemsWithFilter(difficulty, source, keyword, problemType);
             log.debug("전체 문제 수 조회 완료 - count: {}", count);
 
             return count;
 
         } catch (Exception e) {
-            log.error("전체 문제 수 조회 실패 (필터) - difficulty: {}, source: {}, keyword: {}, topic: {}",
-                    difficulty, source, keyword, topic, e);
+            log.error("전체 문제 수 조회 실패 (필터) - difficulty: {}, source: {}, keyword: {}, topic: {}, problemType: {}",
+                    difficulty, source, keyword, topic, problemType, e);
             throw new RuntimeException("전체 문제 수 조회 중 오류가 발생했습니다.", e);
         }
     }
@@ -123,7 +124,8 @@ public class AlgorithmProblemService {
                     request.getDifficulty(),
                     request.getSource(),
                     request.getKeyword(),
-                    request.getTopic()
+                    request.getTopic(),
+                    request.getProblemType()  // problemType 추가
             );
 
             // 전체 개수 조회
@@ -131,7 +133,8 @@ public class AlgorithmProblemService {
                     request.getDifficulty(),
                     request.getSource(),
                     request.getKeyword(),
-                    request.getTopic()
+                    request.getTopic(),
+                    request.getProblemType()  // problemType 추가
             );
 
             // 페이징 정보 계산
