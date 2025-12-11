@@ -119,16 +119,22 @@ public class ChatMessageServiceImpl implements ChatMessageService {
 
     /**
      * ================================
-     *  OpenAI 호출
+     *  OpenAI 호출 - 안내원 스타일 적용
      * ================================
      */
     private String callOpenAI(String userMessage) {
-        SystemMessage systemPrompt = promptBuilder.buildPrompt(userMessage);
-        UserMessage userPrompt = new UserMessage(userMessage);
+        // 1️⃣ PromptBuilder로 안내원 프롬프트 생성
+        String fullPrompt = promptBuilder.buildCompleteGuidePrompt(
+                "KOSA 백엔드 프로젝트", // projectName
+                "MAIN",                // pageContext 예: MAIN / BILLING / MYPAGE / ADMIN
+                userMessage            // userQuery
+        );
 
-        Prompt prompt = new Prompt(List.of(systemPrompt, userPrompt));
+        // 2️⃣ 간단한 UserMessage로 AI 호출
+        UserMessage userPrompt = new UserMessage(fullPrompt);
+        Prompt prompt = new Prompt(List.of(userPrompt));  // SystemMessage 제거!
+
         ChatResponse response = openAiChatModel.call(prompt);
-
         return response.getResult().getOutput().getText();
     }
 
