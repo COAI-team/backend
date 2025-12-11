@@ -181,6 +181,212 @@ public class ProblemVectorStoreService {
         return results;
     }
 
+    // ===== AI 생성 문제 유사도 검사 및 저장 =====
+
+    /**
+     * AI 생성 문제의 유사도 검사
+     * 제목과 설명을 결합하여 Vector DB에서 유사한 문제 검색
+     *
+     * @param title       문제 제목
+     * @param description 문제 설명
+     * @param threshold   유사도 임계값 (0.0 ~ 1.0)
+     * @return 유사도 검사 결과 (유사 문제 목록, 최대 유사도 등)
+     */
+    public SimilarityCheckResult checkSimilarity(String title, String description, double threshold) {
+        log.info("🔍 AI 생성 문제 유사도 검사 시작 - 제목: {}, 임계값: {}", title, threshold);
+
+        SimilarityCheckResult result = new SimilarityCheckResult();
+        result.setThreshold(threshold);
+
+        try {
+            // 제목 + 설명을 결합하여 검색 쿼리 생성
+            String query = String.format("%s %s", title, description);
+
+            // 유사한 문제 검색 (상위 5개)
+            SearchRequest request = SearchRequest.builder()
+                    .query(query)
+                    .topK(5)
+                    .similarityThreshold(0.5)  // 낮은 임계값으로 일단 검색
+                    .build();
+
+            List<Document> similarDocs = vectorStore.similaritySearch(request);
+
+            if (similarDocs.isEmpty()) {
+                log.info("✅ 유사한 문제 없음 - 유사도 검사 통과");
+                result.setPassed(true);
+                result.setMaxSimilarity(0.0);
+                return result;
+            }
+
+            // 유사도 계산 (Spring AI는 score를 metadata에 포함하지 않으므로 직접 계산)
+            double maxSimilarity = 0.0;
+            Document mostSimilar = null;
+
+            for (Document doc : similarDocs) {
+                // 텍스트 유사도 계산 (Jaccard + 공통 키워드 기반)
+                String docContent = doc.getText();
+                double similarity = calculateContentSimilarity(query, docContent);
+
+                if (similarity > maxSimilarity) {
+                    maxSimilarity = similarity;
+                    mostSimilar = doc;
+                }
+            }
+
+            result.setMaxSimilarity(maxSimilarity);
+            result.setSimilarDocuments(similarDocs);
+
+            if (mostSimilar != null) {
+                result.setMostSimilarTitle((String) mostSimilar.getMetadata().get("title"));
+                result.setMostSimilarId((String) mostSimilar.getMetadata().get("externalId"));
+            }
+
+            // 임계값 검사
+            if (maxSimilarity >= threshold) {
+                result.setPassed(false);
+                log.warn("⚠️ 유사도 검사 실패 - 최대 유사도: {:.2f} >= 임계값: {:.2f}, 유사 문제: {}",
+                        maxSimilarity, threshold, result.getMostSimilarTitle());
+            } else {
+                result.setPassed(true);
+                log.info("✅ 유사도 검사 통과 - 최대 유사도: {:.2f} < 임계값: {:.2f}",
+                        maxSimilarity, threshold);
+            }
+
+        } catch (Exception e) {
+            log.error("유사도 검사 중 오류 발생", e);
+            result.setPassed(true);  // 오류 시 일단 통과 (검사 실패로 인한 블로킹 방지)
+            result.setError(e.getMessage());
+        }
+
+        return result;
+    }
+
+    /**
+     * 콘텐츠 유사도 계산 (Jaccard + 키워드 기반)
+     */
+    private double calculateContentSimilarity(String text1, String text2) {
+        if (text1 == null || text2 == null) {
+            return 0.0;
+        }
+
+        // 토큰화
+        java.util.Set<String> tokens1 = tokenize(text1);
+        java.util.Set<String> tokens2 = tokenize(text2);
+
+        if (tokens1.isEmpty() || tokens2.isEmpty()) {
+            return 0.0;
+        }
+
+        // Jaccard 유사도
+        java.util.Set<String> intersection = new java.util.HashSet<>(tokens1);
+        intersection.retainAll(tokens2);
+
+        java.util.Set<String> union = new java.util.HashSet<>(tokens1);
+        union.addAll(tokens2);
+
+        return union.isEmpty() ? 0.0 : (double) intersection.size() / union.size();
+    }
+
+    /**
+     * 텍스트 토큰화
+     */
+    private java.util.Set<String> tokenize(String text) {
+        if (text == null) {
+            return java.util.Collections.emptySet();
+        }
+        String[] tokens = text.toLowerCase()
+                .replaceAll("[^a-z0-9가-힣\\s]", " ")
+                .trim()
+                .split("\\s+");
+        return new java.util.HashSet<>(java.util.Arrays.asList(tokens));
+    }
+
+    /**
+     * AI 생성 문제를 Vector DB에 저장
+     *
+     * @param problemId   MySQL DB의 문제 ID
+     * @param title       문제 제목
+     * @param description 문제 설명
+     * @param difficulty  난이도
+     * @param tags        태그 목록
+     * @return 저장된 문서 ID
+     */
+    public String storeGeneratedProblem(Long problemId, String title, String description,
+                                        String difficulty, List<String> tags) {
+        log.info("📝 AI 생성 문제 Vector DB 저장 - ID: {}, 제목: {}", problemId, title);
+
+        // 문서 ID 생성 (AI_GENERATED + problemId)
+        String documentId = UUID.nameUUIDFromBytes(
+                String.format("AI_GENERATED_%d", problemId).getBytes(StandardCharsets.UTF_8)
+        ).toString();
+
+        // 임베딩용 콘텐츠 생성
+        String content = String.format(
+                "제목: %s\n난이도: %s\n태그: %s\n설명: %s",
+                title,
+                difficulty,
+                tags != null ? String.join(", ", tags) : "",
+                description
+        );
+
+        // 메타데이터 구성
+        Map<String, Object> metadata = new java.util.HashMap<>();
+        metadata.put("source", "AI_GENERATED");
+        metadata.put("externalId", String.valueOf(problemId));
+        metadata.put("title", title);
+        metadata.put("difficulty", difficulty);
+        metadata.put("tags", tags != null ? String.join(",", tags) : "");
+
+        Document document = new Document(documentId, content, metadata);
+        vectorStore.add(List.of(document));
+
+        log.info("✅ AI 생성 문제 Vector DB 저장 완료 - docId: {}", documentId);
+        return documentId;
+    }
+
+    /**
+     * 유사도 검사 결과 클래스
+     */
+    public static class SimilarityCheckResult {
+        private boolean passed;
+        private double maxSimilarity;
+        private double threshold;
+        private String mostSimilarTitle;
+        private String mostSimilarId;
+        private List<Document> similarDocuments;
+        private String error;
+
+        // Getters and Setters
+        public boolean isPassed() { return passed; }
+        public void setPassed(boolean passed) { this.passed = passed; }
+
+        public double getMaxSimilarity() { return maxSimilarity; }
+        public void setMaxSimilarity(double maxSimilarity) { this.maxSimilarity = maxSimilarity; }
+
+        public double getThreshold() { return threshold; }
+        public void setThreshold(double threshold) { this.threshold = threshold; }
+
+        public String getMostSimilarTitle() { return mostSimilarTitle; }
+        public void setMostSimilarTitle(String mostSimilarTitle) { this.mostSimilarTitle = mostSimilarTitle; }
+
+        public String getMostSimilarId() { return mostSimilarId; }
+        public void setMostSimilarId(String mostSimilarId) { this.mostSimilarId = mostSimilarId; }
+
+        public List<Document> getSimilarDocuments() { return similarDocuments; }
+        public void setSimilarDocuments(List<Document> similarDocuments) { this.similarDocuments = similarDocuments; }
+
+        public String getError() { return error; }
+        public void setError(String error) { this.error = error; }
+
+        public String getSummary() {
+            if (error != null) {
+                return String.format("오류: %s", error);
+            }
+            return String.format("통과=%s, 최대유사도=%.2f, 임계값=%.2f, 유사문제=%s",
+                    passed, maxSimilarity, threshold, mostSimilarTitle);
+        }
+    }
+
     /**
      * 문서 고유 ID 생성 (UUID 형식)
      * source + externalId 조합을 기반으로 결정적 UUID 생성
