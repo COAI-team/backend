@@ -212,8 +212,18 @@ public class AlgorithmProblemService {
             List<AlgoTestcaseDto> testcases = algorithmProblemMapper.selectTestCasesByProblemId(problemId);
             problem.setTestcases(testcases);
 
-            log.debug("문제 상세 조회 완료 - problemId: {}, title: {}, testcases: {}",
-                    problemId, problem.getAlgoProblemTitle(), testcases != null ? testcases.size() : 0);
+            // 문제별 통계 조회 및 설정
+            Map<String, Object> statistics = algorithmProblemMapper.selectProblemStatistics(problemId);
+            if (statistics != null) {
+                Object totalAttempts = statistics.get("totalAttempts");
+                Object successCount = statistics.get("successCount");
+                problem.setTotalAttempts(totalAttempts != null ? ((Number) totalAttempts).intValue() : 0);
+                problem.setSuccessCount(successCount != null ? ((Number) successCount).intValue() : 0);
+            }
+
+            log.debug("문제 상세 조회 완료 - problemId: {}, title: {}, testcases: {}, totalAttempts: {}, successCount: {}",
+                    problemId, problem.getAlgoProblemTitle(), testcases != null ? testcases.size() : 0,
+                    problem.getTotalAttempts(), problem.getSuccessCount());
 
             return problem;
 
