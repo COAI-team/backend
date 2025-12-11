@@ -2,7 +2,6 @@ package kr.or.kosa.backend.algorithm.controller;
 
 import kr.or.kosa.backend.algorithm.dto.AlgoProblemDto;
 import kr.or.kosa.backend.algorithm.dto.request.ProblemGenerationRequestDto;
-import kr.or.kosa.backend.algorithm.dto.request.ProblemListRequestDto;
 import kr.or.kosa.backend.algorithm.dto.response.ProblemGenerationResponseDto;
 import kr.or.kosa.backend.algorithm.dto.response.ProblemStatisticsResponseDto;
 import kr.or.kosa.backend.algorithm.dto.enums.ProblemDifficulty;
@@ -108,8 +107,6 @@ public class AlgorithmProblemController {
     /**
      * AI 문제 생성 (SSE 스트리밍)
      * GET /api/algo/problems/generate/stream
-     *
-     * 실시간으로 생성 과정을 클라이언트에 전송
      */
     @GetMapping(value = "/generate/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<String> generateProblemStream(
@@ -120,7 +117,6 @@ public class AlgorithmProblemController {
 
         log.info("AI 문제 생성 스트리밍 요청 - 난이도: {}, 주제: {}, 타입: {}", difficulty, topic, problemType);
 
-        // 요청 DTO 생성
         ProblemGenerationRequestDto request = ProblemGenerationRequestDto.builder()
                 .difficulty(ProblemDifficulty.valueOf(difficulty))
                 .topic(topic)
@@ -131,7 +127,6 @@ public class AlgorithmProblemController {
         return aiProblemGeneratorService.generateProblemStream(request)
                 .map(event -> {
                     try {
-                        // SSE 이벤트 형식으로 변환
                         return "data: " + event + "\n\n";
                     } catch (Exception e) {
                         log.error("SSE 이벤트 변환 실패", e);
@@ -149,9 +144,6 @@ public class AlgorithmProblemController {
     /**
      * AI 문제 생성 (검증 포함)
      * POST /api/algo/problems/generate/validated
-     *
-     * 생성된 문제에 대해 구조 검증, 코드 실행 검증, 유사도 검사를 수행하고
-     * 실패 시 Self-Correction을 통해 자동 수정을 시도
      */
     @PostMapping("/generate/validated")
     public ResponseEntity<ApiResponse<Map<String, Object>>> generateValidatedProblem(
@@ -175,7 +167,6 @@ public class AlgorithmProblemController {
                 userId = userDetails.id().longValue();
             }
 
-            // Orchestrator를 통한 검증 포함 문제 생성
             ProblemGenerationResponseDto response = problemGenerationOrchestrator.generateProblem(
                     request, userId, null);
 
@@ -206,8 +197,6 @@ public class AlgorithmProblemController {
     /**
      * AI 문제 생성 (검증 포함, SSE 스트리밍)
      * GET /api/algo/problems/generate/validated/stream
-     *
-     * 실시간으로 생성 및 검증 과정을 클라이언트에 전송
      */
     @GetMapping(value = "/generate/validated/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<String> generateValidatedProblemStream(
@@ -228,12 +217,10 @@ public class AlgorithmProblemController {
         return Flux.create(sink -> {
             reactor.core.scheduler.Schedulers.boundedElastic().schedule(() -> {
                 try {
-                    // Orchestrator를 통한 검증 포함 문제 생성 (진행률 콜백 사용)
                     ProblemGenerationResponseDto response = problemGenerationOrchestrator.generateProblem(
                             request,
-                            null,  // userId (인증 없이 사용)
+                            null,
                             progressEvent -> {
-                                // 진행률 이벤트를 SSE로 전송
                                 try {
                                     Map<String, Object> event = new HashMap<>();
                                     event.put("type", "PROGRESS");
@@ -247,7 +234,6 @@ public class AlgorithmProblemController {
                             }
                     );
 
-                    // 완료 이벤트 전송
                     Map<String, Object> completeEvent = new HashMap<>();
                     completeEvent.put("type", "COMPLETE");
                     completeEvent.put("problemId", response.getProblemId());
@@ -277,8 +263,8 @@ public class AlgorithmProblemController {
     }
 
     /**
-     * 문제 목록 조회 (기존 - 하위 호환성 유지)
-     * GET /api/algo/problems?page=1&size=10&difficulty=BRONZE&source=AI_GENERATED&keyword=검색어&topic=배열
+     * 문제 목록 조회
+     * GET /api/algo/problems?page=1&size=10&difficulty=BRONZE&source=AI_GENERATED&keyword=검색어&topic=배열&problemType=ALGORITHM
      */
     @GetMapping
     public ResponseEntity<ApiResponse<Map<String, Object>>> getProblems(
@@ -287,16 +273,12 @@ public class AlgorithmProblemController {
             @RequestParam(required = false) String difficulty,
             @RequestParam(required = false) String source,
             @RequestParam(required = false) String keyword,
-            @RequestParam(required = false) String topic) {  // topic 파라미터 추가
+            @RequestParam(required = false) String topic,
+            @RequestParam(required = false) String problemType,
+            @AuthenticationPrincipal JwtAuthentication authentication) {
 
-        log.info("========================================");
-        log.info("문제 목록 조회 요청");
-        log.info("page: {}, size: {}", page, size);
-        log.info("difficulty: '{}' (null: {})", difficulty, difficulty == null);
-        log.info("source: '{}' (null: {})", source, source == null);
-        log.info("keyword: '{}' (null: {})", keyword, keyword == null);
-        log.info("topic: '{}' (null: {})", topic, topic == null);  // topic 로그 추가
-        log.info("========================================");
+        log.info("문제 목록 조회 요청 - page: {}, size: {}, difficulty: {}, source: {}, keyword: {}, topic: {}, problemType: {}",
+                page, size, difficulty, source, keyword, topic, problemType);
 
         try {
             if (page < 1) {
@@ -306,39 +288,19 @@ public class AlgorithmProblemController {
                 size = 10;
             }
 
-            // 빈 문자열 처리
-            if (difficulty != null && difficulty.trim().isEmpty()) {
-                difficulty = null;
-                log.info("difficulty를 null로 변환");
-            }
-            if (source != null && source.trim().isEmpty()) {
-                source = null;
-                log.info("source를 null로 변환");
-            }
-            if (keyword != null && keyword.trim().isEmpty()) {
-                keyword = null;
-                log.info("keyword를 null로 변환");
-            }
-            // topic 빈 문자열 처리 추가
-            if (topic != null && topic.trim().isEmpty()) {
-                topic = null;
-                log.info("topic을 null로 변환");
+            Long userId = null;
+            if (authentication != null) {
+                JwtUserDetails userDetails = (JwtUserDetails) authentication.getPrincipal();
+                userId = userDetails.id().longValue();
             }
 
             int offset = (page - 1) * size;
 
-            log.info("Service 호출 전 - offset: {}, limit: {}, difficulty: {}, source: {}, keyword: {}, topic: {}",
-                    offset, size, difficulty, source, keyword, topic);
-
-            // Service 호출에 topic 추가
             List<AlgoProblemDto> problems = algorithmProblemService.getProblemsWithFilter(
-                    offset, size, difficulty, source, keyword, topic);
+                    offset, size, difficulty, source, keyword, topic, problemType);
 
-            log.info("Service 호출 후 - 조회된 문제 수: {}", problems.size());
-
-            // getTotalProblemsCountWithFilter에도 topic 추가
             int totalCount = algorithmProblemService.getTotalProblemsCountWithFilter(
-                    difficulty, source, keyword, topic);
+                    difficulty, source, keyword, topic, problemType);
 
             int totalPages = (int) Math.ceil((double) totalCount / size);
             boolean hasNext = page < totalPages;
@@ -358,64 +320,7 @@ public class AlgorithmProblemController {
             return ResponseEntity.ok(ApiResponse.success(responseData));
 
         } catch (Exception e) {
-            log.error("❌❌❌ 문제 목록 조회 실패 ❌❌❌", e);
-            log.error("에러 타입: {}", e.getClass().getName());
-            log.error("에러 메시지: {}", e.getMessage());
-            throw new CustomBusinessException(AlgoErrorCode.INVALID_INPUT);
-        }
-    }
-
-    /**
-     * 문제 목록 조회 V2 (고급 필터링 + 통계)
-     * GET /api/algo/problems/v2?page=1&size=10&difficulty=BRONZE&source=AI_GENERATED&language=Java&status=solved&sortBy=latest&topic=배열
-     */
-    @GetMapping("/v2")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> getProblemsV2(
-            @RequestParam(defaultValue = "1") Integer page,
-            @RequestParam(defaultValue = "10") Integer size,
-            @RequestParam(required = false) String difficulty,
-            @RequestParam(required = false) String source,
-            @RequestParam(required = false) String language,
-            @RequestParam(required = false) String status,
-            @RequestParam(required = false) String keyword,
-            @RequestParam(required = false) String topic,  // topic 파라미터 추가
-            @RequestParam(defaultValue = "latest") String sortBy,
-            @AuthenticationPrincipal JwtAuthentication authentication) {
-
-        log.info("문제 목록 조회 V2 - page: {}, size: {}, difficulty: {}, source: {}, language: {}, status: {}, keyword: {}, topic: {}, sortBy: {}",
-                page, size, difficulty, source, language, status, keyword, topic, sortBy);
-
-        try {
-            // 사용자 ID 추출
-            Long userId = null;
-            if (authentication != null) {
-                JwtUserDetails userDetails = (JwtUserDetails) authentication.getPrincipal();
-                userId = userDetails.id().longValue();
-            }
-
-            // 요청 Dto 생성
-            ProblemListRequestDto request = ProblemListRequestDto.builder()
-                    .page(page)
-                    .size(size)
-                    .difficulty(difficulty)
-                    .source(source)
-                    .language(language)
-                    .status(status)
-                    .keyword(keyword)
-                    .topic(topic)
-                    .sortBy(sortBy)
-                    .userId(userId)
-                    .build();
-
-            // 문제 목록 조회
-            Map<String, Object> responseData = algorithmProblemService.getProblemListWithStats(request);
-
-            log.info("문제 목록 조회 V2 성공 - 총 {}개", responseData.get("totalCount"));
-
-            return ResponseEntity.ok(ApiResponse.success(responseData));
-
-        } catch (Exception e) {
-            log.error("문제 목록 조회 V2 실패", e);
+            log.error("문제 목록 조회 실패", e);
             throw new CustomBusinessException(AlgoErrorCode.INVALID_INPUT);
         }
     }
@@ -431,14 +336,12 @@ public class AlgorithmProblemController {
         log.info("통계 정보 조회");
 
         try {
-            // 사용자 ID 추출
             Long userId = null;
             if (authentication != null) {
                 JwtUserDetails userDetails = (JwtUserDetails) authentication.getPrincipal();
                 userId = userDetails.id().longValue();
             }
 
-            // 통계 조회
             ProblemStatisticsResponseDto statistics = algorithmProblemService.getProblemStatistics(userId);
 
             log.info("통계 정보 조회 성공 - {}", statistics);

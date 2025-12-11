@@ -23,5 +23,5 @@ public class CodeboardDetailResponseDto {
     private Integer likeCount;
     private LocalDateTime codeboardCreatedAt;
     private List<String> tags;
-    private boolean isLiked;
+    private Boolean isLiked;
 }

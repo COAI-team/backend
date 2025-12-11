@@ -81,7 +81,8 @@ public class AlgorithmJudgingService {
 
         } catch (Exception e) {
             log.error("통합 채점 프로세스 중 오류 발생 - submissionId: {}", submissionId, e);
-            markSubmissionFailed(submissionId);
+
+            markSubmissionFailed(submissionId, e.getMessage());
         }
     }
 
@@ -120,7 +121,8 @@ public class AlgorithmJudgingService {
     /**
      * 제출 실패 표시
      */
-    private void markSubmissionFailed(Long submissionId) {
+
+    private void markSubmissionFailed(Long submissionId, String errorMessage) {
         try {
             AlgoSubmissionDto submission = submissionMapper.selectSubmissionById(submissionId);
             if (submission != null) {
@@ -144,7 +146,8 @@ public class AlgorithmJudgingService {
         if (judgeResult.getPassedCount() > 0 && judgeResult.getTotalCount() > 0) {
             double partialScore = (double) judgeResult.getPassedCount() /
                     judgeResult.getTotalCount() * 100;
-            return BigDecimal.valueOf(partialScore).setScale(2, RoundingMode.HALF_UP);
+
+            return new BigDecimal(partialScore).setScale(2, RoundingMode.HALF_UP);
         }
 
         return BigDecimal.ZERO;
