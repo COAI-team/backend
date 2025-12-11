@@ -64,7 +64,7 @@ public class SimilarityChecker {
         try {
             // 기존 문제 목록 조회
             List<AlgoProblemDto> existingProblems = problemMapper.selectProblemsWithFilter(
-                    0, similarityCheckLimit, null, null, null);
+                    0, similarityCheckLimit, null, null, null, null);
 
             if (existingProblems == null || existingProblems.isEmpty()) {
                 log.info("비교할 기존 문제가 없습니다");

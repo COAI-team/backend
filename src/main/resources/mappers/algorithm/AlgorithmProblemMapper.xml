@@ -2,8 +2,6 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
-<!-- 파일 경로: resources/mappers/algorithm/AlgorithmProblemMapper.xml -->
-
 <mapper namespace="kr.or.kosa.backend.algorithm.mapper.AlgorithmProblemMapper">
 
     <!-- ResultMap 정의 -->
@@ -25,7 +23,6 @@
         <result property="algoUpdatedAt" column="ALGO_UPDATED_AT"/>
         <result property="algoProblemTags" column="ALGO_PROBLEM_TAGS"/>
         <result property="algoProblemStatus" column="ALGO_PROBLEM_STATUS"/>
-        <!-- LLM 생성 문제 전용 필드 (사용자에게 표시) -->
         <result property="constraints" column="CONSTRAINTS"/>
         <result property="inputFormat" column="INPUT_FORMAT"/>
         <result property="outputFormat" column="OUTPUT_FORMAT"/>
@@ -81,6 +78,9 @@
         <if test="source != null and source != ''">
             AND ALGO_PROBLEM_SOURCE = #{source}
         </if>
+        <if test="problemType != null and problemType != ''">
+            AND PROBLEM_TYPE = #{problemType}
+        </if>
         <if test="keyword != null and keyword != ''">
             AND (ALGO_PROBLEM_TITLE LIKE CONCAT('%', #{keyword}, '%')
             OR ALGO_PROBLEM_DESCRIPTION LIKE CONCAT('%', #{keyword}, '%'))
@@ -99,6 +99,9 @@
         </if>
         <if test="source != null and source != ''">
             AND ALGO_PROBLEM_SOURCE = #{source}
+        </if>
+        <if test="problemType != null and problemType != ''">
+            AND PROBLEM_TYPE = #{problemType}
         </if>
         <if test="keyword != null and keyword != ''">
             AND (ALGO_PROBLEM_TITLE LIKE CONCAT('%', #{keyword}, '%')
@@ -124,35 +127,34 @@
     </select>
 
     <!-- AI 생성 문제 저장 -->
-    <!-- 1. 문제 저장 (AUTO_INCREMENT) -->
     <insert id="insertProblem"
             parameterType="kr.or.kosa.backend.algorithm.dto.AlgoProblemDto"
             useGeneratedKeys="true"
             keyProperty="algoProblemId"
             keyColumn="ALGO_PROBLEM_ID">
         INSERT INTO ALGO_PROBLEMS (
-            ALGO_PROBLEM_TITLE, ALGO_PROBLEM_DESCRIPTION, ALGO_PROBLEM_DIFFICULTY, ALGO_PROBLEM_SOURCE,
-            PROBLEM_TYPE, INIT_SCRIPT, TIMELIMIT, MEMORYLIMIT, ALGO_CREATER,
-            ALGO_CREATED_AT, ALGO_UPDATED_AT, ALGO_PROBLEM_TAGS, ALGO_PROBLEM_STATUS,
-            CONSTRAINTS, INPUT_FORMAT, OUTPUT_FORMAT
+        ALGO_PROBLEM_TITLE, ALGO_PROBLEM_DESCRIPTION, ALGO_PROBLEM_DIFFICULTY, ALGO_PROBLEM_SOURCE,
+        PROBLEM_TYPE, INIT_SCRIPT, TIMELIMIT, MEMORYLIMIT, ALGO_CREATER,
+        ALGO_CREATED_AT, ALGO_UPDATED_AT, ALGO_PROBLEM_TAGS, ALGO_PROBLEM_STATUS,
+        CONSTRAINTS, INPUT_FORMAT, OUTPUT_FORMAT
         ) VALUES (
-            #{algoProblemTitle}, #{algoProblemDescription}, #{algoProblemDifficulty}, #{algoProblemSource},
-            #{problemType,typeHandler=org.apache.ibatis.type.EnumTypeHandler}, #{initScript}, #{timelimit}, #{memorylimit}, #{algoCreater},
-            #{algoCreatedAt}, #{algoUpdatedAt}, #{algoProblemTags}, #{algoProblemStatus},
-            #{constraints}, #{inputFormat}, #{outputFormat}
+        #{algoProblemTitle}, #{algoProblemDescription}, #{algoProblemDifficulty}, #{algoProblemSource},
+        #{problemType,typeHandler=org.apache.ibatis.type.EnumTypeHandler}, #{initScript}, #{timelimit}, #{memorylimit}, #{algoCreater},
+        #{algoCreatedAt}, #{algoUpdatedAt}, #{algoProblemTags}, #{algoProblemStatus},
+        #{constraints}, #{inputFormat}, #{outputFormat}
         )
     </insert>
 
-    <!-- 2. 테스트케이스 저장 -->
+    <!-- 테스트케이스 저장 -->
     <insert id="insertTestcase"
             parameterType="kr.or.kosa.backend.algorithm.dto.AlgoTestcaseDto"
             useGeneratedKeys="true"
             keyProperty="testcaseId"
             keyColumn="TESTCASE_ID">
         INSERT INTO ALGO_TESTCASES (
-            ALGO_PROBLEM_ID, INPUT_DATA, EXPECTED_OUTPUT, IS_SAMPLE
+        ALGO_PROBLEM_ID, INPUT_DATA, EXPECTED_OUTPUT, IS_SAMPLE
         ) VALUES (
-            #{algoProblemId}, #{inputData}, #{expectedOutput}, #{isSample}
+        #{algoProblemId}, #{inputData}, #{expectedOutput}, #{isSample}
         )
     </insert>
 
@@ -165,7 +167,7 @@
         ORDER BY TESTCASE_ID ASC
     </select>
 
-    <!-- 모든 테스트케이스 조회 (문제 상세용 - 기본 정보만) -->
+    <!-- 모든 테스트케이스 조회 -->
     <select id="selectTestCasesByProblemId" resultMap="algoTestcaseResultMap">
         SELECT TESTCASE_ID, ALGO_PROBLEM_ID, INPUT_DATA, EXPECTED_OUTPUT, IS_SAMPLE
         FROM ALGO_TESTCASES
@@ -173,7 +175,7 @@
         ORDER BY TESTCASE_ID ASC
     </select>
 
-    <!-- algoTestcaseResultMap이 기존 파일에 없다면 추가 -->
+    <!-- algoTestcaseResultMap -->
     <resultMap id="algoTestcaseResultMap" type="kr.or.kosa.backend.algorithm.dto.AlgoTestcaseDto">
         <id property="testcaseId" column="TESTCASE_ID"/>
         <result property="algoProblemId" column="ALGO_PROBLEM_ID"/>
@@ -181,4 +183,13 @@
         <result property="expectedOutput" column="EXPECTED_OUTPUT"/>
         <result property="isSample" column="IS_SAMPLE"/>
     </resultMap>
+
+    <!-- 문제별 통계 조회 (제출 수, 맞힌 사람 수) -->
+    <select id="selectProblemStatistics" resultType="map">
+        SELECT
+            COALESCE(COUNT(*), 0) AS totalAttempts,
+            COALESCE(COUNT(DISTINCT CASE WHEN JUDGE_RESULT = 'AC' THEN USER_ID END), 0) AS successCount
+        FROM ALGO_SUBMISSIONS
+        WHERE ALGO_PROBLEM_ID = #{problemId}
+    </select>
 </mapper>
