@@ -24,6 +24,10 @@ public class ProblemSolveResponseDto {
     private Integer timeLimit;
     private Integer memoryLimit;
 
+    // 문제 통계 정보
+    private Integer totalAttempts;  // 총 제출 수
+    private Integer successCount;   // 맞힌 사람 수
+
     // 샘플 테스트케이스
     private List<TestCaseDto> sampleTestCases;
 

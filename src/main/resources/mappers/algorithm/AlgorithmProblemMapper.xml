@@ -183,4 +183,13 @@
         <result property="expectedOutput" column="EXPECTED_OUTPUT"/>
         <result property="isSample" column="IS_SAMPLE"/>
     </resultMap>
+
+    <!-- 문제별 통계 조회 (제출 수, 맞힌 사람 수) -->
+    <select id="selectProblemStatistics" resultType="map">
+        SELECT
+            COALESCE(COUNT(*), 0) AS totalAttempts,
+            COALESCE(COUNT(DISTINCT CASE WHEN JUDGE_RESULT = 'AC' THEN USER_ID END), 0) AS successCount
+        FROM ALGO_SUBMISSIONS
+        WHERE ALGO_PROBLEM_ID = #{problemId}
+    </select>
 </mapper>
