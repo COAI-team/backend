@@ -402,6 +402,51 @@ public class ProblemVectorStoreService {
     }
 
     /**
+     * tags 필드에서 태그 목록 추출
+     * tags는 List<String>, String(JSON 배열), 또는 String(쉼표 구분) 형태일 수 있음
+     *
+     * @param tagsObj payload에서 가져온 tags 객체
+     * @return 태그 목록
+     */
+    @SuppressWarnings("unchecked")
+    private List<String> extractTags(Object tagsObj) {
+        if (tagsObj == null) {
+            return null;
+        }
+
+        // 이미 List인 경우
+        if (tagsObj instanceof List) {
+            return (List<String>) tagsObj;
+        }
+
+        // String인 경우 (JSON 배열 또는 쉼표 구분)
+        if (tagsObj instanceof String tagsStr) {
+            if (tagsStr.isBlank()) {
+                return null;
+            }
+
+            // JSON 배열 형태인 경우: ["tag1", "tag2"]
+            if (tagsStr.startsWith("[")) {
+                try {
+                    com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                    return mapper.readValue(tagsStr, new com.fasterxml.jackson.core.type.TypeReference<List<String>>() {});
+                } catch (Exception e) {
+                    log.warn("태그 JSON 파싱 실패: {}", tagsStr);
+                    return null;
+                }
+            }
+
+            // 쉼표로 구분된 문자열인 경우: "tag1, tag2"
+            return java.util.Arrays.stream(tagsStr.split(","))
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .toList();
+        }
+
+        return null;
+    }
+
+    /**
      * 문자열에 한국어가 포함되어 있는지 확인
      */
     private boolean containsKorean(String text) {
@@ -413,6 +458,246 @@ public class ProblemVectorStoreService {
                 (c >= 0xAC00 && c <= 0xD7A3) ||  // 완성형 한글
                 (c >= 0x3131 && c <= 0x3163)    // 자음/모음
         );
+    }
+
+    /**
+     * Vector DB 컬렉션 통계 조회
+     * 난이도별, 토픽별 문서 수 집계
+     *
+     * @return 컬렉션 통계 정보
+     */
+    public VectorDbStats getCollectionStats() {
+        log.info("📊 Vector DB 통계 조회 시작");
+
+        VectorDbStats stats = new VectorDbStats();
+        String nextPageOffset = null;
+        int batchSize = 100;
+        int totalScanned = 0;
+        int maxDocuments = 2000; // 최대 스캔 문서 수
+
+        try {
+            WebClient webClient = WebClient.builder()
+                    .baseUrl("http://" + qdrantHost + ":6333")
+                    .build();
+
+            while (totalScanned < maxDocuments) {
+                // Qdrant scroll API 호출
+                Map<String, Object> requestBody = new java.util.HashMap<>();
+                requestBody.put("limit", batchSize);
+                requestBody.put("with_payload", true);
+                requestBody.put("with_vector", false);
+                if (nextPageOffset != null) {
+                    requestBody.put("offset", nextPageOffset);
+                }
+
+                Map<String, Object> response = webClient.post()
+                        .uri("/collections/" + collectionName + "/points/scroll")
+                        .bodyValue(requestBody)
+                        .retrieve()
+                        .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
+                        .block();
+
+                if (response == null || !response.containsKey("result")) {
+                    log.warn("Qdrant 응답이 비어있습니다.");
+                    break;
+                }
+
+                @SuppressWarnings("unchecked")
+                Map<String, Object> result = (Map<String, Object>) response.get("result");
+                @SuppressWarnings("unchecked")
+                List<Map<String, Object>> points = (List<Map<String, Object>>) result.get("points");
+
+                if (points == null || points.isEmpty()) {
+                    log.info("더 이상 문서가 없습니다.");
+                    break;
+                }
+
+                for (Map<String, Object> point : points) {
+                    totalScanned++;
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> payload = (Map<String, Object>) point.get("payload");
+
+                    if (payload == null) continue;
+
+                    // 난이도 집계
+                    String difficulty = (String) payload.get("difficulty");
+                    if (difficulty != null && !difficulty.isEmpty()) {
+                        stats.incrementDifficulty(difficulty);
+                    }
+
+                    // 토픽 집계 (tags 필드에서 추출)
+                    // tags는 List<String> 또는 String(JSON) 형태일 수 있음
+                    List<String> tags = extractTags(payload.get("tags"));
+                    if (tags != null && !tags.isEmpty()) {
+                        for (String tag : tags) {
+                            stats.incrementTopic(tag);
+                        }
+                    }
+
+                    // 난이도×토픽 조합 집계
+                    if (difficulty != null && tags != null && !tags.isEmpty()) {
+                        for (String tag : tags) {
+                            stats.incrementCombination(difficulty, tag);
+                        }
+                    }
+
+                    // 소스 집계
+                    String source = (String) payload.get("source");
+                    if (source != null) {
+                        stats.incrementSource(source);
+                    }
+                }
+
+                // 다음 페이지 오프셋
+                nextPageOffset = result.get("next_page_offset") != null
+                        ? result.get("next_page_offset").toString()
+                        : null;
+
+                if (nextPageOffset == null) {
+                    log.info("마지막 페이지 도달");
+                    break;
+                }
+            }
+
+            stats.setTotalDocuments(totalScanned);
+            log.info("✅ Vector DB 통계 조회 완료: 총 {}개 문서", totalScanned);
+
+        } catch (Exception e) {
+            log.error("Vector DB 통계 조회 중 오류 발생", e);
+            stats.setError(e.getMessage());
+        }
+
+        return stats;
+    }
+
+    /**
+     * Vector DB 통계 데이터 클래스
+     */
+    public static class VectorDbStats {
+        private int totalDocuments;
+        private final Map<String, Integer> byDifficulty = new java.util.HashMap<>();
+        private final Map<String, Integer> byTopic = new java.util.HashMap<>();
+        private final Map<String, Integer> bySource = new java.util.HashMap<>();
+        private final Map<String, Map<String, Integer>> byCombination = new java.util.HashMap<>();
+        private String error;
+
+        public void incrementDifficulty(String difficulty) {
+            byDifficulty.merge(difficulty, 1, Integer::sum);
+        }
+
+        public void incrementTopic(String topic) {
+            byTopic.merge(topic, 1, Integer::sum);
+        }
+
+        public void incrementSource(String source) {
+            bySource.merge(source, 1, Integer::sum);
+        }
+
+        public void incrementCombination(String difficulty, String topic) {
+            byCombination.computeIfAbsent(difficulty, k -> new java.util.HashMap<>())
+                    .merge(topic, 1, Integer::sum);
+        }
+
+        public void setTotalDocuments(int total) { this.totalDocuments = total; }
+        public void setError(String error) { this.error = error; }
+
+        public int getTotalDocuments() { return totalDocuments; }
+        public Map<String, Integer> getByDifficulty() { return byDifficulty; }
+        public Map<String, Integer> getByTopic() { return byTopic; }
+        public Map<String, Integer> getBySource() { return bySource; }
+        public Map<String, Map<String, Integer>> getByCombination() { return byCombination; }
+        public String getError() { return error; }
+
+        // 영어 토픽 → 한국어 태그 매핑 (Vector DB에 저장된 한국어 태그와 매칭)
+        private static final Map<String, List<String>> TOPIC_KOREAN_MAP = Map.ofEntries(
+            Map.entry("implementation", List.of("구현")),
+            Map.entry("greedy", List.of("그리디 알고리즘")),
+            Map.entry("sorting", List.of("정렬")),
+            Map.entry("binary_search", List.of("이분 탐색", "매개 변수 탐색")),
+            Map.entry("bruteforcing", List.of("브루트포스 알고리즘")),
+            Map.entry("bfs", List.of("너비 우선 탐색")),
+            Map.entry("dfs", List.of("깊이 우선 탐색")),
+            Map.entry("dp", List.of("다이나믹 프로그래밍", "비트필드를 이용한 다이나믹 프로그래밍", "트리에서의 다이나믹 프로그래밍")),
+            Map.entry("divide_and_conquer", List.of("분할 정복")),
+            Map.entry("backtracking", List.of("백트래킹")),
+            Map.entry("data_structures", List.of("자료 구조", "스택", "큐", "덱")),
+            Map.entry("hashing", List.of("해싱", "해시를 사용한 집합과 맵")),
+            Map.entry("priority_queue", List.of("우선순위 큐")),
+            Map.entry("graphs", List.of("그래프 이론", "그래프 탐색")),
+            Map.entry("shortest_path", List.of("최단 경로", "데이크스트라", "플로이드–워셜", "벨만–포드")),
+            Map.entry("trees", List.of("트리", "세그먼트 트리")),
+            Map.entry("disjoint_set", List.of("분리 집합")),
+            Map.entry("string", List.of("문자열", "KMP", "라빈–카프")),
+            Map.entry("math", List.of("수학", "정수론", "조합론")),
+            Map.entry("bitmask", List.of("비트마스킹")),
+            Map.entry("two_pointer", List.of("두 포인터")),
+            Map.entry("sliding_window", List.of("슬라이딩 윈도우")),
+            Map.entry("simulation", List.of("시뮬레이션"))
+        );
+
+        /**
+         * 부족한 카테고리 목록 반환 (기대치 대비)
+         * 한국어 태그와 영어 토픽 간 매핑을 사용하여 정확한 카운트 계산
+         *
+         * @param expectedPerCategory 카테고리당 기대 문서 수
+         * @return 부족한 카테고리 목록
+         */
+        public List<Map<String, Object>> getMissingCategories(int expectedPerCategory) {
+            List<Map<String, Object>> missing = new ArrayList<>();
+
+            List<String> difficulties = List.of("BRONZE", "SILVER", "GOLD", "PLATINUM");
+            List<String> topics = List.of(
+                "implementation", "greedy", "sorting", "binary_search", "bruteforcing",
+                "bfs", "dfs", "dp", "divide_and_conquer", "backtracking",
+                "data_structures", "hashing", "priority_queue", "graphs", "shortest_path",
+                "trees", "disjoint_set", "string", "math", "bitmask",
+                "two_pointer", "sliding_window", "simulation"
+            );
+
+            for (String diff : difficulties) {
+                Map<String, Integer> topicCounts = byCombination.getOrDefault(diff, new java.util.HashMap<>());
+                for (String topic : topics) {
+                    // 영어 토픽에 해당하는 한국어 태그들의 카운트 합산
+                    int count = getKoreanTagCount(topicCounts, topic);
+                    if (count < expectedPerCategory) {
+                        Map<String, Object> entry = new java.util.HashMap<>();
+                        entry.put("difficulty", diff);
+                        entry.put("topic", topic);
+                        entry.put("topicKorean", getKoreanTopicName(topic));
+                        entry.put("count", count);
+                        entry.put("expected", expectedPerCategory);
+                        entry.put("missing", expectedPerCategory - count);
+                        missing.add(entry);
+                    }
+                }
+            }
+
+            return missing;
+        }
+
+        /**
+         * 영어 토픽에 해당하는 한국어 태그들의 카운트 합산
+         */
+        private int getKoreanTagCount(Map<String, Integer> topicCounts, String englishTopic) {
+            List<String> koreanTags = TOPIC_KOREAN_MAP.get(englishTopic);
+            if (koreanTags == null) {
+                return topicCounts.getOrDefault(englishTopic, 0);
+            }
+
+            int total = 0;
+            for (String koreanTag : koreanTags) {
+                total += topicCounts.getOrDefault(koreanTag, 0);
+            }
+            return total;
+        }
+
+        /**
+         * 영어 토픽의 한국어 대표 이름 반환
+         */
+        private String getKoreanTopicName(String englishTopic) {
+            List<String> koreanTags = TOPIC_KOREAN_MAP.get(englishTopic);
+            return (koreanTags != null && !koreanTags.isEmpty()) ? koreanTags.get(0) : englishTopic;
+        }
     }
 
     /**
