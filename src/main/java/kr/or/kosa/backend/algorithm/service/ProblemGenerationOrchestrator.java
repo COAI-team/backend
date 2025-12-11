@@ -46,6 +46,9 @@ public class ProblemGenerationOrchestrator {
     private final SimilarityChecker similarityChecker;
     private final SelfCorrectionService selfCorrectionService;
 
+    // Code-First 테스트케이스 생성기
+    private final TestCaseGeneratorService testCaseGeneratorService;
+
     // RAG 설정
     @Value("${algorithm.generation.rag-enabled:true}")
     private boolean ragEnabled;
@@ -70,7 +73,7 @@ public class ProblemGenerationOrchestrator {
                 request.getTopic(), request.getDifficulty());
 
         try {
-            // 1. LLM으로 문제 생성
+            // 1. LLM으로 문제 생성 (testCases는 input만 포함)
             notifyProgress(progressCallback, "GENERATING", "LLM 문제 생성 중...", 10);
             ProblemGenerationResponseDto generatedProblem = generateWithLLM(request);
 
@@ -78,7 +81,11 @@ public class ProblemGenerationOrchestrator {
                 throw new RuntimeException("LLM 문제 생성 실패");
             }
 
-            // 2. 검증 및 Self-Correction 루프
+            // 2. Code-First: optimalCode 실행하여 testCase output 생성
+            notifyProgress(progressCallback, "GENERATING_OUTPUTS", "테스트케이스 출력 생성 중...", 15);
+            generatedProblem = generateTestCaseOutputs(generatedProblem);
+
+            // 3. 검증 및 Self-Correction 루프
             int attempt = 0;
             List<ValidationResultDto> validationResults;
 
@@ -193,6 +200,55 @@ public class ProblemGenerationOrchestrator {
                 .naiveCode(parsed.naiveCode())
                 .language("Python 3")  // 기본 언어
                 .status(ProblemGenerationResponseDto.GenerationStatus.SUCCESS)
+                .build();
+    }
+
+    /**
+     * Code-First: optimalCode를 실행하여 테스트케이스 expected output 생성
+     */
+    private ProblemGenerationResponseDto generateTestCaseOutputs(ProblemGenerationResponseDto problem) {
+        String optimalCode = problem.getOptimalCode();
+        String naiveCode = problem.getNaiveCode();
+        String language = problem.getLanguage() != null ? problem.getLanguage() : "Python 3";
+        List<AlgoTestcaseDto> testCases = problem.getTestCases();
+
+        if (optimalCode == null || optimalCode.isBlank()) {
+            log.warn("optimalCode가 없어 Code-First 출력 생성을 건너뜁니다.");
+            return problem;
+        }
+
+        if (testCases == null || testCases.isEmpty()) {
+            log.warn("testCases가 없어 Code-First 출력 생성을 건너뜁니다.");
+            return problem;
+        }
+
+        log.info("Code-First 테스트케이스 출력 생성 시작 - {}개 케이스", testCases.size());
+
+        TestCaseGeneratorService.TestCaseGenerationResult result =
+                testCaseGeneratorService.generateOutputs(optimalCode, naiveCode, language, testCases);
+
+        if (result.testCases().isEmpty()) {
+            log.error("Code-First 출력 생성 실패 - 모든 테스트케이스 실패");
+            throw new RuntimeException("테스트케이스 출력 생성 실패: optimalCode 실행 오류");
+        }
+
+        // 경고가 있으면 로그
+        if (!result.warnings().isEmpty()) {
+            log.warn("Code-First 출력 생성 경고: {}", result.warnings());
+        }
+
+        log.info("Code-First 출력 생성 완료 - 성공률: {}% ({}/{})",
+                String.format("%.1f", result.getSuccessRate()), result.successCount(), testCases.size());
+
+        // 결과를 problem에 반영
+        return ProblemGenerationResponseDto.builder()
+                .problem(problem.getProblem())
+                .testCases(result.testCases())  // 출력이 생성된 테스트케이스
+                .optimalCode(optimalCode)
+                .naiveCode(naiveCode)
+                .language(language)
+                .status(problem.getStatus())
+                .validationResults(problem.getValidationResults())
                 .build();
     }
 

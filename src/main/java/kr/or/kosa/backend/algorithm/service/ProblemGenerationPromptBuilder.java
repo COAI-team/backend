@@ -115,7 +115,7 @@ public class ProblemGenerationPromptBuilder {
             sb.append(String.format("- 스토리 테마: %s\n", request.getAdditionalRequirements()));
         }
 
-        // 3. JSON 응답 형식
+        // 3. JSON 응답 형식 (Code-First 방식: 입력만 생성, 출력은 코드 실행으로 생성)
         sb.append("""
 
                 **응답 형식 (JSON):**
@@ -130,11 +130,11 @@ public class ProblemGenerationPromptBuilder {
                   "memoryLimit": 256,
                   "expectedTimeComplexity": "O(n log n)",
                   "testCases": [
-                    {"input": "5\\n1 3 5 7 9", "output": "YES", "isSample": true, "description": "기본 케이스"},
-                    {"input": "3\\n10 20 30", "output": "NO", "isSample": true, "description": "다른 케이스"},
-                    {"input": "10\\n1 2 3 4 5 6 7 8 9 10", "output": "55", "isSample": false, "description": "경계값 테스트"},
-                    {"input": "1\\n1000000000", "output": "1000000000", "isSample": false, "description": "코너 케이스"},
-                    {"input": "100\\n1 2 3 ... 100", "output": "5050", "isSample": false, "description": "큰 입력 테스트"}
+                    {"input": "5\\n1 3 5 7 9", "isSample": true, "description": "기본 케이스"},
+                    {"input": "3\\n10 20 30", "isSample": true, "description": "음수 포함 케이스"},
+                    {"input": "1\\n0", "isSample": false, "description": "최소 입력 (경계값)"},
+                    {"input": "10\\n1000000000 -1000000000 0 0 0 0 0 0 0 0", "isSample": false, "description": "최대값/최소값 경계"},
+                    {"input": "100\\n1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100", "isSample": false, "description": "큰 입력 테스트"}
                   ],
                   "optimalCode": "Python 최적 풀이 코드 (전체 코드)",
                   "naiveCode": "Python 비효율적 풀이 코드 (시간 초과 발생해야 함)",
@@ -149,8 +149,17 @@ public class ProblemGenerationPromptBuilder {
                 - 코드는 반드시 실행 가능해야 합니다. 함수를 정의했다면 마지막에 반드시 호출하세요!
                 - 올바른 예시: def solve(): ...코드... \\n\\nsolve()  (마지막에 solve() 호출)
                 - 잘못된 예시: def solve(): ...코드...  (함수 정의만 하고 호출 안함)
-                - testCases의 input/output은 실제 프로그램 입출력 형식과 일치해야 합니다.
                 - expectedTimeComplexity도 반드시 포함하세요.
+
+                **테스트케이스 규칙 (Code-First 방식):**
+                - **output 필드는 작성하지 마세요!** 시스템이 optimalCode를 실행하여 자동 생성합니다.
+                - input만 작성하고, 다양한 케이스를 포함해야 합니다.
+                - 반드시 포함해야 하는 케이스 유형:
+                  1. 기본 케이스 (isSample: true, 2-3개)
+                  2. 경계값 테스트: 최소 입력 (N=1 또는 빈 배열)
+                  3. 경계값 테스트: 최대 입력 (제약조건의 상한에 가까운 값)
+                  4. 특수 케이스: 0, 음수, 같은 값 반복 등
+                  5. 스트레스 테스트: 시간복잡도 검증을 위한 큰 입력
 
                 **JSON 형식 필수 규칙:**
                 - 모든 문자열 값은 하나의 연속된 문자열이어야 합니다.
@@ -160,7 +169,7 @@ public class ProblemGenerationPromptBuilder {
                 - 잘못된 예시: "optimalCode": "def solve():" + "\\n    n = int(input())"
 
                 **테스트케이스 데이터 규칙:**
-                - input과 output은 반드시 실제 문자열 데이터로 작성하세요.
+                - input은 반드시 실제 문자열 데이터로 작성하세요.
                 - Python 코드나 표현식 (join, range, for 등)을 절대 사용하지 마세요.
                 - 잘못된 예시: "input": "".join(str(x) for x in range(100))
                 - 올바른 예시: "input": "1 2 3 4 5"

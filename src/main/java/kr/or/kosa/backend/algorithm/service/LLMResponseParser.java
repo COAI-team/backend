@@ -157,36 +157,166 @@ public class LLMResponseParser {
      * 예: ".join(str(x) for x in range(100))" 같은 패턴
      */
     private String removePythonExpressions(String json) {
-        // Python 코드 패턴들: .join(, range(, for x in, str(x)
-        if (!json.contains(".join(") && !json.contains("range(") && !json.contains(" for ")) {
+        // Python 코드 패턴들: .join(, range(, for x in, f"{
+        if (!json.contains(".join(") && !json.contains("range(") &&
+            !json.contains(" for ") && !json.contains("f\"{")) {
             return json; // Python 표현식 없음
         }
 
         log.warn("Python 코드 표현식 감지됨 - 문제가 있는 테스트케이스 제거 시도");
 
-        // testCases 배열에서 Python 표현식이 포함된 항목 제거
-        // 패턴: {"input": "...", "output": "...", ...} 형태의 객체 중
-        // .join( 또는 range( 또는 for x in 을 포함하는 항목 제거
+        // testCases 배열 위치 찾기
+        int testCasesStart = json.indexOf("\"testCases\"");
+        if (testCasesStart == -1) {
+            return json;
+        }
 
-        // 정규식으로 testCases 배열 내의 문제있는 객체 제거
-        // 각 테스트케이스 객체를 찾아서 Python 표현식이 있으면 제거
-        String result = json;
+        // testCases 배열 시작 '[' 찾기
+        int arrayStart = json.indexOf('[', testCasesStart);
+        if (arrayStart == -1) {
+            return json;
+        }
 
-        // 패턴: {...} 객체 중 .join( 또는 range( 포함하는 것
-        // testCases 배열 내부의 객체만 대상으로 함
-        result = result.replaceAll(
-                "\\{[^{}]*(\\.join\\(|range\\(|\\sfor\\s)[^{}]*\\}\\s*,?",
-                ""
-        );
+        // testCases 배열 끝 ']' 찾기 (중첩 괄호 고려)
+        int arrayEnd = findMatchingBracket(json, arrayStart);
+        if (arrayEnd == -1) {
+            return json;
+        }
 
-        // 빈 쉼표 정리 (,, → ,)
-        result = result.replaceAll(",\\s*,", ",");
-        // 배열 시작 후 쉼표 정리 ([, → [)
-        result = result.replaceAll("\\[\\s*,", "[");
-        // 배열 끝 전 쉼표 정리 (,] → ])
-        result = result.replaceAll(",\\s*]", "]");
+        String beforeTestCases = json.substring(0, arrayStart + 1);
+        String testCasesContent = json.substring(arrayStart + 1, arrayEnd);
+        String afterTestCases = json.substring(arrayEnd);
 
-        return result;
+        // 각 테스트케이스 객체를 파싱하여 Python 표현식이 있는 것 제거
+        List<String> cleanedTestCases = new ArrayList<>();
+        int pos = 0;
+        while (pos < testCasesContent.length()) {
+            // 공백 건너뛰기
+            while (pos < testCasesContent.length() &&
+                   Character.isWhitespace(testCasesContent.charAt(pos))) {
+                pos++;
+            }
+            if (pos >= testCasesContent.length()) break;
+
+            // '{' 찾기
+            if (testCasesContent.charAt(pos) != '{') {
+                pos++;
+                continue;
+            }
+
+            // 객체 끝 '}' 찾기
+            int objEnd = findMatchingBrace(testCasesContent, pos);
+            if (objEnd == -1) break;
+
+            String testCaseObj = testCasesContent.substring(pos, objEnd + 1);
+
+            // Python 표현식 포함 여부 확인
+            if (!containsPythonExpression(testCaseObj)) {
+                cleanedTestCases.add(testCaseObj);
+            } else {
+                log.debug("Python 표현식 포함 테스트케이스 제거: {}...",
+                        testCaseObj.length() > 100 ? testCaseObj.substring(0, 100) : testCaseObj);
+            }
+
+            pos = objEnd + 1;
+            // 쉼표 건너뛰기
+            while (pos < testCasesContent.length() &&
+                   (Character.isWhitespace(testCasesContent.charAt(pos)) ||
+                    testCasesContent.charAt(pos) == ',')) {
+                pos++;
+            }
+        }
+
+        // 정제된 testCases 재조립
+        String cleanedArray = String.join(",\n    ", cleanedTestCases);
+        return beforeTestCases + "\n    " + cleanedArray + "\n  " + afterTestCases;
+    }
+
+    /**
+     * Python 표현식 포함 여부 확인
+     */
+    private boolean containsPythonExpression(String text) {
+        // 문자열 값 외부의 Python 표현식 패턴 감지
+        // ".join(, range(, for x in 이 따옴표 밖에 있으면 Python 코드
+        return text.matches(".*\"[^\"]*\"\\s*\\.join\\s*\\(.*") ||
+               text.matches(".*\"[^\"]*\"\\s*\\+\\s*\".*") ||  // 문자열 연결
+               text.contains("range(") ||
+               text.contains("f\"{") ||
+               text.matches(".*\\sfor\\s+\\w+\\s+in\\s.*");
+    }
+
+    /**
+     * 매칭되는 닫는 대괄호 찾기
+     */
+    private int findMatchingBracket(String text, int openPos) {
+        int depth = 1;
+        boolean inString = false;
+        boolean escaped = false;
+
+        for (int i = openPos + 1; i < text.length(); i++) {
+            char c = text.charAt(i);
+
+            if (escaped) {
+                escaped = false;
+                continue;
+            }
+
+            if (c == '\\') {
+                escaped = true;
+                continue;
+            }
+
+            if (c == '"') {
+                inString = !inString;
+                continue;
+            }
+
+            if (!inString) {
+                if (c == '[') depth++;
+                else if (c == ']') {
+                    depth--;
+                    if (depth == 0) return i;
+                }
+            }
+        }
+        return -1;
+    }
+
+    /**
+     * 매칭되는 닫는 중괄호 찾기
+     */
+    private int findMatchingBrace(String text, int openPos) {
+        int depth = 1;
+        boolean inString = false;
+        boolean escaped = false;
+
+        for (int i = openPos + 1; i < text.length(); i++) {
+            char c = text.charAt(i);
+
+            if (escaped) {
+                escaped = false;
+                continue;
+            }
+
+            if (c == '\\') {
+                escaped = true;
+                continue;
+            }
+
+            if (c == '"') {
+                inString = !inString;
+                continue;
+            }
+
+            if (!inString) {
+                if (c == '{') depth++;
+                else if (c == '}') {
+                    depth--;
+                    if (depth == 0) return i;
+                }
+            }
+        }
+        return -1;
     }
 
     /**
@@ -369,6 +499,7 @@ public class LLMResponseParser {
 
     /**
      * 테스트케이스 파싱
+     * Code-First 방식: output이 없어도 input만 있으면 파싱 (output은 코드 실행으로 생성)
      */
     private List<AlgoTestcaseDto> parseTestCases(JsonNode root) {
         List<AlgoTestcaseDto> testCases = new ArrayList<>();
@@ -391,23 +522,26 @@ public class LLMResponseParser {
             for (JsonNode tc : testCasesNode) {
                 boolean isSample = tc.has("isSample") && tc.get("isSample").asBoolean(false);
 
-                // 샘플 중복 방지
-                if (isSample && !testCases.isEmpty()) {
+                String input = getText(tc, "input");
+                String output = getText(tc, "output");  // Code-First에서는 null일 수 있음
+
+                // input은 필수
+                if (input == null || input.isBlank()) {
+                    log.debug("input이 없는 테스트케이스 건너뜀");
                     continue;
                 }
 
-                String input = getText(tc, "input");
-                String output = getText(tc, "output");
-
-                if (input != null && output != null) {
-                    testCases.add(AlgoTestcaseDto.builder()
-                            .inputData(input)
-                            .expectedOutput(output)
-                            .isSample(isSample)
-                            .build());
-                }
+                testCases.add(AlgoTestcaseDto.builder()
+                        .inputData(input)
+                        .expectedOutput(output)  // null이어도 OK (Code-First에서 나중에 생성)
+                        .isSample(isSample)
+                        .build());
             }
         }
+
+        log.debug("테스트케이스 파싱 완료 - 총 {}개 (output 있음: {}개)",
+                testCases.size(),
+                testCases.stream().filter(tc -> tc.getExpectedOutput() != null).count());
 
         return testCases;
     }
