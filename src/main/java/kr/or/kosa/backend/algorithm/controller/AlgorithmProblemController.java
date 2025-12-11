@@ -129,18 +129,11 @@ public class AlgorithmProblemController {
                 .build();
 
         return aiProblemGeneratorService.generateProblemStream(request)
-                .map(event -> {
-                    try {
-                        // SSE 이벤트 형식으로 변환
-                        return "data: " + event + "\n\n";
-                    } catch (Exception e) {
-                        log.error("SSE 이벤트 변환 실패", e);
-                        return "data: {\"type\":\"ERROR\",\"message\":\"이벤트 변환 실패\"}\n\n";
-                    }
-                })
+                // Spring WebFlux가 TEXT_EVENT_STREAM_VALUE와 함께 SSE 형식을 자동으로 처리하므로
+                // 수동으로 "data: " prefix를 추가하지 않음 (중복 방지)
                 .onErrorResume(e -> {
                     log.error("스트리밍 중 에러 발생", e);
-                    return Flux.just("data: {\"type\":\"ERROR\",\"message\":\"" + e.getMessage() + "\"}\n\n");
+                    return Flux.just("{\"type\":\"ERROR\",\"message\":\"" + e.getMessage() + "\"}");
                 })
                 .doOnComplete(() -> log.info("스트리밍 완료"))
                 .doOnCancel(() -> log.info("스트리밍 취소됨"));
