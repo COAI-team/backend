@@ -31,6 +31,7 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+
         http
                 .cors(Customizer.withDefaults())
                 .csrf(AbstractHttpConfigurer::disable)
@@ -53,6 +54,9 @@ public class SecurityConfig {
                                 "/admin/**",
                                 "/codeAnalysis/**",
                                 "/api/analysis/**",
+                                "/api/**",            // 임시추가
+                                "/analysis/**",       // 임시추가
+                                "/api/analysis/**",
                                 "/chat/messages"
                         ).permitAll()
                         .requestMatchers(HttpMethod.GET,
@@ -65,6 +69,7 @@ public class SecurityConfig {
                                 ).permitAll()
                         .anyRequest().authenticated()
                 )
+                // JWT 인증 필터 (한 번만 등록)
                 .addFilterBefore(
                         new JwtAuthenticationFilter(jwtProvider),
                         UsernamePasswordAuthenticationFilter.class

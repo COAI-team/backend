@@ -5,8 +5,8 @@
 
 <mapper namespace="kr.or.kosa.backend.admin.mapper.AdminDashBoardMapper">
 
-    <select id="userSignUpCount" resultType="kr.or.kosa.backend.admin.dto.response.AdminDashBoardUserCountResponseDto">
-        SELECT year, month, COUNT (*) AS user_count
+    <select id="userSignUpCount" resultType="kr.or.kosa.backend.admin.dto.UserCountSummaryDto">
+        SELECT year, month, COUNT(*) AS user_count
         FROM (
             SELECT YEAR (USER_CREATEDAT) AS year, MONTH (USER_CREATEDAT) AS month
             FROM USERS
@@ -44,4 +44,41 @@
         ORDER BY YEAR (approved_at), MONTH (approved_at)
     </select>
 
+    <select id="languageRanking" resultType="kr.or.kosa.backend.admin.dto.LanguageRankingDto">
+        select LANGUAGE, count(LANGUAGE) as sub_count from ALGO_SUBMISSIONS t
+        group by `LANGUAGE`
+        with rollup
+        order by sub_count DESC
+        limit 6
+    </select>
+
+    <select id="algoSolverRanking" resultType="kr.or.kosa.backend.admin.dto.AlgoSolverRankingDto">
+        select t.USER_ID, u.USER_NICKNAME  ,count(t.ALGO_PROBLEM_ID) as algo_solver_count
+        from ALGO_SUBMISSIONS t
+        join USERS u on t.USER_ID = u.USER_ID
+        GROUP by t.USER_ID
+        order by algo_solver_count desc
+        LIMIT 5
+    </select>
+
+    <select id="codeBoardStateTotal" resultType="kr.or.kosa.backend.admin.dto.CodeBoardStateTotalDto">
+        SELECT
+            JSON_UNQUOTE(JSON_EXTRACT(ANALYANALYSIS_RESULTSIS_RESULT, '$.name')) AS name,
+            count(*) as name_count
+        FROM CODE_ANALYSIS_HISTORY
+        GROUP BY name
+        WITH ROLLUP
+        ORDER BY name_count DESC
+    </select>
+
+    <select id="codeAnalysisRanking" resultType="kr.or.kosa.backend.admin.dto.CodeAnalysisRankingDto">
+        SELECT ca.USER_ID, u.USER_NICKNAME, count(ca.USER_ID) as board_count
+        FROM CODE_ANALYSIS_HISTORY ca
+        JOIN USERS u ON u.USER_ID = ca.USER_ID
+        GROUP BY ca.USER_ID
+        ORDER BY board_count DESC
+        LIMIT 5
+    </select>
+
 </mapper>
+

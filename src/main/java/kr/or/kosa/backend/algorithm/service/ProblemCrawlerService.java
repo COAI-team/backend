@@ -238,7 +238,7 @@ public class ProblemCrawlerService {
     private boolean isDuplicate(String title) {
         try {
             List<AlgoProblemDto> problems = problemMapper.selectProblemsWithFilter(
-                    0, 1, null, null, title
+                    0, 1, null, null, title, null
             );
             return !problems.isEmpty();
         } catch (Exception e) {
@@ -276,8 +276,8 @@ public class ProblemCrawlerService {
      */
     public String getCrawlerStatus() {
         int totalProblems = problemMapper.countAllProblems();
-        int bojCount = problemMapper.countProblemsWithFilter(null, "BOJ", null);
-        int leetCodeCount = problemMapper.countProblemsWithFilter(null, "CUSTOM", null);
+        int bojCount = problemMapper.countProblemsWithFilter(null, "BOJ", null, null);
+        int leetCodeCount = problemMapper.countProblemsWithFilter(null, "CUSTOM", null, null);
 
         return String.format("""
                 📊 크롤링 상태

@@ -10,7 +10,6 @@ import java.time.LocalDateTime;
 @Builder
 @ToString
 public class TossConfirmResult {
-
     private final String status;        // 예: DONE
     private final String payMethod;     // 내부 코드 (CARD, EASY_TOSS 등)
     private final String rawJson;       // PG 전체 응답 JSON

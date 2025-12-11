@@ -6,6 +6,8 @@ import kr.or.kosa.backend.admin.dto.response.AdminUserDetailResponseDto;
 import kr.or.kosa.backend.admin.dto.response.PageResponseDto;
 import kr.or.kosa.backend.admin.dto.response.UserFindResponseDto;
 import kr.or.kosa.backend.admin.mapper.AdminUserMapper;
+import kr.or.kosa.backend.pay.dto.TossConfirmResult;
+import kr.or.kosa.backend.pay.service.TossPaymentsClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,9 +17,11 @@ import java.util.List;
 public class AdminServiceImpl implements AdminUserService {
 
     private final AdminUserMapper adminMapper;
+    private final TossPaymentsClient tossPaymentsClient;
 
-    public AdminServiceImpl(AdminUserMapper adminMapper) {
+    public AdminServiceImpl(AdminUserMapper adminMapper,  TossPaymentsClient tossPaymentsClient) {
         this.adminMapper = adminMapper;
+        this.tossPaymentsClient = tossPaymentsClient;
     }
 
     @Override
@@ -44,6 +48,7 @@ public class AdminServiceImpl implements AdminUserService {
         if(resultMyDB != null){ // 디비에는 있다
             int originalAmount = resultMyDB.amount().intValue(); // 원래 금액
             int totalAmount = resultMyDB.amount().intValue() + resultMyDB.usedPoint().intValue(); // 포인트로
+            TossConfirmResult tr = tossPaymentsClient.confirmPayment(resultMyDB.paymentKey(), resultMyDB.order_id(), resultMyDB.amount().longValue());
 
             // 여기서 토스페이먼츠 가자
             boolean tossPaymentsDB = true;
@@ -60,8 +65,6 @@ public class AdminServiceImpl implements AdminUserService {
 
             }
         }
-
-
         return false;
 
         // 결제 디비확인, 토스 페이먼츠에 확인 이거 두개는 내 디비에는 없지만 토스페이먼츠에 있다면 내 데이터 베이스 업데이트

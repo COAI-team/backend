@@ -89,7 +89,7 @@ public class AlgorithmJudgingService {
      * Judge 결과로만 제출 업데이트 (기본 점수)
      */
     private void updateSubmissionWithJudgeResult(Long submissionId, TestRunResponseDto judgeResult,
-            SubmissionRequestDto request) {
+                                                 SubmissionRequestDto request) {
         AlgoSubmissionDto submission = submissionMapper.selectSubmissionById(submissionId);
         if (submission == null)
             return;
