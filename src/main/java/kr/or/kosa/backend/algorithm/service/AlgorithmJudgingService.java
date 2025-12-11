@@ -32,7 +32,7 @@ public class AlgorithmJudgingService {
     private final CodeExecutorService codeExecutorService;  // Judge0 또는 Piston 선택
     private final AlgorithmEvaluationService evaluationService;
     private final LanguageConstantService languageConstantService;
-    private final DailyQuizBonusService dailyQuizBonusService;
+//    private final DailyQuizBonusService dailyQuizBonusService;
 
     /**
      * 통합 채점 및 평가 프로세스 (비동기)
@@ -71,11 +71,11 @@ public class AlgorithmJudgingService {
                     submissionId, judgeResult.getOverallResult());
 
             if (updatedSubmission != null && updatedSubmission.getJudgeResult() == JudgeResult.AC) {
-                dailyQuizBonusService.handleDailyQuizSolved(
-                        updatedSubmission.getUserId(),
-                        updatedSubmission.getAlgoProblemId(),
-                        LocalDate.now()
-                );
+//                dailyQuizBonusService.handleDailyQuizSolved(
+//                        updatedSubmission.getUserId(),
+//                        updatedSubmission.getAlgoProblemId(),
+//                        LocalDate.now()
+//                );
             }
 
             // 5. AI 평가 및 점수 계산 비동기 시작 (분리된 서비스)

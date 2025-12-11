@@ -4,7 +4,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 public record UserPaymentDetailDto(
-    String order_id,
+    String orderId,
     long userId,
     String planCode,
     String paymentKey,
