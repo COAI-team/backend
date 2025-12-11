@@ -125,8 +125,9 @@ public class ChatMessageServiceImpl implements ChatMessageService {
     private String callOpenAI(String userMessage) {
         // 1️⃣ PromptBuilder로 안내원 프롬프트 생성
         String fullPrompt = promptBuilder.buildCompleteGuidePrompt(
-                "KOSA 백엔드 프로젝트",  // 프로젝트명
-                userMessage              // 사용자 질문
+                "KOSA 백엔드 프로젝트", // projectName
+                "MAIN",                // pageContext 예: MAIN / BILLING / MYPAGE / ADMIN
+                userMessage            // userQuery
         );
 
         // 2️⃣ 간단한 UserMessage로 AI 호출
