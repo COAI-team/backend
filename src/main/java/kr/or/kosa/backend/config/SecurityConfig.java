@@ -57,7 +57,8 @@ public class SecurityConfig {
                                 "/api/**",           // 임시추가
                                 "/analysis/**",       // 임시추가
                                 "/api/analysis/**",
-                                "/chat/messages"
+                                "/chat/messages",
+                                "/ws/**"
                         ).permitAll()
                         .requestMatchers(HttpMethod.GET,
                                 "/freeboard/**",
