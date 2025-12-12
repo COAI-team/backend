@@ -9,6 +9,8 @@ import kr.or.kosa.backend.users.domain.Users;
 import kr.or.kosa.backend.users.dto.*;
 import kr.or.kosa.backend.users.exception.UserErrorCode;
 import kr.or.kosa.backend.users.mapper.UserMapper;
+import kr.or.kosa.backend.tutor.subscription.SubscriptionTier;
+import kr.or.kosa.backend.tutor.subscription.SubscriptionTierResolver;
 import kr.or.kosa.backend.auth.github.dto.GitHubUserResponse;
 
 import lombok.RequiredArgsConstructor;
@@ -38,6 +40,7 @@ public class UserServiceImpl implements UserService {
     private final S3Uploader s3Uploader;
     private final PasswordResetTokenService passwordResetTokenService;
     private final EncryptionUtil encryptionUtil; // Injected
+    private final SubscriptionTierResolver subscriptionTierResolver;
 
     private static final long REFRESH_TOKEN_EXPIRE_DAYS = 14;
     private static final String REFRESH_KEY_PREFIX = "auth:refresh:";
@@ -138,6 +141,8 @@ public class UserServiceImpl implements UserService {
                 REFRESH_TOKEN_EXPIRE_DAYS,
                 TimeUnit.DAYS);
 
+        SubscriptionTier tier = subscriptionTierResolver.resolveTier(String.valueOf(users.getUserId()));
+
         UserResponseDto userDto = UserResponseDto.builder()
                 .userId(users.getUserId())
                 .userEmail(users.getUserEmail())
@@ -149,6 +154,7 @@ public class UserServiceImpl implements UserService {
                 .userEnabled(users.getUserEnabled())
                 .githubId(users.getGithubId())
                 .hasGithubToken(users.getGithubToken() != null && !users.getGithubToken().isBlank())
+                .subscriptionTier(tier.name())
                 .build();
 
         return UserLoginResponseDto.builder()
@@ -336,6 +342,8 @@ public class UserServiceImpl implements UserService {
         // ⚡ 변경된 정보 다시 조회
         Users updated = userMapper.findById(userId);
 
+        SubscriptionTier tier = subscriptionTierResolver.resolveTier(String.valueOf(updated.getUserId()));
+
         return UserResponseDto.builder()
                 .userId(updated.getUserId())
                 .userEmail(updated.getUserEmail())
@@ -347,6 +355,7 @@ public class UserServiceImpl implements UserService {
                 .userEnabled(updated.getUserEnabled())
                 .githubId(updated.getGithubId())
                 .hasGithubToken(updated.getGithubToken() != null && !updated.getGithubToken().isBlank())
+                .subscriptionTier(tier.name())
                 .build();
     }
 
@@ -370,6 +379,8 @@ public class UserServiceImpl implements UserService {
             throw new CustomBusinessException(UserErrorCode.USER_NOT_FOUND);
         }
 
+        SubscriptionTier tier = subscriptionTierResolver.resolveTier(String.valueOf(users.getUserId()));
+
         return UserResponseDto.builder()
                 .userId(users.getUserId())
                 .userEmail(users.getUserEmail())
@@ -381,6 +392,7 @@ public class UserServiceImpl implements UserService {
                 .userEnabled(users.getUserEnabled())
                 .githubId(users.getGithubId())
                 .hasGithubToken(users.getGithubToken() != null && !users.getGithubToken().isBlank())
+                .subscriptionTier(tier.name())
                 .build();
     }
 

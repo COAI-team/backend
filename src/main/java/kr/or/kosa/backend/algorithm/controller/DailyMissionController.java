@@ -5,6 +5,7 @@ import kr.or.kosa.backend.algorithm.dto.UserAlgoLevelDto;
 import kr.or.kosa.backend.algorithm.dto.enums.MissionType;
 import kr.or.kosa.backend.algorithm.exception.AlgoErrorCode;
 import kr.or.kosa.backend.algorithm.service.DailyMissionService;
+import kr.or.kosa.backend.algorithm.service.DailyQuizBonusService;
 import kr.or.kosa.backend.commons.exception.custom.CustomBusinessException;
 import kr.or.kosa.backend.commons.response.ApiResponse;
 import kr.or.kosa.backend.security.jwt.JwtAuthentication;
@@ -15,12 +16,13 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
- * 데일리 미션 컨트롤러
+ * 일일 미션 컨트롤러
  */
 @RestController
 @RequestMapping("/algo/missions")
@@ -29,6 +31,7 @@ import java.util.Map;
 public class DailyMissionController {
 
     private final DailyMissionService dailyMissionService;
+    private final DailyQuizBonusService dailyQuizBonusService;
 
     /**
      * 오늘의 미션 조회
@@ -42,9 +45,30 @@ public class DailyMissionController {
         Long userId = getUserId(authentication, testUserId);
 
         List<DailyMissionDto> missions = dailyMissionService.getTodayMissions(userId);
-        log.info("오늘의 미션 조회 - userId: {}, 미션 수: {}", userId, missions.size());
+        log.info("오늘 미션 조회 - userId: {}, 미션 수 {}", userId, missions.size());
 
         return ResponseEntity.ok(ApiResponse.success(missions));
+    }
+
+    /**
+     * 오늘의 문제 보너스 상태 조회 (선착순 몇 명, 내가 받을 수 있는지)
+     * GET /api/algo/missions/bonus/status?problemId=1
+     */
+    @GetMapping("/bonus/status")
+    public ResponseEntity<ApiResponse<DailyQuizBonusService.BonusStatus>> getBonusStatus(
+            @RequestParam Long problemId,
+            @AuthenticationPrincipal JwtAuthentication authentication,
+            @RequestParam(required = false) Long testUserId) {
+
+        Long userId = getUserId(authentication, testUserId);
+        if (problemId == null) {
+            throw new CustomBusinessException(AlgoErrorCode.INVALID_INPUT);
+        }
+
+        DailyQuizBonusService.BonusStatus status =
+                dailyQuizBonusService.getBonusStatus(userId, problemId, LocalDate.now());
+
+        return ResponseEntity.ok(ApiResponse.success(status));
     }
 
     /**
@@ -75,7 +99,7 @@ public class DailyMissionController {
         DailyMissionService.MissionCompleteResult result = dailyMissionService.completeMission(userId, missionType);
 
         if (!result.success()) {
-            if (result.message().contains("찾을 수 없")) {
+            if (result.message().contains("찾을 수 없습니다")) {
                 throw new CustomBusinessException(AlgoErrorCode.MISSION_NOT_FOUND);
             } else {
                 throw new CustomBusinessException(AlgoErrorCode.MISSION_ALREADY_COMPLETED);
@@ -127,10 +151,9 @@ public class DailyMissionController {
     }
 
     /**
-     * 인증 객체에서 사용자 ID 추출 (테스트용 userId 우선)
+     * 인증 객체에서 userId 추출 (테스트용 userId 우선)
      */
     private Long getUserId(JwtAuthentication authentication, Long testUserId) {
-        // 테스트용 userId가 있으면 사용 (개발 환경 전용)
         if (testUserId != null) {
             log.warn("테스트 모드: testUserId={} 사용", testUserId);
             return testUserId;

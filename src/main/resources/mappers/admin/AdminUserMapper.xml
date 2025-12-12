@@ -21,11 +21,11 @@
         FROM USERS
         <where>
             <choose>
-                <when test="filter instanceof java.lang.Integer">
-                    USER_ISDELETED = #{filter}
+                <when test="statusFilter instanceof java.lang.Integer">
+                    USER_ISDELETED = #{statusFilter}
                 </when>
-                <when test="filter instanceof java.lang.String and filter != ''">
-                    USER_ROLE = #{filter}
+                <when test="roleFilter instanceof java.lang.String and roleFilter != ''">
+                    USER_ROLE = #{roleFilter}
                 </when>
             </choose>
 
@@ -45,11 +45,11 @@
         USERS
         <where>
             <choose>
-                <when test="filter instanceof java.lang.Integer">
-                    USER_ISDELETED = #{filter}
+                <when test="statusFilter instanceof java.lang.Integer">
+                    USER_ISDELETED = #{statusFilter}
                 </when>
-                <when test="filter instanceof java.lang.String and filter != ''">
-                    USER_ROLE = #{filter}
+                <when test="roleFilter instanceof java.lang.String and roleFilter != ''">
+                    USER_ROLE = #{roleFilter}
                 </when>
             </choose>
 
@@ -58,7 +58,6 @@
             </if>
         </where>
     </select>
-
     <!--                 유저 상세 정보                 -->
     <resultMap id="findOneUserByUserId"
                type="kr.or.kosa.backend.admin.dto.response.AdminUserDetailResponseDto">
@@ -112,7 +111,7 @@
         SELECT
         order_id, user_id, plan_code, payment_key,original_amount, used_point, amount, approved_at
         FROM payments
-        WHERE user_id = 102 AND status = 'DONE'
+        WHERE user_id = #{userId} AND status = 'DONE'
         ORDER BY approved_at DESC
         LIMIT 1
     </select>
@@ -122,4 +121,17 @@
         where user_id = #{userId} and ph.payment_order_id = #{orderId} and change_amount = #{usedPoint}
     </select>
 
+    <delete id="deleteSubscription">
+        DELETE FROM subscriptions
+        WHERE user_id = #{userId}
+        AND order_id = #{orderId}
+        AND subscription_type = #{subscriptionType}
+    </delete>
+
+    <update id="banUser" >
+        UPDATE USERS
+            SET USER_DELETEDAT = NOW(),
+            USER_ISDELETED = 1
+        WHERE USER_ID = #{userId}
+    </update>
 </mapper>

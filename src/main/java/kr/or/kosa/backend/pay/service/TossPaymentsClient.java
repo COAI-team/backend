@@ -29,6 +29,24 @@ public class TossPaymentsClient {
         this.restTemplate = new RestTemplate();
     }
 
+    public boolean getPayment(String paymentKey) {
+        HttpHeaders headers = createHeaders();
+        String url = "https://api.tosspayments.com/v1/payments/" + paymentKey;
+        try {
+            ResponseEntity<Map> response = restTemplate.exchange(
+                url, HttpMethod.GET, new HttpEntity<>(headers), Map.class);
+            Map<String, Object> responseBody = (Map<String, Object>) response.getBody();
+            String status = (String) responseBody.get("status");
+            return "DONE".equals(status);// DTO 변환
+        } catch (HttpClientErrorException e) {
+            if (e.getStatusCode() == HttpStatus.NOT_FOUND) { // 404 NOT_FOUND => 결제 데이터가 없다면
+                return false;
+            }
+            throw new IllegalStateException("결제 단건 조회 실패: " + e.getResponseBodyAsString());
+        }
+    }
+
+
     public TossConfirmResult confirmPayment(String paymentKey, String orderId, long amount) {
 
         HttpHeaders headers = createHeaders();
