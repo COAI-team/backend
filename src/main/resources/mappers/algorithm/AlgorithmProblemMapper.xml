@@ -92,7 +92,7 @@
     <!-- 전체 문제 수 조회 (필터 포함) -->
     <select id="countProblemsWithFilter" resultType="int">
         SELECT COUNT(*)
-        FROM ALGO_PROBLEMS
+        FROM ALGO_PROBLEMS p
         WHERE ALGO_PROBLEM_STATUS = 1
         <if test="difficulty != null and difficulty != ''">
             AND ALGO_PROBLEM_DIFFICULTY = #{difficulty}
@@ -100,12 +100,32 @@
         <if test="source != null and source != ''">
             AND ALGO_PROBLEM_SOURCE = #{source}
         </if>
-        <if test="problemType != null and problemType != ''">
-            AND PROBLEM_TYPE = #{problemType}
-        </if>
         <if test="keyword != null and keyword != ''">
             AND (ALGO_PROBLEM_TITLE LIKE CONCAT('%', #{keyword}, '%')
             OR ALGO_PROBLEM_DESCRIPTION LIKE CONCAT('%', #{keyword}, '%'))
+        </if>
+        <if test="problemType != null and problemType != ''">
+            AND PROBLEM_TYPE = #{problemType}
+        </if>
+        <if test="solved != null and solved != ''">
+            <choose>
+                <when test="solved == 'solved' and userId != null">
+                    AND EXISTS (
+                    SELECT 1 FROM ALGO_SUBMISSIONS s
+                    WHERE s.USER_ID = #{userId}
+                    AND s.ALGO_PROBLEM_ID = p.ALGO_PROBLEM_ID
+                    AND s.JUDGE_RESULT = 'AC'
+                    )
+                </when>
+                <when test="solved == 'unsolved' and userId != null">
+                    AND NOT EXISTS (
+                    SELECT 1 FROM ALGO_SUBMISSIONS s
+                    WHERE s.USER_ID = #{userId}
+                    AND s.ALGO_PROBLEM_ID = p.ALGO_PROBLEM_ID
+                    AND s.JUDGE_RESULT = 'AC'
+                    )
+                </when>
+            </choose>
         </if>
     </select>
 
@@ -209,8 +229,8 @@
         WHERE s.USER_ID = #{userId}
         AND s.ALGO_PROBLEM_ID = p.ALGO_PROBLEM_ID
         AND s.JUDGE_RESULT = 'AC'
-        ) THEN true
-        ELSE false
+        ) THEN 1
+        ELSE 0
         END AS isSolved
         FROM ALGO_PROBLEMS p
         WHERE p.ALGO_PROBLEM_STATUS = 1
@@ -219,6 +239,26 @@
         </if>
         <if test="tags != null and tags != ''">
             AND p.ALGO_PROBLEM_TAGS LIKE CONCAT('%', #{tags}, '%')
+        </if>
+        <if test="solved != null and solved != ''">
+            <choose>
+                <when test="solved == 'solved' and userId != null">
+                    AND EXISTS (
+                    SELECT 1 FROM ALGO_SUBMISSIONS s
+                    WHERE s.USER_ID = #{userId}
+                    AND s.ALGO_PROBLEM_ID = p.ALGO_PROBLEM_ID
+                    AND s.JUDGE_RESULT = 'AC'
+                    )
+                </when>
+                <when test="solved == 'unsolved' and userId != null">
+                    AND NOT EXISTS (
+                    SELECT 1 FROM ALGO_SUBMISSIONS s
+                    WHERE s.USER_ID = #{userId}
+                    AND s.ALGO_PROBLEM_ID = p.ALGO_PROBLEM_ID
+                    AND s.JUDGE_RESULT = 'AC'
+                    )
+                </when>
+            </choose>
         </if>
         ORDER BY p.ALGO_PROBLEM_ID ASC
         LIMIT #{size} OFFSET #{offset}

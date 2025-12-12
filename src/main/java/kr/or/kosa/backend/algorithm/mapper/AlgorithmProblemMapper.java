@@ -59,7 +59,10 @@ public interface AlgorithmProblemMapper {
             @Param("difficulty") String difficulty,
             @Param("source") String source,
             @Param("keyword") String keyword,
-            @Param("problemType") String problemType);
+            @Param("problemType") String problemType,
+            @Param("userId") Long userId,
+            @Param("solved") String solved
+    );
 
     /**
      * 문제 상세 조회 (ID로)
@@ -127,6 +130,7 @@ public interface AlgorithmProblemMapper {
             @Param("difficulty") String difficulty,
             @Param("tags") String tags,
             @Param("offset") int offset,
-            @Param("size") int size
+            @Param("size") int size,
+            @Param("solved") String solved
     );
 }

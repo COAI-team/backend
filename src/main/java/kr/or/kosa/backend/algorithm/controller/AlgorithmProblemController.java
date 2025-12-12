@@ -319,9 +319,6 @@ public class AlgorithmProblemController {
 //        }
 //    }
 
-    /**
-     * 문제 목록 조회
-     */
     @GetMapping
     public ResponseEntity<ApiResponse<Map<String, Object>>> getProblems(
             @RequestParam(defaultValue = "1") int page,
@@ -331,9 +328,11 @@ public class AlgorithmProblemController {
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String topic,
             @RequestParam(required = false) String problemType,
-            @RequestAttribute(value = "userId", required = false) Long userId) { // 👈 변경
+            @RequestParam(required = false) String solved,  // 추가
+            @RequestAttribute(value = "userId", required = false) Long userId) {
 
-        log.info("문제 목록 조회 요청 - userId: {}, page: {}, size: {}", userId, page, size);
+        log.info("문제 목록 조회 요청 - userId: {}, page: {}, size: {}, solved: {}",
+                userId, page, size, solved);
 
         try {
             if (page < 1) page = 1;
@@ -342,10 +341,10 @@ public class AlgorithmProblemController {
             int offset = (page - 1) * size;
 
             List<Map<String, Object>> problems = algorithmProblemService.getProblemsWithUserStatus(
-                    userId, offset, size, difficulty, source, keyword, topic, problemType);
+                    userId, offset, size, difficulty, source, keyword, topic, problemType, solved);
 
             int totalCount = algorithmProblemService.getTotalProblemsCountWithFilter(
-                    difficulty, source, keyword, topic, problemType);
+                    difficulty, source, keyword, topic, problemType, userId, solved);  // userId, solved 추가
 
             int totalPages = (int) Math.ceil((double) totalCount / size);
 
