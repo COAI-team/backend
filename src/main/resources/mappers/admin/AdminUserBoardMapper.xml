@@ -5,22 +5,22 @@
 
 <mapper namespace="kr.or.kosa.backend.admin.mapper.AdminUserBoardMapper">
 
-    <select id="">
-        select c.CODEBOARD_ID, c.CODEBOARD_TITLE, u.USER_NICKNAME
-        from CODEBOARD c
-        join USERS u on u.USER_ID = c.USER_ID
-    </select>
+<!--    <select id="">-->
+<!--        select c.CODEBOARD_ID, c.CODEBOARD_TITLE, u.USER_NICKNAME-->
+<!--        from CODEBOARD c-->
+<!--        join USERS u on u.USER_ID = c.USER_ID-->
+<!--    </select>-->
 
-    <select id="">
-        select t.ALGOSUBMISSION_ID, u.USER_NICKNAME
-        from ALGO_SUBMISSIONS t
-        join USERS u on u.USER_ID = t.USER_ID;
-    </select>
+<!--    <select id="">-->
+<!--        select t.ALGOSUBMISSION_ID, u.USER_NICKNAME-->
+<!--        from ALGO_SUBMISSIONS t-->
+<!--        join USERS u on u.USER_ID = t.USER_ID;-->
+<!--    </select>-->
 
-    <select id="">
-        select f.FREEBOARD_ID, f.FREEBOARD_TITLE, u.USER_NICKNAME
-        from FREEBOARD f
-        join USERS u on u.USER_ID = f.USER_ID;
-    </select>
+<!--    <select id="">-->
+<!--        select f.FREEBOARD_ID, f.FREEBOARD_TITLE, u.USER_NICKNAME-->
+<!--        from FREEBOARD f-->
+<!--        join USERS u on u.USER_ID = f.USER_ID;-->
+<!--    </select>-->
 </mapper>
 
