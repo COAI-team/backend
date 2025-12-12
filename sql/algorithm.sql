@@ -140,6 +140,11 @@ CREATE TABLE `ALGO_SUBMISSIONS` (
     INDEX `idx_judge_result` (`JUDGE_RESULT`),
     INDEX `idx_solve_mode` (`SOLVE_MODE`)
 ) ENGINE = InnoDB AUTO_INCREMENT = 1000 DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '알고리즘 제출 기록';
+
+-- 사용자별 AC 문제 조회용 복합 인덱스
+CREATE INDEX idx_user_problem_ac
+ON ALGO_SUBMISSIONS(USER_ID, ALGO_PROBLEM_ID, JUDGE_RESULT);
+
 -- =============================================
 -- 5. 모니터링 세션 테이블 (집중 모드 전용)
 -- =============================================

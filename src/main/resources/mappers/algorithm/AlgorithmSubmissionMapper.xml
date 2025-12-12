@@ -128,6 +128,8 @@
     </select>
 
     <!-- 문제별 제출 목록 조회 (공개된 것만) -->
+    <!-- 작업자 G: 주석 처리 -->
+    <!--
     <select id="selectPublicSubmissionsByProblemId" resultMap="algoSubmissionResultMap">
         SELECT
         s.*,
@@ -139,6 +141,7 @@
         ORDER BY s.FINAL_SCORE DESC, s.SUBMITTED_AT ASC
         LIMIT #{limit} OFFSET #{offset}
     </select>
+    -->
 
     <!-- 특정 사용자의 특정 문제 최고 점수 제출 조회 -->
     <select id="selectBestSubmissionByUserAndProblem" resultMap="algoSubmissionResultMap">
@@ -166,5 +169,51 @@
         IS_SHARED = #{isShared}
         WHERE ALGOSUBMISSION_ID = #{submissionId}
     </update>
+
+    <!-- 작업자 S: 문제별 공개된 제출 목록 조회 (맞은 것만, 점수순) -->
+    <select id="selectPublicSubmissionsByProblemId" resultMap="algoSubmissionResultMap">
+        SELECT
+        s.ALGOSUBMISSION_ID,
+        s.ALGO_PROBLEM_ID,
+        s.USER_ID,
+        s.SOURCE_CODE,
+        s.LANGUAGE,
+        s.EXECUTION_TIME,
+        s.MEMORY_USAGE,
+        s.PASSED_TEST_COUNT,
+        s.TOTAL_TEST_COUNT,
+        s.AI_FEEDBACK,
+        s.AI_FEEDBACK_STATUS,
+        s.AI_FEEDBACK_TYPE,
+        s.JUDGE_RESULT,
+        s.SOLVE_MODE,
+        s.MONITORING_SESSION_ID,
+        s.AI_SCORE,
+        s.TIME_EFFICIENCY_SCORE,
+        s.FINAL_SCORE,
+        s.SCORE_WEIGHTS,
+        s.STARTSOLVING,
+        s.ENDSOLVING,
+        s.SOLVING_DURATION_SECONDS,
+        s.GITHUB_COMMIT_REQUESTED,
+        s.GITHUB_COMMIT_STATUS,
+        s.SUBMITTED_AT,
+        s.IS_SHARED
+        FROM ALGO_SUBMISSIONS s
+        WHERE s.ALGO_PROBLEM_ID = #{problemId}
+        AND s.IS_SHARED = 1
+        AND s.JUDGE_RESULT = 'AC'
+        ORDER BY s.FINAL_SCORE DESC, s.SUBMITTED_AT DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <!-- 문제별 공개된 제출 총 개수 -->
+    <select id="countPublicSubmissionsByProblemId" resultType="int">
+        SELECT COUNT(*)
+        FROM ALGO_SUBMISSIONS
+        WHERE ALGO_PROBLEM_ID = #{problemId}
+        AND IS_SHARED = 1
+        AND JUDGE_RESULT = 'AC'
+    </select>
 
 </mapper>

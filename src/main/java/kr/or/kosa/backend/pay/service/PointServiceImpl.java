@@ -99,7 +99,6 @@ public class PointServiceImpl implements PointService {
         if (rewardPoints <= 0) {
             return;
         }
-
         BigDecimal reward = BigDecimal.valueOf(rewardPoints);
 
         // 유저 포인트 row가 없으면 생성

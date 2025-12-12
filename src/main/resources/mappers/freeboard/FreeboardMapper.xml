@@ -163,16 +163,14 @@
         SET FREEBOARD_TITLE = #{freeboardTitle},
         FREEBOARD_CONTENT = #{freeboardContent},
         FREEBOARD_PLAIN_TEXT = #{freeboardPlainText},
-        FREEBOARD_REPRESENT_IMAGE = #{freeboardRepresentImage},
-        FREEBOARD_UPDATED_AT = NOW()
+        FREEBOARD_REPRESENT_IMAGE = #{freeboardRepresentImage}
         WHERE FREEBOARD_ID = #{freeboardId}
     </update>
 
     <!-- 게시글 삭제 (소프트 삭제) -->
     <update id="delete">
         UPDATE FREEBOARD
-        SET FREEBOARD_DELETED_YN = 'Y',
-        FREEBOARD_UPDATED_AT = NOW()
+        SET FREEBOARD_DELETED_YN = 'Y'
         WHERE FREEBOARD_ID = #{freeboardId}
     </update>
 

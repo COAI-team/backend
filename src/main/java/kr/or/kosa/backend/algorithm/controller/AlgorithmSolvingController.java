@@ -8,6 +8,7 @@ import kr.or.kosa.backend.algorithm.dto.response.TestRunResponseDto;
 import kr.or.kosa.backend.algorithm.exception.AlgoErrorCode;
 import kr.or.kosa.backend.algorithm.service.AlgorithmSolvingService;
 import kr.or.kosa.backend.commons.exception.custom.CustomBusinessException;
+import kr.or.kosa.backend.commons.pagination.PageResponse;
 import kr.or.kosa.backend.commons.response.ApiResponse;
 import kr.or.kosa.backend.security.jwt.JwtAuthentication;
 import kr.or.kosa.backend.security.jwt.JwtUserDetails;
@@ -227,6 +228,28 @@ public class AlgorithmSolvingController {
 
         } catch (Exception e) {
             log.error("제출 이력 조회 중 예외 발생", e);
+            throw new CustomBusinessException(AlgoErrorCode.SUBMISSION_NOT_FOUND);
+        }
+    }
+
+    /**
+     * 문제별 공유된 제출 목록 조회 (다른 사람의 풀이)
+     */
+    @GetMapping("/problems/{problemId}/solutions")
+    public ResponseEntity<ApiResponse<PageResponse<SubmissionResponseDto>>> getSharedSubmissions(
+            @PathVariable("problemId") Long problemId,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size) {
+
+        log.info("공유된 제출 목록 조회 - problemId: {}, page: {}, size: {}", problemId, page, size);
+
+        try {
+            PageResponse<SubmissionResponseDto> response = solvingService.getSharedSubmissions(problemId, page, size);
+
+            return ResponseEntity.ok(new ApiResponse<>("0000", "공유된 제출 목록 조회 완료", response));
+
+        } catch (Exception e) {
+            log.error("공유된 제출 목록 조회 중 예외 발생", e);
             throw new CustomBusinessException(AlgoErrorCode.SUBMISSION_NOT_FOUND);
         }
     }

@@ -102,4 +102,12 @@ public interface AlgorithmSubmissionMapper {
             @Param("submissionId") Long submissionId,
             @Param("isShared") Boolean isShared
     );
+
+    /**
+     * 문제별 공개된 제출 총 개수
+     * @param problemId 문제 ID
+     * @return 총 개수
+     */
+    int countPublicSubmissionsByProblemId(@Param("problemId") Long problemId);
+
 }

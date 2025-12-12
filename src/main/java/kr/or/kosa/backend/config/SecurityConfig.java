@@ -47,6 +47,7 @@ public class SecurityConfig {
                                 "/oauth2/**",
                                 "/users/**",
                                 "/email/**",
+                                "/algo/missions/**",
                                 "/algo/**",
                                 "/admin/**",
                                 "/codeAnalysis/**",

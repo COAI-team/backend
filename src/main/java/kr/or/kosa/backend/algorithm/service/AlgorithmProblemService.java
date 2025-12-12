@@ -29,10 +29,9 @@ public class AlgorithmProblemService {
     private final AlgorithmProblemMapper algorithmProblemMapper;
     private final ProblemValidationLogMapper validationLogMapper;
 
-
     /**
      * 전체 문제 수 조회
-     * 
+     *
      * @return 전체 문제 개수
      */
     public int getTotalProblemsCount() {
@@ -51,16 +50,16 @@ public class AlgorithmProblemService {
     }
 
     /**
-    * 문제 목록 조회 (필터 포함)
-    * @param offset     시작 위치
-    * @param limit      조회 개수
-    * @param difficulty 난이도 필터 (nullable)
-    * @param source     출처 필터 (nullable)
-    * @param keyword    검색어 (nullable)
-    * @param topic      주제 필터 (nullable)
-    * @param problemType 문제 유형 필터 (nullable)
-    * @return 문제 목록
-    */
+     * 문제 목록 조회 (필터 포함)
+     * @param offset     시작 위치
+     * @param limit      조회 개수
+     * @param difficulty 난이도 필터 (nullable)
+     * @param source     출처 필터 (nullable)
+     * @param keyword    검색어 (nullable)
+     * @param topic      주제 필터 (nullable)
+     * @param problemType 문제 유형 필터 (nullable)
+     * @return 문제 목록
+     */
     public List<AlgoProblemDto> getProblemsWithFilter(int offset, int limit, String difficulty, String source,
                                                       String keyword, String topic, String problemType) {
         log.debug("문제 목록 조회 (필터) - offset: {}, limit: {}, difficulty: {}, source: {}, keyword: {}, topic: {}, problemType: {}",
@@ -80,83 +79,105 @@ public class AlgorithmProblemService {
         }
     }
 
+
+//     문제 목록 조회 (V2 - 통계 포함 제거할 예정
+//     @param request 문제 목록 조회 요청 DTO
+//     @return 문제 목록 및 페이징 정보
+//
+//    public Map<String, Object> getProblemListWithStats(ProblemListRequestDto request) {
+//        log.debug("문제 목록 조회 (V2) - request: {}", request);
+//
+//        try {
+//            // 문제 목록 조회
+//            List<AlgoProblemDto> problems = getProblemsWithFilter(
+//                    request.getOffset(),
+//                    request.getLimit(),
+//                    request.getDifficulty(),
+//                    request.getSource(),
+//                    request.getKeyword(),
+//                    request.getTopic(),
+//                    request.getProblemType()
+//            );
+//
+//            // 전체 개수 조회
+//            int totalCount = getTotalProblemsCountWithFilter(
+//                    request.getDifficulty(),
+//                    request.getSource(),
+//                    request.getKeyword(),
+//                    request.getTopic(),
+//                    request.getProblemType(),
+//                    null,
+//                    null
+//            );
+//
+//            // 페이징 정보 계산
+//            int totalPages = (int) Math.ceil((double) totalCount / request.getLimit());
+//
+//            // 응답 데이터 구성
+//            Map<String, Object> responseData = new HashMap<>();
+//            responseData.put("problems", problems);
+//            responseData.put("totalCount", totalCount);
+//            responseData.put("currentPage", request.getPage());
+//            responseData.put("pageSize", request.getLimit());
+//            responseData.put("totalPages", totalPages);
+//            responseData.put("hasNext", request.getPage() < totalPages);
+//            responseData.put("hasPrevious", request.getPage() > 1);
+//
+//            log.debug("문제 목록 조회 완료 - totalCount: {}, problems: {}", totalCount, problems.size());
+//
+//            return responseData;
+//
+//        } catch (Exception e) {
+//            log.error("문제 목록 조회 실패 (V2)", e);
+//            throw new RuntimeException("문제 목록 조회 중 오류가 발생했습니다.", e);
+//        }
+//    }
+
     /**
-     * 전체 문제 수 조회 (필터 포함)
-     *
-     * @param difficulty 난이도 필터 (nullable)
-     * @param source     출처 필터 (nullable)
-     * @param keyword    검색어 (nullable)
-     * @param topic      주제 필터 (nullable)
-     * @param problemType 문제 유형 필터 (nullable)
-     * @return 필터링된 문제 개수
+     * 사용자 풀이 상태 포함 문제 목록 조회
      */
-    public int getTotalProblemsCountWithFilter(String difficulty, String source, String keyword, String topic, String problemType) {
-        log.debug("전체 문제 수 조회 (필터) - difficulty: {}, source: {}, keyword: {}, topic: {}, problemType: {}",
-                difficulty, source, keyword, topic, problemType);
+    public List<Map<String, Object>> getProblemsWithUserStatus(
+            Long userId, int offset, int limit, String difficulty,
+            String source, String keyword, String topic, String problemType, String solved) {
+
+        log.debug("문제 목록 조회 (풀이 상태 포함) - userId: {}, offset: {}, limit: {}, solved: {}",
+                userId, offset, limit, solved);
 
         try {
-            int count = algorithmProblemMapper.countProblemsWithFilter(difficulty, source, keyword, problemType);
+            List<Map<String, Object>> problems = algorithmProblemMapper.selectProblemsWithUserStatus(
+                    userId, difficulty, topic, offset, limit, solved);
+
+            log.debug("문제 목록 조회 완료 - 조회된 문제 수: {}", problems.size());
+
+            return problems;
+
+        } catch (Exception e) {
+            log.error("문제 목록 조회 실패", e);
+            throw new RuntimeException("문제 목록 조회 중 오류가 발생했습니다.", e);
+        }
+    }
+
+    /**
+     * 전체 문제 수 조회 (필터 포함)
+     */
+    public int getTotalProblemsCountWithFilter(String difficulty, String source,
+                                               String keyword, String topic, String problemType,
+                                               Long userId, String solved) {
+
+        log.debug("전체 문제 수 조회 (필터) - difficulty: {}, userId: {}, solved: {}",
+                difficulty, userId, solved);
+
+        try {
+            int count = algorithmProblemMapper.countProblemsWithFilter(
+                    difficulty, source, keyword, problemType, userId, solved);
+
             log.debug("전체 문제 수 조회 완료 - count: {}", count);
 
             return count;
 
         } catch (Exception e) {
-            log.error("전체 문제 수 조회 실패 (필터) - difficulty: {}, source: {}, keyword: {}, topic: {}, problemType: {}",
-                    difficulty, source, keyword, topic, problemType, e);
+            log.error("전체 문제 수 조회 실패 (필터)", e);
             throw new RuntimeException("전체 문제 수 조회 중 오류가 발생했습니다.", e);
-        }
-    }
-
-    /**
-     * 문제 목록 조회 (V2 - 통계 포함)
-     *
-     * @param request 문제 목록 조회 요청 DTO
-     * @return 문제 목록 및 페이징 정보
-     */
-    public Map<String, Object> getProblemListWithStats(ProblemListRequestDto request) {
-        log.debug("문제 목록 조회 (V2) - request: {}", request);
-
-        try {
-            // 문제 목록 조회
-            List<AlgoProblemDto> problems = getProblemsWithFilter(
-                    request.getOffset(),
-                    request.getLimit(),
-                    request.getDifficulty(),
-                    request.getSource(),
-                    request.getKeyword(),
-                    request.getTopic(),
-                    request.getProblemType()  // problemType 추가
-            );
-
-            // 전체 개수 조회
-            int totalCount = getTotalProblemsCountWithFilter(
-                    request.getDifficulty(),
-                    request.getSource(),
-                    request.getKeyword(),
-                    request.getTopic(),
-                    request.getProblemType()  // problemType 추가
-            );
-
-            // 페이징 정보 계산
-            int totalPages = (int) Math.ceil((double) totalCount / request.getLimit());
-
-            // 응답 데이터 구성
-            Map<String, Object> responseData = new HashMap<>();
-            responseData.put("problems", problems);
-            responseData.put("totalCount", totalCount);
-            responseData.put("currentPage", request.getPage());
-            responseData.put("pageSize", request.getLimit());
-            responseData.put("totalPages", totalPages);
-            responseData.put("hasNext", request.getPage() < totalPages);
-            responseData.put("hasPrevious", request.getPage() > 1);
-
-            log.debug("문제 목록 조회 완료 - totalCount: {}, problems: {}", totalCount, problems.size());
-
-            return responseData;
-
-        } catch (Exception e) {
-            log.error("문제 목록 조회 실패 (V2)", e);
-            throw new RuntimeException("문제 목록 조회 중 오류가 발생했습니다.", e);
         }
     }
 
@@ -177,9 +198,9 @@ public class AlgorithmProblemService {
             // 현재는 기본값 반환 (merge 충돌 해결을 위한 임시 구현)
             return ProblemStatisticsResponseDto.builder()
                     .totalProblems(totalProblems)
-                    .solvedProblems(0)      // TODO: 사용자별 해결 문제 수 조회
-                    .averageAccuracy(0.0)   // TODO: 평균 정답률 계산
-                    .totalAttempts(0)       // TODO: 총 응시자 수 조회
+                    .solvedProblems(0)
+                    .averageAccuracy(0.0)
+                    .totalAttempts(0)
                     .build();
 
         } catch (Exception e) {
@@ -235,7 +256,7 @@ public class AlgorithmProblemService {
 
     /**
      * 문제 존재 여부 확인
-     * 
+     *
      * @param problemId 문제 ID
      * @return 존재 여부
      */
@@ -260,7 +281,7 @@ public class AlgorithmProblemService {
 
     /**
      * 페이지 번호 검증
-     * 
+     *
      * @param page 페이지 번호 (1부터 시작)
      * @param size 페이지 크기
      * @return 검증된 페이지 번호
@@ -285,7 +306,7 @@ public class AlgorithmProblemService {
 
     /**
      * 페이지 크기 검증
-     * 
+     *
      * @param size 페이지 크기
      * @return 검증된 페이지 크기
      */
@@ -306,7 +327,7 @@ public class AlgorithmProblemService {
     // ===== AI 생성 문제 저장 메서드 =====
     /**
      * AI 생성 문제를 DB에 저장
-     * 
+     *
      * @param responseDto AI 생성 결과
      * @param userId      생성자 ID (null 가능)
      * @return 저장된 문제 ID
@@ -318,7 +339,7 @@ public class AlgorithmProblemService {
 
             // 1. 문제 엔티티 준비
             AlgoProblemDto problem = responseDto.getProblem();
-            problem.setAlgoCreater(userId); // 생성자 ID 설정
+            problem.setAlgoCreater(userId);
 
             // 2. 문제 저장 (AUTO_INCREMENT로 ID 자동 생성)
             int insertResult = algorithmProblemMapper.insertProblem(problem);
@@ -463,7 +484,7 @@ public class AlgorithmProblemService {
                     .similarityScore(similarityScore)
                     .similarityValid(similarityValid)
                     .validationStatus(validationStatus)
-                    .correctionAttempts(0)  // 저장 시점에서는 수정 시도 전
+                    .correctionAttempts(0)
                     .failureReasons(failureReasons)
                     .createdAt(LocalDateTime.now())
                     .completedAt(LocalDateTime.now())
@@ -481,7 +502,6 @@ public class AlgorithmProblemService {
 
         } catch (Exception e) {
             log.error("검증 로그 저장 중 오류 발생 - problemId: {}", problemId, e);
-            // 검증 로그 저장 실패가 전체 프로세스를 중단하지 않도록 예외를 던지지 않음
         }
     }
 
