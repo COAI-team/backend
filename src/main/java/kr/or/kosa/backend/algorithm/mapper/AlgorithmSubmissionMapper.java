@@ -102,4 +102,15 @@ public interface AlgorithmSubmissionMapper {
             @Param("submissionId") Long submissionId,
             @Param("isShared") Boolean isShared
     );
+
+    /**
+     * GitHub 커밋 URL 업데이트
+     * @param submissionId 제출 ID
+     * @param githubCommitUrl GitHub 커밋 URL
+     * @return 영향받은 행 수
+     */
+    int updateGithubCommitUrl(
+            @Param("submissionId") Long submissionId,
+            @Param("githubCommitUrl") String githubCommitUrl
+    );
 }

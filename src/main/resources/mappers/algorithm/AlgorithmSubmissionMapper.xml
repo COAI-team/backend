@@ -6,6 +6,7 @@
     <!-- Result Map 정의 -->
     <!-- 변경사항: focusScore, focusSessionId, eyetracked 제거 / solveMode, monitoringSessionId 추가 -->
     <!-- 변경사항 (2025-12-13): language (VARCHAR) → languageId (INT) -->
+    <!-- 변경사항 (2025-12-13): githubCommitRequested, githubCommitStatus → githubCommitUrl -->
     <resultMap id="algoSubmissionResultMap" type="kr.or.kosa.backend.algorithm.dto.AlgoSubmissionDto">
         <id property="algosubmissionId" column="ALGOSUBMISSION_ID"/>
         <result property="algoProblemId" column="ALGO_PROBLEM_ID"/>
@@ -29,8 +30,7 @@
         <result property="startSolving" column="STARTSOLVING"/>
         <result property="endSolving" column="ENDSOLVING"/>
         <result property="solvingDurationSeconds" column="SOLVING_DURATION_SECONDS"/>
-        <result property="githubCommitRequested" column="GITHUB_COMMIT_REQUESTED"/>
-        <result property="githubCommitStatus" column="GITHUB_COMMIT_STATUS"/>
+        <result property="githubCommitUrl" column="GITHUB_COMMIT_URL"/>
         <result property="isShared" column="IS_SHARED"/>
         <result property="submittedAt" column="SUBMITTED_AT"/>
     </resultMap>
@@ -38,6 +38,7 @@
     <!-- 제출 저장 -->
     <!-- 변경사항: focusScore, focusSessionId, eyetracked 제거 / solveMode, monitoringSessionId 추가 -->
     <!-- 변경사항 (2025-12-13): LANGUAGE → LANGUAGE_ID -->
+    <!-- 변경사항 (2025-12-13): GITHUB_COMMIT_REQUESTED, GITHUB_COMMIT_STATUS → GITHUB_COMMIT_URL -->
     <insert id="insertSubmission" parameterType="kr.or.kosa.backend.algorithm.dto.AlgoSubmissionDto"
             useGeneratedKeys="true" keyProperty="algosubmissionId">
         INSERT INTO ALGO_SUBMISSIONS (
@@ -45,14 +46,14 @@
         PASSED_TEST_COUNT, TOTAL_TEST_COUNT, AI_FEEDBACK, AI_FEEDBACK_STATUS, AI_FEEDBACK_TYPE,
         JUDGE_RESULT, SOLVE_MODE, MONITORING_SESSION_ID, AI_SCORE, TIME_EFFICIENCY_SCORE, FINAL_SCORE,
         SCORE_WEIGHTS, STARTSOLVING, ENDSOLVING,
-        SOLVING_DURATION_SECONDS, GITHUB_COMMIT_REQUESTED, GITHUB_COMMIT_STATUS,
+        SOLVING_DURATION_SECONDS, GITHUB_COMMIT_URL,
         IS_SHARED, SUBMITTED_AT
         ) VALUES (
         #{algoProblemId}, #{userId}, #{sourceCode}, #{languageId}, #{executionTime}, #{memoryUsage},
         #{passedTestCount}, #{totalTestCount}, #{aiFeedback}, #{aiFeedbackStatus}, #{aiFeedbackType},
         #{judgeResult}, #{solveMode}, #{monitoringSessionId}, #{aiScore}, #{timeEfficiencyScore}, #{finalScore},
         #{scoreWeights}, #{startSolving}, #{endSolving},
-        #{solvingDurationSeconds}, #{githubCommitRequested}, #{githubCommitStatus},
+        #{solvingDurationSeconds}, #{githubCommitUrl},
         #{isShared}, NOW()
         )
     </insert>
@@ -60,6 +61,7 @@
     <!-- 제출 ID로 조회 -->
     <!-- 변경사항: focusScore, focusSessionId, eyetracked 제거 / solveMode, monitoringSessionId 추가 -->
     <!-- 변경사항 (2025-12-13): LANGUAGE → LANGUAGE_ID -->
+    <!-- 변경사항 (2025-12-13): GITHUB_COMMIT_REQUESTED, GITHUB_COMMIT_STATUS → GITHUB_COMMIT_URL -->
     <select id="selectSubmissionById" resultMap="algoSubmissionResultMap">
         SELECT
         s.ALGOSUBMISSION_ID,
@@ -84,8 +86,7 @@
         s.STARTSOLVING,
         s.ENDSOLVING,
         s.SOLVING_DURATION_SECONDS,
-        s.GITHUB_COMMIT_REQUESTED,
-        s.GITHUB_COMMIT_STATUS,
+        s.GITHUB_COMMIT_URL,
         s.SUBMITTED_AT,
         s.IS_SHARED
         FROM ALGO_SUBMISSIONS s
@@ -167,6 +168,13 @@
     <update id="updateSharingStatus">
         UPDATE ALGO_SUBMISSIONS SET
         IS_SHARED = #{isShared}
+        WHERE ALGOSUBMISSION_ID = #{submissionId}
+    </update>
+
+    <!-- GitHub 커밋 URL 업데이트 (2025-12-13) -->
+    <update id="updateGithubCommitUrl">
+        UPDATE ALGO_SUBMISSIONS SET
+        GITHUB_COMMIT_URL = #{githubCommitUrl}
         WHERE ALGOSUBMISSION_ID = #{submissionId}
     </update>
 

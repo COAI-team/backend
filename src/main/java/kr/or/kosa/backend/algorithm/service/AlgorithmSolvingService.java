@@ -6,7 +6,6 @@ import kr.or.kosa.backend.algorithm.dto.AlgoTestcaseDto;
 import kr.or.kosa.backend.algorithm.dto.LanguageDto;
 import kr.or.kosa.backend.algorithm.dto.enums.AiFeedbackStatus;
 import kr.or.kosa.backend.algorithm.dto.enums.AiFeedbackType;
-import kr.or.kosa.backend.algorithm.dto.enums.GithubCommitStatus;
 import kr.or.kosa.backend.algorithm.dto.enums.JudgeResult;
 import kr.or.kosa.backend.algorithm.dto.enums.LanguageType;
 import kr.or.kosa.backend.algorithm.dto.enums.ProblemType;
@@ -313,8 +312,8 @@ public class AlgorithmSolvingService {
                 // 풀이 모드 및 모니터링 세션 (focusSessionId, eyetracked 제거됨)
                 .solveMode(request.getSolveMode() != null ? request.getSolveMode() : SolveMode.BASIC)
                 .monitoringSessionId(request.getMonitoringSessionId())
-                .githubCommitRequested(request.getRequestGithubCommit() != null && request.getRequestGithubCommit())
-                .githubCommitStatus(GithubCommitStatus.NONE)
+                // GitHub 커밋 URL은 커밋 시 저장됨 (초기값 null)
+                .githubCommitUrl(null)
                 .isShared(false)
                 .submittedAt(now)
                 .build();
