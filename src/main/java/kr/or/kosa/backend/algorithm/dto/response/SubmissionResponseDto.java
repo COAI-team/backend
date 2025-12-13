@@ -69,6 +69,9 @@ public class SubmissionResponseDto {
     // 공유 설정
     private Boolean isShared;
 
+    // GitHub 커밋 URL (NULL: 미커밋, 값: 커밋완료)
+    private String githubCommitUrl;
+
     // 제출 시각
     private LocalDateTime submittedAt;
 

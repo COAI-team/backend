@@ -395,6 +395,7 @@ public class AlgorithmSolvingService {
                 .solvingDurationSeconds(submission.getSolvingDurationSeconds())
                 .solvingDurationMinutes(submission.getSolvingDurationMinutes())
                 .isShared(submission.getIsShared())
+                .githubCommitUrl(submission.getGithubCommitUrl())
                 .submittedAt(submission.getSubmittedAt())
                 .build();
     }
