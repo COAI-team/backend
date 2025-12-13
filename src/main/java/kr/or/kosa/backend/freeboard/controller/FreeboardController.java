@@ -22,7 +22,7 @@ public class FreeboardController {
 
     private final FreeboardService freeboardService;
 
-    // 게시글 목록 조회 (검색/정렬 포함) - PathVariable보다 먼저 선언
+    // 게시글 목록 조회 (검색/정렬 포함)
     @GetMapping
     public ResponseEntity<ApiResponse<PageResponse<FreeboardListResponseDto>>> getList(
             @RequestParam(defaultValue = "1") int page,
@@ -48,7 +48,7 @@ public class FreeboardController {
         return ResponseEntity.ok(ApiResponse.success(Map.of("freeboardId", freeboardId)));
     }
 
-    // 게시글 상세 조회 - PathVariable은 나중에 선언
+    // 게시글 상세 조회
     @GetMapping("/{freeboardId}")
     public ResponseEntity<ApiResponse<FreeboardDetailResponseDto>> get(
             @PathVariable Long freeboardId,

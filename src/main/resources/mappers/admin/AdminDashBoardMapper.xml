@@ -28,7 +28,7 @@
     </select>
 
     <select id="todayPaymentSummary" resultType="kr.or.kosa.backend.admin.dto.TodayPaymentSummaryDto">
-        select count(*)               as today_payment_count,
+        select count(*) as today_payment_count,
                IFNULL(sum(amount), 0) as today_total_pay
         from payments
         where DATE (approved_at) = CURDATE()
@@ -36,12 +36,14 @@
 
     <select id="paymentSummary" resultType="kr.or.kosa.backend.admin.dto.PaymentSummaryDto">
         SELECT
-            YEAR (approved_at) AS year, MONTH (approved_at) AS month, COUNT (*) AS paymentCount, IFNULL(SUM (amount), 0) AS total_pay
+        YEAR(approved_at) AS year,
+        MONTH(approved_at) AS month,
+        COUNT(*) AS paymentCount,
+        IFNULL(SUM(amount), 0) AS total_pay
         FROM payments
         WHERE status = 'DONE'
-        GROUP BY YEAR (approved_at), MONTH (approved_at)
-        WITH ROLLUP
-        ORDER BY YEAR (approved_at), MONTH (approved_at)
+        GROUP BY YEAR(approved_at), MONTH(approved_at) WITH ROLLUP
+        ORDER BY YEAR(approved_at), MONTH(approved_at)
     </select>
 
     <select id="languageRanking" resultType="kr.or.kosa.backend.admin.dto.LanguageRankingDto">
@@ -79,6 +81,5 @@
         ORDER BY board_count DESC
         LIMIT 5
     </select>
-
 </mapper>
 

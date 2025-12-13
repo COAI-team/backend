@@ -19,6 +19,8 @@ import kr.or.kosa.backend.algorithm.mapper.AlgorithmProblemMapper;
 import kr.or.kosa.backend.algorithm.mapper.AlgorithmSubmissionMapper;
 import kr.or.kosa.backend.algorithm.mapper.MonitoringMapper;
 import kr.or.kosa.backend.algorithm.dto.MonitoringSessionDto;
+import kr.or.kosa.backend.commons.pagination.PageRequest;
+import kr.or.kosa.backend.commons.pagination.PageResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -95,17 +97,6 @@ public class AlgorithmSolvingService {
                         .build())
                 .collect(Collectors.toList());
 
-        // 6. 문제 통계 조회
-        java.util.Map<String, Object> statistics = problemMapper.selectProblemStatistics(problemId);
-        Integer totalAttempts = 0;
-        Integer successCount = 0;
-        if (statistics != null) {
-            Object ta = statistics.get("totalAttempts");
-            Object sc = statistics.get("successCount");
-            totalAttempts = ta != null ? ((Number) ta).intValue() : 0;
-            successCount = sc != null ? ((Number) sc).intValue() : 0;
-        }
-
         return ProblemSolveResponseDto.builder()
                 .problemId(problem.getAlgoProblemId())
                 .title(problem.getAlgoProblemTitle())
@@ -113,8 +104,6 @@ public class AlgorithmSolvingService {
                 .difficulty(problem.getAlgoProblemDifficulty().name())
                 .timeLimit(problem.getTimelimit())
                 .memoryLimit(problem.getMemorylimit())
-                .totalAttempts(totalAttempts)
-                .successCount(successCount)
                 .problemType(problemType != null ? problemType.name() : "ALGORITHM")
                 .initScript(problem.getInitScript())
                 .availableLanguages(availableLanguages)
@@ -246,6 +235,38 @@ public class AlgorithmSolvingService {
 
         AlgoProblemDto problem = problemMapper.selectProblemById(submission.getAlgoProblemId());
         return convertToSubmissionResponse(submission, problem, null);
+    }
+
+    /**
+     * 문제별 공유된 제출 목록 조회 (다른 사람의 풀이)
+     */
+    @Transactional(readOnly = true)
+    public PageResponse<SubmissionResponseDto> getSharedSubmissions(Long problemId, int page, int size) {
+        log.info("공유된 제출 목록 조회 - problemId: {}, page: {}, size: {}", problemId, page, size);
+
+        // 1. 페이지 요청 객체 생성
+        PageRequest pageRequest = new PageRequest(page, size);
+
+        // 2. 총 개수 조회
+        int totalCount = submissionMapper.countPublicSubmissionsByProblemId(problemId);
+
+        // 3. 제출 목록 조회
+        List<AlgoSubmissionDto> submissions = submissionMapper.selectPublicSubmissionsByProblemId(
+                problemId,
+                pageRequest.getOffset(),
+                pageRequest.getSize()
+        );
+
+        // 4. DTO 변환
+        List<SubmissionResponseDto> content = submissions.stream()
+                .map(submission -> {
+                    AlgoProblemDto problem = problemMapper.selectProblemById(submission.getAlgoProblemId());
+                    return convertToSubmissionResponse(submission, problem, null);
+                })
+                .collect(Collectors.toList());
+
+        // 5. PageResponse 반환
+        return new PageResponse<>(content, pageRequest, totalCount);
     }
 
     /**

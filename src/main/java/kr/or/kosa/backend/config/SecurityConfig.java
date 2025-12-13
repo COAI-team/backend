@@ -45,11 +45,9 @@ public class SecurityConfig {
                                 "/",
                                 "/auth/github/**",
                                 "/oauth2/**",
-                                "/users/register",
-                                "/users/login",
-                                "/users/github/link",
-                                "/users/password/**",
+                                "/users/**",
                                 "/email/**",
+                                "/algo/missions/**",
                                 "/algo/**",
                                 "/github/**",
                                 "/admin/**",
@@ -58,7 +56,8 @@ public class SecurityConfig {
                                 "/api/**",            // 임시추가
                                 "/analysis/**",       // 임시추가
                                 "/api/analysis/**",
-                                "/chat/messages"
+                                "/chat/messages",
+                                "/ws/**"
                         ).permitAll()
                         .requestMatchers(HttpMethod.GET,
                                 "/freeboard/**",
@@ -93,7 +92,7 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of("http://localhost:5173"));
+        configuration.setAllowedOrigins(List.of("https://localhost:5173", "http://localhost:5173"));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);

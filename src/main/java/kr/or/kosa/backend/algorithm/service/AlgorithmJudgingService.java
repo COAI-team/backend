@@ -13,10 +13,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Duration;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -35,9 +37,10 @@ public class AlgorithmJudgingService {
 
     private final AlgorithmSubmissionMapper submissionMapper;
     private final AlgorithmProblemMapper problemMapper;
-    private final CodeExecutorService codeExecutorService;  // Judge0 또는 Piston 선택
+    private final CodeExecutorService codeExecutorService;
     private final AlgorithmEvaluationService evaluationService;
     private final LanguageService languageService;  // 언어 정보 조회 (DB 기반)
+    private final DailyQuizBonusService dailyQuizBonusService;
 
     /**
      * 통합 채점 및 평가 프로세스 (비동기)
@@ -72,12 +75,21 @@ public class AlgorithmJudgingService {
             TestRunResponseDto judgeResult = judgeFuture.get();
 
             // 4. Judge 결과만으로 기본 제출 정보 업데이트
-            updateSubmissionWithJudgeResult(submissionId, judgeResult, request);
+            AlgoSubmissionDto updatedSubmission = updateSubmissionWithJudgeResult(submissionId, judgeResult, request);
 
             log.info("Judge0 채점 완료 - submissionId: {}, result: {}",
                     submissionId, judgeResult.getOverallResult());
 
-            // 5. AI 평가 및 점수 계산 비동기 시작 (분리된 서비스)
+            // 5. Daily Quiz 보너스 처리
+            if (updatedSubmission != null && updatedSubmission.getJudgeResult() == JudgeResult.AC) {
+                dailyQuizBonusService.handleDailyQuizSolved(
+                        updatedSubmission.getUserId(),
+                        updatedSubmission.getAlgoProblemId(),
+                        LocalDate.now()
+                );
+            }
+
+            // 6. AI 평가 및 점수 계산 비동기 시작 (분리된 서비스)
             log.info("🤖 AI 평가 서비스 호출 시작 - submissionId: {}, 현재 스레드: {}",
                     submissionId, Thread.currentThread().getName());
             try {
@@ -85,7 +97,7 @@ public class AlgorithmJudgingService {
                 log.info("✅ AI 평가 서비스 호출 완료 - submissionId: {}", submissionId);
             } catch (Exception aiEx) {
                 log.error("❌ AI 평가 서비스 호출 실패 - submissionId: {}", submissionId, aiEx);
-                throw aiEx; // 상위 catch 블록에서 처리하도록 재던짐
+                throw aiEx;
             }
 
         } catch (Exception e) {
@@ -97,11 +109,11 @@ public class AlgorithmJudgingService {
     /**
      * Judge 결과로만 제출 업데이트 (기본 점수)
      */
-    private void updateSubmissionWithJudgeResult(Long submissionId, TestRunResponseDto judgeResult,
-                                                 SubmissionRequestDto request) {
+    private AlgoSubmissionDto updateSubmissionWithJudgeResult(Long submissionId, TestRunResponseDto judgeResult,
+                                                              SubmissionRequestDto request) {
         AlgoSubmissionDto submission = submissionMapper.selectSubmissionById(submissionId);
         if (submission == null)
-            return;
+            return null;
 
         // Judge 결과 설정
         submission.setJudgeResult(JudgeResult.valueOf(judgeResult.getOverallResult()));
@@ -122,8 +134,9 @@ public class AlgorithmJudgingService {
         // 기본 점수 계산 (Judge 결과만으로)
         BigDecimal basicScore = calculateBasicScore(judgeResult);
         submission.setFinalScore(basicScore);
-
+        // DB 업데이트
         submissionMapper.updateSubmission(submission);
+        return submission;
     }
 
     /**
