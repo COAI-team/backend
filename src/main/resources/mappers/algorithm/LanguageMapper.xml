@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!--
+    LANGUAGES 테이블 Mapper XML
+    변경사항 (2025-12-13):
+    - LANGUAGE_CONSTANTS → LANGUAGES 테이블 리팩토링
+    - LANGUAGE_ID (INT, Judge0 API ID)를 Primary Key로 사용
+    - PISTON_LANGUAGE 컬럼 추가
+-->
+<mapper namespace="kr.or.kosa.backend.algorithm.mapper.LanguageMapper">
+
+    <!-- ResultMap: Language 매핑 -->
+    <resultMap id="LanguageResultMap" type="kr.or.kosa.backend.algorithm.dto.LanguageDto">
+        <id property="languageId" column="LANGUAGE_ID"/>
+        <result property="languageName" column="LANGUAGE_NAME"/>
+        <result property="pistonLanguage" column="PISTON_LANGUAGE"/>
+        <result property="languageType" column="LANGUAGE_TYPE"
+                javaType="kr.or.kosa.backend.algorithm.dto.enums.LanguageType"/>
+        <result property="timeFactor" column="TIME_FACTOR"/>
+        <result property="timeAddition" column="TIME_ADDITION"/>
+        <result property="memoryFactor" column="MEMORY_FACTOR"/>
+        <result property="memoryAddition" column="MEMORY_ADDITION"/>
+    </resultMap>
+
+    <!-- 공통 SELECT 컬럼 -->
+    <sql id="selectColumns">
+        LANGUAGE_ID,
+        LANGUAGE_NAME,
+        PISTON_LANGUAGE,
+        LANGUAGE_TYPE,
+        TIME_FACTOR,
+        TIME_ADDITION,
+        MEMORY_FACTOR,
+        MEMORY_ADDITION
+    </sql>
+
+    <!-- 전체 언어 조회 (캐싱용) -->
+    <select id="selectAll" resultMap="LanguageResultMap">
+        SELECT
+        <include refid="selectColumns"/>
+        FROM LANGUAGES
+        ORDER BY LANGUAGE_NAME
+    </select>
+
+    <!-- 언어 ID로 조회 (Judge0 API ID) -->
+    <select id="selectById" resultMap="LanguageResultMap">
+        SELECT
+        <include refid="selectColumns"/>
+        FROM LANGUAGES
+        WHERE LANGUAGE_ID = #{languageId}
+    </select>
+
+    <!-- 언어명으로 조회 -->
+    <select id="selectByName" resultMap="LanguageResultMap">
+        SELECT
+        <include refid="selectColumns"/>
+        FROM LANGUAGES
+        WHERE LANGUAGE_NAME = #{languageName}
+    </select>
+
+    <!-- Piston 언어명으로 조회 -->
+    <select id="selectByPistonLanguage" resultMap="LanguageResultMap">
+        SELECT
+        <include refid="selectColumns"/>
+        FROM LANGUAGES
+        WHERE PISTON_LANGUAGE = #{pistonLanguage}
+    </select>
+
+    <!-- 언어 유형별 조회 -->
+    <select id="selectByType" resultMap="LanguageResultMap">
+        SELECT
+        <include refid="selectColumns"/>
+        FROM LANGUAGES
+        WHERE LANGUAGE_TYPE = #{languageType}
+        ORDER BY LANGUAGE_NAME
+    </select>
+
+    <!-- 언어 삽입 -->
+    <insert id="insert">
+        INSERT INTO LANGUAGES (
+            LANGUAGE_ID,
+            LANGUAGE_NAME,
+            PISTON_LANGUAGE,
+            LANGUAGE_TYPE,
+            TIME_FACTOR,
+            TIME_ADDITION,
+            MEMORY_FACTOR,
+            MEMORY_ADDITION
+        ) VALUES (
+            #{languageId},
+            #{languageName},
+            #{pistonLanguage},
+            #{languageType},
+            #{timeFactor},
+            #{timeAddition},
+            #{memoryFactor},
+            #{memoryAddition}
+        )
+    </insert>
+
+    <!-- 언어 업데이트 -->
+    <update id="update">
+        UPDATE LANGUAGES
+        SET LANGUAGE_NAME = #{languageName},
+            PISTON_LANGUAGE = #{pistonLanguage},
+            LANGUAGE_TYPE = #{languageType},
+            TIME_FACTOR = #{timeFactor},
+            TIME_ADDITION = #{timeAddition},
+            MEMORY_FACTOR = #{memoryFactor},
+            MEMORY_ADDITION = #{memoryAddition}
+        WHERE LANGUAGE_ID = #{languageId}
+    </update>
+
+    <!-- 언어 삭제 -->
+    <delete id="deleteById">
+        DELETE FROM LANGUAGES
+        WHERE LANGUAGE_ID = #{languageId}
+    </delete>
+
+</mapper>

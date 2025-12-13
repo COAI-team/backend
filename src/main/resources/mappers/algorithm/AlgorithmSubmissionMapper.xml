@@ -5,12 +5,13 @@
 
     <!-- Result Map 정의 -->
     <!-- 변경사항: focusScore, focusSessionId, eyetracked 제거 / solveMode, monitoringSessionId 추가 -->
+    <!-- 변경사항 (2025-12-13): language (VARCHAR) → languageId (INT) -->
     <resultMap id="algoSubmissionResultMap" type="kr.or.kosa.backend.algorithm.dto.AlgoSubmissionDto">
         <id property="algosubmissionId" column="ALGOSUBMISSION_ID"/>
         <result property="algoProblemId" column="ALGO_PROBLEM_ID"/>
         <result property="userId" column="USER_ID"/>
         <result property="sourceCode" column="SOURCE_CODE"/>
-        <result property="language" column="LANGUAGE"/>
+        <result property="languageId" column="LANGUAGE_ID"/>
         <result property="judgeResult" column="JUDGE_RESULT"/>
         <result property="executionTime" column="EXECUTION_TIME"/>
         <result property="memoryUsage" column="MEMORY_USAGE"/>
@@ -36,17 +37,18 @@
 
     <!-- 제출 저장 -->
     <!-- 변경사항: focusScore, focusSessionId, eyetracked 제거 / solveMode, monitoringSessionId 추가 -->
+    <!-- 변경사항 (2025-12-13): LANGUAGE → LANGUAGE_ID -->
     <insert id="insertSubmission" parameterType="kr.or.kosa.backend.algorithm.dto.AlgoSubmissionDto"
             useGeneratedKeys="true" keyProperty="algosubmissionId">
         INSERT INTO ALGO_SUBMISSIONS (
-        ALGO_PROBLEM_ID, USER_ID, SOURCE_CODE, LANGUAGE, EXECUTION_TIME, MEMORY_USAGE,
+        ALGO_PROBLEM_ID, USER_ID, SOURCE_CODE, LANGUAGE_ID, EXECUTION_TIME, MEMORY_USAGE,
         PASSED_TEST_COUNT, TOTAL_TEST_COUNT, AI_FEEDBACK, AI_FEEDBACK_STATUS, AI_FEEDBACK_TYPE,
         JUDGE_RESULT, SOLVE_MODE, MONITORING_SESSION_ID, AI_SCORE, TIME_EFFICIENCY_SCORE, FINAL_SCORE,
         SCORE_WEIGHTS, STARTSOLVING, ENDSOLVING,
         SOLVING_DURATION_SECONDS, GITHUB_COMMIT_REQUESTED, GITHUB_COMMIT_STATUS,
         IS_SHARED, SUBMITTED_AT
         ) VALUES (
-        #{algoProblemId}, #{userId}, #{sourceCode}, #{language}, #{executionTime}, #{memoryUsage},
+        #{algoProblemId}, #{userId}, #{sourceCode}, #{languageId}, #{executionTime}, #{memoryUsage},
         #{passedTestCount}, #{totalTestCount}, #{aiFeedback}, #{aiFeedbackStatus}, #{aiFeedbackType},
         #{judgeResult}, #{solveMode}, #{monitoringSessionId}, #{aiScore}, #{timeEfficiencyScore}, #{finalScore},
         #{scoreWeights}, #{startSolving}, #{endSolving},
@@ -57,13 +59,14 @@
 
     <!-- 제출 ID로 조회 -->
     <!-- 변경사항: focusScore, focusSessionId, eyetracked 제거 / solveMode, monitoringSessionId 추가 -->
+    <!-- 변경사항 (2025-12-13): LANGUAGE → LANGUAGE_ID -->
     <select id="selectSubmissionById" resultMap="algoSubmissionResultMap">
         SELECT
         s.ALGOSUBMISSION_ID,
         s.ALGO_PROBLEM_ID,
         s.USER_ID,
         s.SOURCE_CODE,
-        s.LANGUAGE,
+        s.LANGUAGE_ID,
         s.EXECUTION_TIME,
         s.MEMORY_USAGE,
         s.PASSED_TEST_COUNT,
