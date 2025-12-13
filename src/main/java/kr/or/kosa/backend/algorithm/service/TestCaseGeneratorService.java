@@ -1,6 +1,7 @@
 package kr.or.kosa.backend.algorithm.service;
 
 import kr.or.kosa.backend.algorithm.dto.AlgoTestcaseDto;
+import kr.or.kosa.backend.algorithm.dto.LanguageDto;
 import kr.or.kosa.backend.algorithm.dto.response.TestRunResponseDto;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,6 +30,7 @@ import java.util.concurrent.TimeUnit;
 public class TestCaseGeneratorService {
 
     private final CodeExecutorService codeExecutorService;
+    private final LanguageService languageService;  // 언어 정보 조회
 
     @Value("${algorithm.testcase.epsilon:1e-9}")
     private double epsilon;
@@ -41,25 +43,36 @@ public class TestCaseGeneratorService {
      *
      * @param optimalCode  최적 솔루션 코드
      * @param naiveCode    비효율적 솔루션 코드 (교차 검증용, nullable)
-     * @param language     프로그래밍 언어
+     * @param languageName 프로그래밍 언어명 (예: "Python 3", "Java 17")
      * @param testCases    입력 데이터만 있는 테스트케이스 목록
      * @return 출력 데이터가 채워진 테스트케이스 목록
+     *
+     * 변경사항 (2025-12-13): languageName → languageId 변환 후 CodeExecutorService 호출
      */
     public TestCaseGenerationResult generateOutputs(
             String optimalCode,
             String naiveCode,
-            String language,
+            String languageName,
             List<AlgoTestcaseDto> testCases) {
 
-        log.info("Code-First 테스트케이스 생성 시작 - {} 케이스, language: {}", testCases.size(), language);
+        log.info("Code-First 테스트케이스 생성 시작 - {} 케이스, language: {}", testCases.size(), languageName);
 
         List<AlgoTestcaseDto> generatedTestCases = new ArrayList<>();
         List<String> warnings = new ArrayList<>();
         int successCount = 0;
         int crossValidationFailCount = 0;
 
+        // 언어명 → languageId 변환
+        LanguageDto language = languageService.getByName(languageName);
+        if (language == null) {
+            log.error("지원하지 않는 프로그래밍 언어: {}", languageName);
+            warnings.add("지원하지 않는 프로그래밍 언어: " + languageName);
+            return new TestCaseGenerationResult(generatedTestCases, 0, 0, warnings);
+        }
+        Integer languageId = language.getLanguageId();
+
         // 1. optimalCode로 모든 테스트케이스 실행하여 출력 생성
-        TestRunResponseDto optimalResults = executeCode(optimalCode, language, testCases);
+        TestRunResponseDto optimalResults = executeCode(optimalCode, languageId, testCases);
 
         if (optimalResults == null) {
             log.error("optimalCode 실행 실패 - 전체 실행 오류");
@@ -70,7 +83,7 @@ public class TestCaseGeneratorService {
         // 2. naiveCode 교차 검증 (있는 경우)
         TestRunResponseDto naiveResults = null;
         if (naiveCode != null && !naiveCode.isBlank()) {
-            naiveResults = executeCode(naiveCode, language, testCases);
+            naiveResults = executeCode(naiveCode, languageId, testCases);
             if (naiveResults == null) {
                 log.debug("naiveCode 실행 실패 (시간 초과 가능성)");
             }
@@ -165,8 +178,12 @@ public class TestCaseGeneratorService {
     /**
      * 코드 실행 (judgeCode 활용)
      * 더미 expectedOutput으로 실행하여 actualOutput 추출
+     *
+     * @param code       실행할 코드
+     * @param languageId 언어 ID (LANGUAGES.LANGUAGE_ID)
+     * @param testCases  테스트케이스 목록
      */
-    private TestRunResponseDto executeCode(String code, String language, List<AlgoTestcaseDto> testCases) {
+    private TestRunResponseDto executeCode(String code, Integer languageId, List<AlgoTestcaseDto> testCases) {
         try {
             // 더미 expectedOutput을 설정한 테스트케이스 생성
             List<AlgoTestcaseDto> testCasesWithDummy = testCases.stream()
@@ -178,7 +195,7 @@ public class TestCaseGeneratorService {
                     .toList();
 
             CompletableFuture<TestRunResponseDto> future = codeExecutorService.judgeCode(
-                    code, language, testCasesWithDummy, (int) timeoutMs, 256 * 1024);
+                    code, languageId, testCasesWithDummy, (int) timeoutMs, 256 * 1024);
 
             return future.get(timeoutMs + 5000, TimeUnit.MILLISECONDS);
 

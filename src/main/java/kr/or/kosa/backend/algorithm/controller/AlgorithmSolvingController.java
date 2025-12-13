@@ -95,7 +95,7 @@ public class AlgorithmSolvingController {
         Long userId = extractUserId(authentication);
 
         log.info("코드 제출 요청 - problemId: {}, userId: {}, language: {}",
-                request.getProblemId(), userId, request.getLanguage());
+                request.getProblemId(), userId, request.getLanguageId());
 
         try {
             SubmissionResponseDto response =
@@ -132,7 +132,7 @@ public class AlgorithmSolvingController {
         Long userId = extractUserId(authentication);
 
         log.info("샘플 테스트 실행 요청 - problemId: {}, language: {}, userId: {}",
-                request.getProblemId(), request.getLanguage(), userId);
+                request.getProblemId(), request.getLanguageId(), userId);
 
         try {
             TestRunResponseDto response = solvingService.runSampleTest(request);

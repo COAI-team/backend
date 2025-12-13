@@ -10,6 +10,11 @@ import java.util.List;
 
 /**
  * 제출 결과 응답 DTO
+ *
+ * 변경사항 (2025-12-13):
+ * - language (String) → languageId (INT) + languageName (String)
+ * - languageId: LANGUAGES.LANGUAGE_ID (Judge0 API ID)
+ * - languageName: 표시용 언어 이름 (예: "Python 3", "Java 17")
  */
 @Getter
 @Builder
@@ -24,7 +29,8 @@ public class SubmissionResponseDto {
     private String difficulty;         // 난이도 (BRONZE, SILVER, GOLD, PLATINUM)
     private Integer timeLimit;         // 시간 제한 (ms)
     private Integer memoryLimit;       // 메모리 제한 (MB)
-    private String language; // DB 언어명 (예: "Python 3", "Java 17")
+    private Integer languageId;        // 언어 ID (LANGUAGES.LANGUAGE_ID, Judge0 API ID)
+    private String languageName;       // 표시용 언어명 (예: "Python 3", "Java 17")
     private String sourceCode;
 
     // 채점 결과
