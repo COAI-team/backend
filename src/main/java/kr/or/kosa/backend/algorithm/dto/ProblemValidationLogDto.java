@@ -2,8 +2,9 @@ package kr.or.kosa.backend.algorithm.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.time.LocalDateTime;
 
@@ -12,7 +13,8 @@ import java.time.LocalDateTime;
  * LLM이 생성한 문제의 품질 검증 결과를 저장
  * 개발자 검토용 (사용자에게 노출되지 않음)
  */
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
