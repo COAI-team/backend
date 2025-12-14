@@ -64,17 +64,24 @@ CREATE TABLE `ALGO_PROBLEMS` (
     INDEX `idx_problem_type` (`PROBLEM_TYPE`)
 ) ENGINE = InnoDB AUTO_INCREMENT = 1 DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '알고리즘 문제';
 -- =============================================
--- 2. 언어별 상수 테이블 (언어 유형 추가)
+-- 2. 언어 테이블 (Judge0 ID를 PK로 사용)
 -- =============================================
-CREATE TABLE `LANGUAGE_CONSTANTS` (
-    `LANGUAGE_NAME` VARCHAR(50) PRIMARY KEY COMMENT '언어명',
+-- 변경 사유:
+-- 1. 보안 강화: FK 제약으로 유효한 언어만 제출 가능
+-- 2. 코드 단순화: Judge0 ID를 PK로 사용하여 매핑 로직 제거
+-- 3. Piston 지원: PISTON_LANGUAGE 컬럼으로 Piston API 호환
+CREATE TABLE `LANGUAGES` (
+    `LANGUAGE_ID` INT PRIMARY KEY COMMENT 'Judge0 language_id (PK)',
+    `LANGUAGE_NAME` VARCHAR(50) NOT NULL UNIQUE COMMENT '표시용 언어명',
+    `PISTON_LANGUAGE` VARCHAR(30) NULL COMMENT 'Piston API용 언어명',
     `LANGUAGE_TYPE` ENUM('GENERAL', 'DB') DEFAULT 'GENERAL' NOT NULL COMMENT '언어 유형',
     `TIME_FACTOR` DECIMAL(3, 1) DEFAULT 1.0 COMMENT '시간 제한 배수',
     `TIME_ADDITION` INT DEFAULT 0 COMMENT '시간 제한 추가(ms)',
     `MEMORY_FACTOR` DECIMAL(3, 1) DEFAULT 1.0 COMMENT '메모리 제한 배수',
     `MEMORY_ADDITION` INT DEFAULT 0 COMMENT '메모리 제한 추가(MB)',
-    INDEX `idx_language_type` (`LANGUAGE_TYPE`)
-) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '언어별 채점 상수';
+    INDEX `idx_language_type` (`LANGUAGE_TYPE`),
+    INDEX `idx_language_name` (`LANGUAGE_NAME`)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '언어별 채점 상수 (Judge0 ID 기반)';
 -- =============================================
 -- 3. 알고리즘 테스트케이스 테이블
 -- =============================================
@@ -102,7 +109,7 @@ CREATE TABLE `ALGO_SUBMISSIONS` (
     `ALGO_PROBLEM_ID` BIGINT NOT NULL COMMENT '문제 고유 식별자',
     `USER_ID` BIGINT NOT NULL COMMENT '제출자 ID',
     `SOURCE_CODE` TEXT NOT NULL COMMENT '제출한 소스코드',
-    `LANGUAGE` VARCHAR(50) NOT NULL COMMENT '제출 언어',
+    `LANGUAGE_ID` INT NOT NULL COMMENT '제출 언어 ID (LANGUAGES.LANGUAGE_ID FK)',
     `EXECUTION_TIME` INT NULL COMMENT '실행 시간(ms)',
     `MEMORY_USAGE` INT NULL COMMENT '메모리 사용량(MB)',
     `PASSED_TEST_COUNT` INT DEFAULT 0 COMMENT '통과한 테스트케이스 수',
@@ -125,20 +132,21 @@ CREATE TABLE `ALGO_SUBMISSIONS` (
     `STARTSOLVING` TIMESTAMP NULL COMMENT '문제 풀이 시작 시각',
     `ENDSOLVING` TIMESTAMP NULL COMMENT '문제 풀이 종료 시각',
     `SOLVING_DURATION_SECONDS` INT NULL COMMENT '총 풀이 소요 시간(초)',
-    `GITHUB_COMMIT_REQUESTED` TINYINT(1) DEFAULT 0 COMMENT 'GitHub 자동 커밋 요청 여부',
-    `GITHUB_COMMIT_STATUS` ENUM('NONE', 'PENDING', 'COMPLETED', 'FAILED') DEFAULT 'NONE' COMMENT 'GitHub 커밋 진행 상태',
+    `GITHUB_COMMIT_URL` VARCHAR(500) NULL COMMENT 'GitHub 커밋 URL (NULL: 미커밋, 값: 커밋완료)',
     `SUBMITTED_AT` TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '제출 시각',
     `IS_SHARED` TINYINT(1) DEFAULT 0 COMMENT '게시글로 공유 여부',
     -- 외래키
     FOREIGN KEY (`ALGO_PROBLEM_ID`) REFERENCES `ALGO_PROBLEMS`(`ALGO_PROBLEM_ID`) ON DELETE CASCADE,
     FOREIGN KEY (`USER_ID`) REFERENCES `USERS`(`USER_ID`) ON DELETE CASCADE,
+    FOREIGN KEY (`LANGUAGE_ID`) REFERENCES `LANGUAGES`(`LANGUAGE_ID`),
     -- 인덱스
     INDEX `idx_user_problem` (`USER_ID`, `ALGO_PROBLEM_ID`),
     INDEX `idx_final_score` (`FINAL_SCORE` DESC),
     INDEX `idx_submitted_at` (`SUBMITTED_AT` DESC),
     INDEX `idx_monitoring_session` (`MONITORING_SESSION_ID`),
     INDEX `idx_judge_result` (`JUDGE_RESULT`),
-    INDEX `idx_solve_mode` (`SOLVE_MODE`)
+    INDEX `idx_solve_mode` (`SOLVE_MODE`),
+    INDEX `idx_language_id` (`LANGUAGE_ID`)
 ) ENGINE = InnoDB AUTO_INCREMENT = 1000 DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '알고리즘 제출 기록';
 
 -- 사용자별 AC 문제 조회용 복합 인덱스
@@ -188,28 +196,26 @@ CREATE TABLE `MONITORING_SESSIONS` (
     INDEX `idx_submission` (`ALGOSUBMISSION_ID`)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '집중 모드 모니터링 세션';
 -- =============================================
--- 6. GitHub 커밋 테이블
+-- 6. 사용자 GitHub 자동커밋 설정 테이블
 -- =============================================
-CREATE TABLE `GITHUB_COMMITS` (
-    `COMMIT_ID` BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '커밋 고유 식별자',
-    `ALGOSUBMISSION_ID` BIGINT NOT NULL COMMENT '연결된 제출 ID',
-    `USER_ID` BIGINT NOT NULL COMMENT '사용자 ID',
-    `GITHUB_USERNAME` VARCHAR(100) NOT NULL COMMENT 'GitHub 사용자명',
-    `REPOSITORY_NAME` VARCHAR(100) NOT NULL COMMENT '리포지토리명',
-    `BRANCH_NAME` VARCHAR(100) DEFAULT 'main' COMMENT '브랜치명',
-    `INCLUDE_AI_FEEDBACK` TINYINT(1) DEFAULT 1 COMMENT 'AI 피드백 포함 여부',
-    `CUSTOM_COMMIT_MESSAGE` TEXT NULL COMMENT '사용자 지정 커밋 메시지',
-    `COMMIT_STATUS` ENUM('PENDING', 'COMPLETED', 'FAILED') DEFAULT 'PENDING' COMMENT '커밋 진행 상태',
-    `COMMIT_URL` VARCHAR(500) NULL COMMENT 'GitHub 커밋 URL',
-    `REQUESTED_AT` TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '커밋 요청 시각',
-    `COMPLETED_AT` TIMESTAMP NULL COMMENT '커밋 완료 시각',
-    `ERROR_MESSAGE` TEXT NULL COMMENT '커밋 실패 시 에러 메시지',
-    FOREIGN KEY (`ALGOSUBMISSION_ID`) REFERENCES `ALGO_SUBMISSIONS`(`ALGOSUBMISSION_ID`) ON DELETE CASCADE,
-    FOREIGN KEY (`USER_ID`) REFERENCES `USERS`(`USER_ID`) ON DELETE CASCADE,
-    INDEX `idx_submission` (`ALGOSUBMISSION_ID`),
-    INDEX `idx_user_status` (`USER_ID`, `COMMIT_STATUS`),
-    INDEX `idx_requested_at` (`REQUESTED_AT` DESC)
-) ENGINE = InnoDB AUTO_INCREMENT = 1 DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = 'GitHub 자동 커밋';
+-- 설계 근거:
+-- 1. USERS 테이블 수정 최소화 (Single Responsibility)
+-- 2. 1:1 관계로 사용자별 설정 관리
+-- 3. 커밋 이력은 GitHub 자체가 Single Source of Truth
+CREATE TABLE `USER_GITHUB_SETTINGS` (
+    `SETTING_ID` BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '설정 고유 식별자',
+    `USER_ID` BIGINT NOT NULL UNIQUE COMMENT '사용자 ID (1:1 관계)',
+    `GITHUB_REPO_NAME` VARCHAR(255) NULL COMMENT '연동된 저장소명 (예: coai-solutions)',
+    `GITHUB_REPO_URL` VARCHAR(500) NULL COMMENT '저장소 전체 URL',
+    `AUTO_COMMIT_ENABLED` TINYINT(1) DEFAULT 0 NOT NULL COMMENT '자동 커밋 활성화 여부',
+    `CREATED_AT` DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL COMMENT '생성 일시',
+    `UPDATED_AT` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '수정 일시',
+    -- 외래키
+    CONSTRAINT `FK_GITHUB_SETTINGS_USER`
+        FOREIGN KEY (`USER_ID`) REFERENCES `USERS`(`USER_ID`) ON DELETE CASCADE,
+    -- 인덱스
+    INDEX `idx_auto_commit` (`AUTO_COMMIT_ENABLED`)
+) ENGINE = InnoDB AUTO_INCREMENT = 1 DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '사용자 GitHub 자동커밋 설정';
 -- =============================================
 -- (삭제됨) 부정행위 로그 테이블
 -- =============================================
@@ -225,42 +231,24 @@ CREATE TABLE `GITHUB_COMMITS` (
 ALTER TABLE `ALGO_PROBLEMS` AUTO_INCREMENT = 1;
 ALTER TABLE `ALGO_TESTCASES` AUTO_INCREMENT = 1;
 ALTER TABLE `ALGO_SUBMISSIONS` AUTO_INCREMENT = 1000;
-ALTER TABLE `GITHUB_COMMITS` AUTO_INCREMENT = 1;
+ALTER TABLE `USER_GITHUB_SETTINGS` AUTO_INCREMENT = 1;
 -- =============================================
--- 언어별 상수 데이터 삽입 (제공된 표 반영 + LANGUAGE_TYPE)
+-- 언어 데이터 삽입 (Judge0 ID 기반 + Piston 지원)
 -- =============================================
-INSERT INTO LANGUAGE_CONSTANTS (LANGUAGE_NAME, LANGUAGE_TYPE, TIME_FACTOR, TIME_ADDITION, MEMORY_FACTOR, MEMORY_ADDITION) VALUES
-('C++17', 'GENERAL', 1.0, 0, 1.0, 0), ('C11', 'GENERAL', 1.0, 0, 1.0, 0), ('C99', 'GENERAL', 1.0, 0, 1.0, 0), ('C++98', 'GENERAL', 1.0, 0, 1.0, 0),
-('C++11', 'GENERAL', 1.0, 0, 1.0, 0), ('C++14', 'GENERAL', 1.0, 0, 1.0, 0), ('C++20', 'GENERAL', 1.0, 0, 1.0, 0), ('C++23', 'GENERAL', 1.0, 0, 1.0, 0),
-('C++26', 'GENERAL', 1.0, 0, 1.0, 0), ('C (Clang)', 'GENERAL', 1.0, 0, 1.0, 0), ('C++ (Clang)', 'GENERAL', 1.0, 0, 1.0, 0), ('C17', 'GENERAL', 1.0, 0, 1.0, 0),
-('C23', 'GENERAL', 1.0, 0, 1.0, 0), ('C90', 'GENERAL', 1.0, 0, 1.0, 0), ('C2x', 'GENERAL', 1.0, 0, 1.0, 0), ('C90 (Clang)', 'GENERAL', 1.0, 0, 1.0, 0),
-('C2x (Clang)', 'GENERAL', 1.0, 0, 1.0, 0),
-('Java 8', 'GENERAL', 2.0, 1000, 2.0, 16), ('Java 8 (OpenJDK)', 'GENERAL', 2.0, 1000, 2.0, 16), ('Java 11', 'GENERAL', 2.0, 1000, 2.0, 16),
-('Java 15', 'GENERAL', 2.0, 1000, 2.0, 16), ('Java (JDK 17)', 'GENERAL', 2.0, 1000, 2.0, 16), ('Java (JDK 21)', 'GENERAL', 2.0, 1000, 2.0, 16),
-('Java 17', 'GENERAL', 2.0, 1000, 2.0, 16), ('Java 21', 'GENERAL', 2.0, 1000, 2.0, 16), ('Java 19', 'GENERAL', 2.0, 1000, 2.0, 16),
-('Python 3', 'GENERAL', 3.0, 2000, 2.0, 32), ('PyPy3', 'GENERAL', 3.0, 2000, 2.0, 128), ('Python 2', 'GENERAL', 3.0, 2000, 2.0, 32),
-('PyPy2', 'GENERAL', 3.0, 2000, 2.0, 128),
-('Ruby', 'GENERAL', 2.0, 1000, 1.0, 512), ('Kotlin (JVM)', 'GENERAL', 2.0, 1000, 2.0, 16), ('Kotlin (Native)', 'GENERAL', 1.0, 0, 1.0, 16),
-('Swift', 'GENERAL', 1.0, 0, 1.0, 512), ('Swift (Apple)', 'GENERAL', 1.0, 0, 1.0, 512), ('Text', 'GENERAL', 1.0, 0, 1.0, 0),
-('C#', 'GENERAL', 2.0, 1000, 2.0, 16), ('node.js', 'GENERAL', 3.0, 2000, 2.0, 2), ('Go', 'GENERAL', 1.0, 2000, 1.0, 512),
-('Go (gccgo)', 'GENERAL', 1.0, 0, 1.0, 0), ('D', 'GENERAL', 1.0, 0, 1.0, 16), ('D (LDC)', 'GENERAL', 1.0, 0, 1.0, 16),
-('F# (Mono)', 'GENERAL', 3.0, 2000, 2.0, 32), ('Pascal', 'GENERAL', 1.0, 0, 1.0, 64), ('Haskell', 'GENERAL', 2.0, 1000, 1.0, 16),
-('Rust 2018', 'GENERAL', 1.0, 0, 1.0, 0), ('Rust 2021', 'GENERAL', 1.0, 0, 1.0, 0), ('Rust', 'GENERAL', 1.0, 0, 1.0, 0),
-('Lua', 'GENERAL', 1.0, 2000, 1.0, 64), ('Perl', 'GENERAL', 3.0, 2000, 2.0, 16), ('PHP', 'GENERAL', 3.0, 2000, 2.0, 16),
-('Clojure', 'GENERAL', 2.0, 1000, 2.0, 16), ('Fortran', 'GENERAL', 1.0, 0, 1.0, 0), ('Scheme (Chicken)', 'GENERAL', 3.0, 2000, 2.0, 32),
-('Scheme (Racket)', 'GENERAL', 3.0, 2000, 2.0, 16), ('Assembly (32bit)', 'GENERAL', 1.0, 0, 1.0, 0), ('Assembly (64bit)', 'GENERAL', 1.0, 0, 1.0, 0),
-('Objective-C', 'GENERAL', 1.0, 0, 1.0, 0), ('Objective-C++', 'GENERAL', 1.0, 0, 1.0, 0), ('아희 (Aheui)', 'GENERAL', 1.0, 2000, 1.0, 64),
-('아희 (Aheui) (Bok-sil)', 'GENERAL', 1.0, 2000, 1.0, 64), ('아희 (Aheui) (C)', 'GENERAL', 1.0, 1000, 1.0, 0), ('Golfscript', 'GENERAL', 1.0, 2000, 1.0, 64),
-('Brainf**k', 'GENERAL', 1.0, 1000, 1.0, 0), ('Whitespace', 'GENERAL', 1.0, 0, 1.0, 0), ('Tcl', 'GENERAL', 1.0, 2000, 1.0, 512),
-('Rhino', 'GENERAL', 2.0, 1000, 2.0, 16), ('Cobol', 'GENERAL', 1.0, 0, 1.0, 0), ('Pike', 'GENERAL', 3.0, 2000, 2.0, 16),
-('Sed', 'GENERAL', 1.0, 2000, 1.0, 64), ('Bash', 'GENERAL', 1.0, 2000, 1.0, 64), ('Ada', 'GENERAL', 1.0, 0, 1.0, 0),
-('AWK', 'GENERAL', 1.0, 2000, 1.0, 64), ('OCaml', 'GENERAL', 1.0, 0, 1.0, 64), ('Perl 6', 'GENERAL', 3.0, 2000, 2.0, 16),
-('Vim', 'GENERAL', 1.0, 2000, 1.0, 64), ('Haxe', 'GENERAL', 2.0, 1000, 2.0, 16), ('Nim', 'GENERAL', 1.0, 0, 1.0, 16),
-('Algol 68', 'GENERAL', 1.0, 0, 1.0, 0), ('Befunge', 'GENERAL', 1.0, 0, 1.0, 32), ('Ceylon', 'GENERAL', 2.0, 1000, 2.0, 16),
-('Pony', 'GENERAL', 1.0, 0, 1.0, 0), ('Nemerle', 'GENERAL', 1.0, 5000, 1.0, 512), ('Cobra', 'GENERAL', 2.0, 1000, 2.0, 16),
-('Nimrod', 'GENERAL', 1.0, 0, 1.0, 0), ('Pascal (FPC)', 'GENERAL', 1.0, 0, 1.0, 64), ('TypeScript', 'GENERAL', 3.0, 2000, 2.0, 2),
-('Visual Basic', 'GENERAL', 2.0, 1000, 2.0, 16), ('MonoDevelop C#', 'GENERAL', 2.0, 1000, 2.0, 16), ('F# (.NET)', 'GENERAL', 2.0, 1000, 2.0, 16),
-('MySQL', 'DB', 1.0, 0, 1.0, 0), ('PostgreSQL', 'DB', 1.0, 0, 1.0, 0), ('SQLite', 'DB', 1.0, 0, 1.0, 0);
+-- LANGUAGE_ID = Judge0 API language_id
+-- PISTON_LANGUAGE = Piston API용 언어명
+INSERT INTO LANGUAGES (LANGUAGE_ID, LANGUAGE_NAME, PISTON_LANGUAGE, LANGUAGE_TYPE, TIME_FACTOR, TIME_ADDITION, MEMORY_FACTOR, MEMORY_ADDITION) VALUES
+(100, 'Python', 'python', 'GENERAL', 3.0, 2000, 2.0, 32),
+(93, 'JavaScript', 'javascript', 'GENERAL', 3.0, 2000, 2.0, 2),
+(91, 'Java', 'java', 'GENERAL', 2.0, 1000, 2.0, 16),
+(51, 'C#', 'csharp.net', 'GENERAL', 2.0, 1000, 2.0, 16),
+(105, 'C++', 'c++', 'GENERAL', 1.0, 0, 1.0, 0),
+(106, 'Go', 'go', 'GENERAL', 1.0, 2000, 1.0, 512),
+(94, 'TypeScript', 'typescript', 'GENERAL', 3.0, 2000, 2.0, 2),
+(111, 'Kotlin', 'kotlin', 'GENERAL', 2.0, 1000, 2.0, 16),
+(83, 'Swift', 'swift', 'GENERAL', 1.0, 0, 1.0, 512),
+(108, 'Rust', 'rust', 'GENERAL', 1.0, 0, 1.0, 0),
+(82, 'SQLite', 'sqlite3', 'DB', 1.0, 0, 1.0, 0);
 -- =============================================
 -- 샘플 데이터 삽입 (문제)
 -- =============================================

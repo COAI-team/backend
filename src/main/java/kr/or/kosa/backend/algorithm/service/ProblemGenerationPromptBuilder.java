@@ -6,6 +6,7 @@ import org.springframework.ai.document.Document;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 알고리즘 문제 생성 프롬프트 빌더
@@ -14,6 +15,18 @@ import java.util.List;
 @Slf4j
 @Component
 public class ProblemGenerationPromptBuilder {
+
+    /**
+     * 사용 가능한 스토리 테마 목록
+     * 프론트엔드에서 선택 가능한 테마들
+     */
+    public static final Map<String, String> STORY_THEMES = Map.of(
+            "SPACE", "우주 탐사대 - 우주선, 행성, 위성 탐사 미션. 예: 탐사선이 N개의 행성을 방문하려 한다...",
+            "GAME", "게임 개발자 - RPG 게임 밸런싱, 아이템 조합, 스킬 시스템. 예: 마법사의 스킬 조합에서 최대 데미지를...",
+            "FINANCE", "금융 분석가 - 주식 거래, 투자 포트폴리오 최적화. 예: N일간의 주가 데이터에서 최대 이익을...",
+            "COOKING", "요리 대회 - 레시피 최적화, 재료 조합, 요리 점수 계산. 예: K가지 재료로 만들 수 있는 요리의...",
+            "FESTIVAL", "음악 페스티벌 - 공연 스케줄링, 무대 배치, 관객 동선. 예: N개의 밴드가 M개의 무대에서..."
+    );
 
     /**
      * 시스템 프롬프트 생성
@@ -55,10 +68,25 @@ public class ProblemGenerationPromptBuilder {
                 4. Optimal 코드는 시간 제한 내 통과해야 합니다.
                 5. Naive 코드는 큰 입력에서 시간초과가 발생해야 합니다.
 
+                ## 언어 규칙 (필수)
+                - **모든 문제 제목, 설명, 제약조건, 입출력 형식은 반드시 한국어로 작성하세요.**
+                - 영어로 작성하면 안 됩니다. 한국어만 사용하세요.
+                - 코드(optimalCode, naiveCode)와 tags는 예외적으로 영어 사용 가능합니다.
+
+                ## 캐릭터/인물명 규칙
+                - 문제에 등장하는 캐릭터나 인물명은 가능한 **"코아이"**를 사용하세요.
+                - 예시: "코아이는 N개의 돌을 가지고 있다", "탐험가 코아이가 섬을 탐험한다"
+                - 여러 캐릭터가 필요한 경우: 모아이, 코아이, 돌이, 석이 등 변형 사용 가능
+
                 ## 금지 사항
                 - 상표권이 있는 캐릭터/브랜드명 사용 금지 (예: 마리오, 포켓몬, 디즈니 캐릭터 등)
                 - 기존 유명 문제와 동일한 스토리 금지
                 - 불명확하거나 애매한 제약 조건 금지
+                - **문제 설명에 알고리즘 힌트나 풀이 방향을 절대 암시하지 마세요.**
+                  - 금지 예시: "이 문제는 DP로 풀 수 있습니다", "그리디하게 접근하면..."
+                  - 금지 예시: "최적 부분 구조를 이용하여...", "분할 정복으로..."
+                  - 문제 설명은 순수하게 상황과 요구사항만 서술해야 합니다.
+                  - 문제에 알고리즘 토픽, 주제는 절대 포함하지 마세요.
 
                 ## 응답 형식
                 반드시 유효한 JSON으로만 응답하세요. 다른 텍스트는 절대 포함하지 마세요.
@@ -112,10 +140,13 @@ public class ProblemGenerationPromptBuilder {
         }
 
         if (request.getAdditionalRequirements() != null && !request.getAdditionalRequirements().isBlank()) {
-            sb.append(String.format("- 스토리 테마: %s\n", request.getAdditionalRequirements()));
+            String themeKey = request.getAdditionalRequirements().toUpperCase();
+            String themeDescription = STORY_THEMES.getOrDefault(themeKey, request.getAdditionalRequirements());
+            sb.append(String.format("- 스토리 테마: %s\n", themeDescription));
+            sb.append("  **테마에 맞는 스토리텔링을 문제 설명에 반드시 적용하세요.**\n");
         }
 
-        // 3. JSON 응답 형식
+        // 3. JSON 응답 형식 (Code-First 방식: 입력만 생성, 출력은 코드 실행으로 생성)
         sb.append("""
 
                 **응답 형식 (JSON):**
@@ -130,11 +161,11 @@ public class ProblemGenerationPromptBuilder {
                   "memoryLimit": 256,
                   "expectedTimeComplexity": "O(n log n)",
                   "testCases": [
-                    {"input": "5\\n1 3 5 7 9", "output": "YES", "isSample": true, "description": "기본 케이스"},
-                    {"input": "3\\n10 20 30", "output": "NO", "isSample": true, "description": "다른 케이스"},
-                    {"input": "10\\n1 2 3 4 5 6 7 8 9 10", "output": "55", "isSample": false, "description": "경계값 테스트"},
-                    {"input": "1\\n1000000000", "output": "1000000000", "isSample": false, "description": "코너 케이스"},
-                    {"input": "100\\n1 2 3 ... 100", "output": "5050", "isSample": false, "description": "큰 입력 테스트"}
+                    {"input": "5\\n1 3 5 7 9", "isSample": true, "description": "기본 케이스"},
+                    {"input": "3\\n10 20 30", "isSample": true, "description": "음수 포함 케이스"},
+                    {"input": "1\\n0", "isSample": false, "description": "최소 입력 (경계값)"},
+                    {"input": "10\\n1000000000 -1000000000 0 0 0 0 0 0 0 0", "isSample": false, "description": "최대값/최소값 경계"},
+                    {"input": "100\\n1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100", "isSample": false, "description": "큰 입력 테스트"}
                   ],
                   "optimalCode": "Python 최적 풀이 코드 (전체 코드)",
                   "naiveCode": "Python 비효율적 풀이 코드 (시간 초과 발생해야 함)",
@@ -149,8 +180,17 @@ public class ProblemGenerationPromptBuilder {
                 - 코드는 반드시 실행 가능해야 합니다. 함수를 정의했다면 마지막에 반드시 호출하세요!
                 - 올바른 예시: def solve(): ...코드... \\n\\nsolve()  (마지막에 solve() 호출)
                 - 잘못된 예시: def solve(): ...코드...  (함수 정의만 하고 호출 안함)
-                - testCases의 input/output은 실제 프로그램 입출력 형식과 일치해야 합니다.
                 - expectedTimeComplexity도 반드시 포함하세요.
+
+                **테스트케이스 규칙 (Code-First 방식):**
+                - **output 필드는 작성하지 마세요!** 시스템이 optimalCode를 실행하여 자동 생성합니다.
+                - input만 작성하고, 다양한 케이스를 포함해야 합니다.
+                - 반드시 포함해야 하는 케이스 유형:
+                  1. 기본 케이스 (isSample: true, 2-3개)
+                  2. 경계값 테스트: 최소 입력 (N=1 또는 빈 배열)
+                  3. 경계값 테스트: 최대 입력 (제약조건의 상한에 가까운 값)
+                  4. 특수 케이스: 0, 음수, 같은 값 반복 등
+                  5. 스트레스 테스트: 시간복잡도 검증을 위한 큰 입력
 
                 **JSON 형식 필수 규칙:**
                 - 모든 문자열 값은 하나의 연속된 문자열이어야 합니다.
@@ -160,11 +200,11 @@ public class ProblemGenerationPromptBuilder {
                 - 잘못된 예시: "optimalCode": "def solve():" + "\\n    n = int(input())"
 
                 **테스트케이스 데이터 규칙:**
-                - input과 output은 반드시 실제 문자열 데이터로 작성하세요.
+                - input은 반드시 실제 문자열 데이터로 작성하세요.
                 - Python 코드나 표현식 (join, range, for 등)을 절대 사용하지 마세요.
                 - 잘못된 예시: "input": "".join(str(x) for x in range(100))
                 - 올바른 예시: "input": "1 2 3 4 5"
-                - 큰 데이터가 필요한 경우 적당한 크기(10~100개)의 실제 데이터를 작성하세요.
+                - 큰 데이터가 필요한 경우 적당한 크���(10~100개)의 실제 데이터를 작성하세요.
                 - 실제 실행 가능한 구체적인 데이터를 사용하세요.
                 """);
 

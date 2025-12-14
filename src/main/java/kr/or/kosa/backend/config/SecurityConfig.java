@@ -49,6 +49,7 @@ public class SecurityConfig {
                                 "/email/**",
                                 "/algo/missions/**",
                                 "/algo/**",
+                                "/github/**",
                                 "/admin/**",
                                 "/codeAnalysis/**",
                                 "/api/analysis/**",

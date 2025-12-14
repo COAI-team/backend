@@ -17,6 +17,10 @@ import java.util.concurrent.CompletableFuture;
  * Piston API 연동 서비스
  * 로컬 개발 환경에서 Judge0 대신 사용
  * 공개 API: https://emkc.org/api/v2/piston
+ *
+ * 변경사항 (2025-12-13):
+ * - LANGUAGES.PISTON_LANGUAGE를 직접 사용하므로 매핑 로직 제거
+ * - pistonLanguage (String)을 직접 전달받음
  */
 @Service
 @RequiredArgsConstructor
@@ -29,57 +33,30 @@ public class PistonService {
     private Integer timeout;
 
     /**
-     * DB 언어명을 Piston 언어명으로 매핑
-     */
-    private String getPistonLanguage(String dbLanguageName) {
-        if (dbLanguageName == null) {
-            throw new IllegalArgumentException("언어명이 null입니다");
-        }
-
-        return switch (dbLanguageName) {
-            case "Python 3", "PyPy3" -> "python";
-            case "Python 2", "PyPy2" -> "python";
-            case "Java 17", "Java (JDK 17)", "Java 21", "Java (JDK 21)",
-                 "Java 11", "Java 15", "Java 19", "Java 8", "Java 8 (OpenJDK)" -> "java";
-            case "C++11", "C++14", "C++17", "C++20", "C++23", "C++26", "C++98", "C++ (Clang)" -> "c++";
-            case "C11", "C17", "C23", "C90", "C99", "C2x", "C2x (Clang)", "C90 (Clang)", "C (Clang)" -> "c";
-            case "node.js", "Rhino" -> "javascript";
-            case "TypeScript" -> "typescript";
-            case "Kotlin (JVM)", "Kotlin (Native)" -> "kotlin";
-            case "Go", "Go (gccgo)" -> "go";
-            case "Rust", "Rust 2018", "Rust 2021" -> "rust";
-            case "Ruby" -> "ruby";
-            case "C#", "MonoDevelop C#" -> "csharp";
-            case "Swift", "Swift (Apple)" -> "swift";
-            case "PHP" -> "php";
-            case "R" -> "r";
-            case "Scala" -> "scala";
-            case "Bash" -> "bash";
-            case "Lua" -> "lua";
-            case "Perl", "Perl 6" -> "perl";
-            case "Haskell" -> "haskell";
-            case "Clojure" -> "clojure";
-            case "Elixir" -> "elixir";
-            case "Erlang" -> "erlang";
-            default -> throw new IllegalArgumentException("Piston에서 지원하지 않는 언어입니다: " + dbLanguageName);
-        };
-    }
-
-    /**
-     * AlgoTestcaseDto 목록으로 채점 실행 (Judge0Service와 동일한 인터페이스)
+     * AlgoTestcaseDto 목록으로 채점 실행
+     *
+     * @param sourceCode     제출할 소스 코드
+     * @param pistonLanguage Piston API 언어명 (LANGUAGES.PISTON_LANGUAGE)
+     * @param testCases      AlgoTestcaseDto 목록
+     * @param timeLimit      시간 제한 (ms)
+     * @param memoryLimit    메모리 제한 (KB)
+     * @return 채점 결과 (TestRunResponseDto)
      */
     public CompletableFuture<TestRunResponseDto> judgeCode(
             String sourceCode,
-            String dbLanguageName,
+            String pistonLanguage,
             List<AlgoTestcaseDto> testCases,
             Integer timeLimit,
             Integer memoryLimit) {
 
         return CompletableFuture.supplyAsync(() -> {
-            log.info("Piston 채점 시작 - language: {}, testCases: {}", dbLanguageName, testCases.size());
+            log.info("Piston 채점 시작 - pistonLanguage: {}, testCases: {}", pistonLanguage, testCases.size());
+
+            if (pistonLanguage == null || pistonLanguage.isBlank()) {
+                throw new IllegalArgumentException("Piston 언어명이 null 또는 빈 문자열입니다");
+            }
 
             List<TestRunResponseDto.TestCaseResultDto> results = new ArrayList<>();
-            String pistonLanguage = getPistonLanguage(dbLanguageName);
             int passedCount = 0;
             int maxExecutionTime = 0;
             int maxMemoryUsage = 0;

@@ -19,4 +19,9 @@ public class TutorClientMessage {
     private String code;        // Full code snapshot from the client
     private String triggerType; // "AUTO" or "USER"
     private String message;     // Optional user question when triggerType is "USER"
+
+    // Judge meta info
+    private String judgeResult;   // "AC", "WA", "TLE", etc.
+    private Integer passedCount;  // passed test case count
+    private Integer totalCount;   // total test case count
 }

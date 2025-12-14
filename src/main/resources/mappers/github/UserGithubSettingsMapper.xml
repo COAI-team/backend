@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!--
+    사용자 GitHub 자동커밋 설정 매퍼
+    테이블: USER_GITHUB_SETTINGS
+    @since 2025-12-13
+-->
+<mapper namespace="kr.or.kosa.backend.auth.github.mapper.UserGithubSettingsMapper">
+
+    <!-- Result Map 정의 -->
+    <resultMap id="userGithubSettingsResultMap" type="kr.or.kosa.backend.auth.github.dto.UserGithubSettingsDto">
+        <id property="settingId" column="SETTING_ID"/>
+        <result property="userId" column="USER_ID"/>
+        <result property="githubRepoName" column="GITHUB_REPO_NAME"/>
+        <result property="githubRepoUrl" column="GITHUB_REPO_URL"/>
+        <result property="autoCommitEnabled" column="AUTO_COMMIT_ENABLED"/>
+        <result property="createdAt" column="CREATED_AT"/>
+        <result property="updatedAt" column="UPDATED_AT"/>
+    </resultMap>
+
+    <!-- 사용자 ID로 설정 조회 -->
+    <select id="selectByUserId" resultMap="userGithubSettingsResultMap">
+        SELECT
+            SETTING_ID,
+            USER_ID,
+            GITHUB_REPO_NAME,
+            GITHUB_REPO_URL,
+            AUTO_COMMIT_ENABLED,
+            CREATED_AT,
+            UPDATED_AT
+        FROM USER_GITHUB_SETTINGS
+        WHERE USER_ID = #{userId}
+    </select>
+
+    <!-- 설정 저장 -->
+    <insert id="insert" parameterType="kr.or.kosa.backend.auth.github.dto.UserGithubSettingsDto"
+            useGeneratedKeys="true" keyProperty="settingId">
+        INSERT INTO USER_GITHUB_SETTINGS (
+            USER_ID,
+            GITHUB_REPO_NAME,
+            GITHUB_REPO_URL,
+            AUTO_COMMIT_ENABLED,
+            CREATED_AT
+        ) VALUES (
+            #{userId},
+            #{githubRepoName},
+            #{githubRepoUrl},
+            #{autoCommitEnabled},
+            NOW()
+        )
+    </insert>
+
+    <!-- 설정 업데이트 (전체) -->
+    <update id="update" parameterType="kr.or.kosa.backend.auth.github.dto.UserGithubSettingsDto">
+        UPDATE USER_GITHUB_SETTINGS SET
+            GITHUB_REPO_NAME = #{githubRepoName},
+            GITHUB_REPO_URL = #{githubRepoUrl},
+            AUTO_COMMIT_ENABLED = #{autoCommitEnabled}
+        WHERE USER_ID = #{userId}
+    </update>
+
+    <!-- 설정 삭제 -->
+    <delete id="deleteByUserId">
+        DELETE FROM USER_GITHUB_SETTINGS
+        WHERE USER_ID = #{userId}
+    </delete>
+
+    <!-- 자동 커밋 설정만 업데이트 -->
+    <update id="updateAutoCommitEnabled">
+        UPDATE USER_GITHUB_SETTINGS SET
+            AUTO_COMMIT_ENABLED = #{autoCommitEnabled}
+        WHERE USER_ID = #{userId}
+    </update>
+
+    <!-- 저장소 정보만 업데이트 -->
+    <update id="updateRepository">
+        UPDATE USER_GITHUB_SETTINGS SET
+            GITHUB_REPO_NAME = #{githubRepoName},
+            GITHUB_REPO_URL = #{githubRepoUrl}
+        WHERE USER_ID = #{userId}
+    </update>
+
+</mapper>

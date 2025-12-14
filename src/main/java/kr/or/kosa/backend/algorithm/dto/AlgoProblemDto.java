@@ -5,8 +5,9 @@ import kr.or.kosa.backend.algorithm.dto.enums.ProblemSource;
 import kr.or.kosa.backend.algorithm.dto.enums.ProblemType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -15,7 +16,8 @@ import java.util.List;
  * 알고리즘 문제 DTO
  * 데이터베이스 테이블: ALGO_PROBLEMS
  */
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder

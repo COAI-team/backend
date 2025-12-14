@@ -18,8 +18,12 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * Judge0 API 연동 서비스 (ALG-07 관련) - 수정 버전
+ * Judge0 API 연동 서비스 (ALG-07 관련)
  * AlgoTestcaseDto를 입력으로 받고 TestRunResponseDto를 반환
+ *
+ * 변경사항 (2025-12-13):
+ * - LANGUAGES.LANGUAGE_ID가 Judge0 API ID이므로 매핑 로직 제거
+ * - languageId (Integer)를 직접 사용
  */
 @Service
 @RequiredArgsConstructor
@@ -42,165 +46,31 @@ public class Judge0Service {
     private Integer memoryLimit;
 
     /**
-     * DB 언어명을 Judge0 언어 ID로 직접 매핑
-     * LANGUAGE_CONSTANTS 테이블의 LANGUAGE_NAME → Judge0 API language_id
-     * Judge0 공식 문서: https://ce.judge0.com/languages
-     *
-     * @param dbLanguageName DB 언어명 (예: "Python 3", "Java 17", "C++17")
-     * @return Judge0 API language_id
-     */
-    private Integer getJudge0LanguageId(String dbLanguageName) {
-        if (dbLanguageName == null) {
-            throw new IllegalArgumentException("언어명이 null입니다");
-        }
-
-        // DB 언어명 → Judge0 language_id 직접 매핑
-        return switch (dbLanguageName) {
-            // === Assembly ===
-            case "Assembly (32bit)", "Assembly (64bit)" -> 45; // Assembly (NASM 2.14.02)
-
-            // === Bash ===
-            case "Bash" -> 46; // Bash (5.0.0)
-
-            // === C 계열 ===
-            case "C (Clang)" -> 104; // C (Clang 18.1.8)
-            case "C11", "C17", "C23", "C90", "C99", "C2x", "C2x (Clang)", "C90 (Clang)" ->
-                50; // C (GCC 9.2.0) - 기본
-
-            // === C++ 계열 ===
-            case "C++ (Clang)" -> 76; // C++ (Clang 7.0.1)
-            case "C++11", "C++14", "C++17", "C++20", "C++23", "C++26", "C++98" ->
-                54; // C++ (GCC 9.2.0) - 기본
-
-            // === C# ===
-            case "C#", "MonoDevelop C#" -> 51; // C# (Mono 6.6.0.161)
-
-            // === COBOL ===
-            case "Cobol" -> 77; // COBOL (GnuCOBOL 2.2)
-
-            // === Clojure ===
-            case "Clojure" -> 86; // Clojure (1.10.1)
-
-            // === D ===
-            case "D", "D (LDC)" -> 56; // D (DMD 2.089.1)
-
-            // === Elixir ===
-            case "Elixir" -> 57; // Elixir (1.9.4)
-
-            // === Erlang ===
-            case "Erlang" -> 58; // Erlang (OTP 22.2)
-
-            // === F# ===
-            case "F# (.NET)", "F# (Mono)" -> 87; // F# (.NET Core SDK 3.1.202)
-
-            // === Fortran ===
-            case "Fortran" -> 59; // Fortran (GFortran 9.2.0)
-
-            // === Go ===
-            case "Go" -> 107; // Go (1.23.5) - 최신 버전
-            case "Go (gccgo)" -> 60; // Go (1.13.5)
-
-            // === Haskell ===
-            case "Haskell" -> 61; // Haskell (GHC 8.8.1)
-
-            // === Java 계열 ===
-            case "Java (JDK 17)", "Java 17" -> 91; // Java (JDK 17.0.6)
-            case "Java (JDK 21)", "Java 21" -> 91; // Java 21은 17로 대체
-            case "Java 11", "Java 15", "Java 19", "Java 8", "Java 8 (OpenJDK)" ->
-                62; // Java (OpenJDK 13.0.1) - 기본
-
-            // === JavaScript 계열 ===
-            case "node.js" -> 102; // JavaScript (Node.js 22.08.0) - 최신
-            case "Rhino" -> 63; // JavaScript (Node.js 12.14.0)
-            case "TypeScript" -> 101; // TypeScript (5.6.2) - 최신
-
-            // === Kotlin ===
-            case "Kotlin (JVM)", "Kotlin (Native)" -> 111; // Kotlin (2.1.10) - 최신
-
-            // === Lua ===
-            case "Lua" -> 64; // Lua (5.3.5)
-
-            // === Objective-C ===
-            case "Objective-C", "Objective-C++" -> 79; // Objective-C (Clang 7.0.1)
-
-            // === OCaml ===
-            case "OCaml" -> 65; // OCaml (4.09.0)
-
-            // === Pascal ===
-            case "Pascal", "Pascal (FPC)" -> 67; // Pascal (FPC 3.0.4)
-
-            // === Perl ===
-            case "Perl", "Perl 6" -> 85; // Perl (5.28.1)
-
-            // === PHP ===
-            case "PHP" -> 98; // PHP (8.3.11) - 최신
-
-            // === Prolog ===
-            case "Prolog" -> 69; // Prolog (GNU Prolog 1.4.5)
-
-            // === Python 계열 ===
-            case "Python 3" -> 71; // Python (3.8.1) - 안정 버전
-            case "Python 2" -> 70; // Python (2.7.17)
-            case "PyPy3" -> 71; // Python 3 안정 버전으로 대체
-            case "PyPy2" -> 70; // Python 2로 대체
-
-            // === R ===
-            case "R" -> 99; // R (4.4.1) - 최신
-
-            // === Ruby ===
-            case "Ruby" -> 72; // Ruby (2.7.0)
-
-            // === Rust 계열 ===
-            case "Rust", "Rust 2018", "Rust 2021" -> 108; // Rust (1.85.0) - 최신
-
-            // === Scala ===
-            case "Scala" -> 112; // Scala (3.4.2) - 최신
-
-            // === Swift ===
-            case "Swift", "Swift (Apple)" -> 83; // Swift (5.2.3)
-
-            // === SQL ===
-            case "SQLite" -> 82; // SQL (SQLite 3.27.2)
-            case "MySQL", "PostgreSQL" -> 82; // SQLite로 대체 (Judge0에서 MySQL/PostgreSQL 미지원)
-
-            // === 기타 지원되지 않는 언어 ===
-            case "Ada", "Algol 68", "AWK", "Befunge", "Brainf**k", "Ceylon", "Cobra",
-                 "Golfscript", "Haxe", "Nemerle", "Nim", "Nimrod", "Pike", "Pony",
-                 "Scheme (Chicken)", "Scheme (Racket)", "Sed", "Tcl", "Text", "Vim",
-                 "Visual Basic", "Whitespace", "아희 (Aheui)", "아희 (Aheui) (Bok-sil)", "아희 (Aheui) (C)" ->
-                throw new IllegalArgumentException(
-                    "Judge0에서 지원하지 않는 언어입니다: " + dbLanguageName +
-                    ". DB에는 존재하지만 Judge0 API에서는 사용할 수 없습니다.");
-
-            default -> throw new IllegalArgumentException(
-                "알 수 없는 언어입니다: " + dbLanguageName +
-                ". LANGUAGE_CONSTANTS 테이블에 등록된 언어가 아니거나 Judge0 매핑이 누락되었습니다.");
-        };
-    }
-
-    /**
      * AlgoTestcaseDto 목록으로 채점 실행
      *
-     * @param sourceCode      제출할 소스 코드
-     * @param dbLanguageName  DB 언어명 (예: "Python 3", "Java 17")
-     * @param testCases       AlgoTestcaseDto 목록
-     * @param timeLimit       시간 제한 (ms)
-     * @param memoryLimit     메모리 제한 (KB)
+     * @param sourceCode  제출할 소스 코드
+     * @param languageId  언어 ID (LANGUAGES.LANGUAGE_ID = Judge0 API language_id)
+     * @param testCases   AlgoTestcaseDto 목록
+     * @param timeLimit   시간 제한 (ms)
+     * @param memoryLimit 메모리 제한 (KB)
      * @return 채점 결과 (TestRunResponseDto)
      */
     public CompletableFuture<TestRunResponseDto> judgeCode(
             String sourceCode,
-            String dbLanguageName,
+            Integer languageId,
             List<AlgoTestcaseDto> testCases,
             Integer timeLimit,
             Integer memoryLimit) {
 
         return CompletableFuture.supplyAsync(() -> {
-            log.info("Judge0 채점 시작 - language: {}, testCases: {}, timeLimit: {}ms, memoryLimit: {}MB",
-                    dbLanguageName, testCases.size(), timeLimit, memoryLimit);
+            log.info("Judge0 채점 시작 - languageId: {}, testCases: {}, timeLimit: {}ms, memoryLimit: {}MB",
+                    languageId, testCases.size(), timeLimit, memoryLimit);
+
+            if (languageId == null) {
+                throw new IllegalArgumentException("언어 ID가 null입니다");
+            }
 
             List<TestRunResponseDto.TestCaseResultDto> results = new ArrayList<>();
-            Integer languageId = getJudge0LanguageId(dbLanguageName);
             int passedCount = 0;
             int maxExecutionTime = 0;
             int maxMemoryUsage = 0;

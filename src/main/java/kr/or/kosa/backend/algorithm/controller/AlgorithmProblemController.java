@@ -232,8 +232,12 @@ public class AlgorithmProblemController {
                     completeEvent.put("type", "COMPLETE");
                     completeEvent.put("problemId", response.getProblemId());
                     completeEvent.put("title", response.getProblem().getAlgoProblemTitle());
+                    completeEvent.put("description", response.getProblem().getAlgoProblemDescription());
+                    completeEvent.put("difficulty", response.getProblem().getAlgoProblemDifficulty().name());
                     completeEvent.put("testCaseCount", response.getTestCases() != null ? response.getTestCases().size() : 0);
+                    completeEvent.put("generationTime", response.getGenerationTime());
                     completeEvent.put("validationResults", response.getValidationResults());
+                    completeEvent.put("hasValidationCode", response.getOptimalCode() != null && !response.getOptimalCode().isBlank());
 
                     sink.next("data: " + objectMapper.writeValueAsString(completeEvent) + "\n\n");
                     sink.complete();

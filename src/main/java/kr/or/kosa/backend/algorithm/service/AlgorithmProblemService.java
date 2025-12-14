@@ -28,6 +28,7 @@ public class AlgorithmProblemService {
 
     private final AlgorithmProblemMapper algorithmProblemMapper;
     private final ProblemValidationLogMapper validationLogMapper;
+    private final ProblemVectorStoreService vectorStoreService;
 
     /**
      * 전체 문제 수 조회
@@ -364,7 +365,27 @@ public class AlgorithmProblemService {
                 saveValidationLog(problem.getAlgoProblemId(), responseDto);
             }
 
-            // 5. ResponseDto에 생성된 ID 설정
+            // 5. Vector DB에 저장 (유사도 검사용)
+            try {
+                List<String> tags = parseTagsFromJson(problem.getAlgoProblemTags());
+                String difficulty = problem.getAlgoProblemDifficulty() != null
+                        ? problem.getAlgoProblemDifficulty().name()
+                        : "UNKNOWN";
+
+                vectorStoreService.storeGeneratedProblem(
+                        problem.getAlgoProblemId(),
+                        problem.getAlgoProblemTitle(),
+                        problem.getAlgoProblemDescription(),
+                        difficulty,
+                        tags
+                );
+                log.info("Vector DB 저장 완료 - problemId: {}", problem.getAlgoProblemId());
+            } catch (Exception e) {
+                log.warn("Vector DB 저장 실패 (무시하고 계속 진행): {}", e.getMessage());
+                // Vector DB 저장 실패해도 MySQL 저장은 성공으로 처리
+            }
+
+            // 6. ResponseDto에 생성된 ID 설정
             responseDto.setProblemId(problem.getAlgoProblemId());
 
             return problem.getAlgoProblemId();
@@ -523,5 +544,31 @@ public class AlgorithmProblemService {
         }
 
         return "[" + String.join(",", failures) + "]";
+    }
+
+    /**
+     * JSON 형태의 태그 문자열을 List로 파싱
+     * 예: "[\"배열\", \"정렬\"]" -> ["배열", "정렬"]
+     */
+    private List<String> parseTagsFromJson(String tagsJson) {
+        if (tagsJson == null || tagsJson.isBlank()) {
+            return List.of();
+        }
+
+        try {
+            // JSON 배열 형태인 경우
+            if (tagsJson.startsWith("[")) {
+                com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                return mapper.readValue(tagsJson, new com.fasterxml.jackson.core.type.TypeReference<List<String>>() {});
+            }
+            // 쉼표로 구분된 문자열인 경우
+            return java.util.Arrays.stream(tagsJson.split(","))
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .collect(Collectors.toList());
+        } catch (Exception e) {
+            log.warn("태그 파싱 실패: {}", tagsJson);
+            return List.of();
+        }
     }
 }

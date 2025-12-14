@@ -1,9 +1,11 @@
 package kr.or.kosa.backend.algorithm.service.validation;
 
 import kr.or.kosa.backend.algorithm.dto.AlgoTestcaseDto;
+import kr.or.kosa.backend.algorithm.dto.LanguageDto;
 import kr.or.kosa.backend.algorithm.dto.ValidationResultDto;
 import kr.or.kosa.backend.algorithm.dto.response.TestRunResponseDto;
 import kr.or.kosa.backend.algorithm.service.CodeExecutorService;
+import kr.or.kosa.backend.algorithm.service.LanguageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -16,6 +18,9 @@ import java.util.stream.Collectors;
 /**
  * Phase 4-2: 코드 실행 검증기
  * Judge0 API를 사용하여 생성된 코드가 테스트케이스를 통과하는지 검증
+ *
+ * 변경사항 (2025-12-13):
+ * - LanguageService 주입하여 languageName → languageId 변환
  */
 @Slf4j
 @Component
@@ -25,6 +30,7 @@ public class CodeExecutionValidator {
     private static final String VALIDATOR_NAME = "CodeExecutionValidator";
 
     private final CodeExecutorService codeExecutorService;  // Judge0 또는 Piston 선택
+    private final LanguageService languageService;          // 언어 정보 조회
 
     @Value("${algorithm.validation.execution-timeout:30}")
     private int executionTimeoutSeconds;
@@ -38,21 +44,23 @@ public class CodeExecutionValidator {
     /**
      * 최적 풀이 코드 실행 검증
      *
-     * @param optimalCode 최적 풀이 코드
-     * @param language    프로그래밍 언어 (DB 언어명)
-     * @param testCases   테스트케이스 목록
-     * @param timeLimit   시간 제한 (ms, nullable)
-     * @param memoryLimit 메모리 제한 (MB, nullable)
+     * @param optimalCode  최적 풀이 코드
+     * @param languageName 프로그래밍 언어명 (예: "Python 3", "Java 17")
+     * @param testCases    테스트케이스 목록
+     * @param timeLimit    시간 제한 (ms, nullable)
+     * @param memoryLimit  메모리 제한 (MB, nullable)
      * @return 검증 결과
+     *
+     * 변경사항 (2025-12-13): languageName → languageId 변환 후 CodeExecutorService 호출
      */
     public ValidationResultDto validate(
             String optimalCode,
-            String language,
+            String languageName,
             List<AlgoTestcaseDto> testCases,
             Integer timeLimit,
             Integer memoryLimit) {
 
-        log.info("코드 실행 검증 시작 - language: {}, testCases: {}", language, testCases != null ? testCases.size() : 0);
+        log.info("코드 실행 검증 시작 - language: {}, testCases: {}", languageName, testCases != null ? testCases.size() : 0);
 
         ValidationResultDto result = ValidationResultDto.builder()
                 .passed(true)
@@ -60,25 +68,33 @@ public class CodeExecutionValidator {
                 .build();
 
         // 1. 입력 검증
-        if (!validateInputs(optimalCode, language, testCases, result)) {
+        if (!validateInputs(optimalCode, languageName, testCases, result)) {
             return result;
         }
 
-        // 2. 시간/메모리 제한 설정
+        // 2. 언어명 → languageId 변환
+        LanguageDto language = languageService.getByName(languageName);
+        if (language == null) {
+            result.addError("지원하지 않는 프로그래밍 언어입니다: " + languageName);
+            return result;
+        }
+        Integer languageId = language.getLanguageId();
+
+        // 3. 시간/메모리 제한 설정
         int effectiveTimeLimit = timeLimit != null && timeLimit > 0 ? timeLimit : defaultTimeLimit;
         int effectiveMemoryLimit = memoryLimit != null && memoryLimit > 0 ? memoryLimit : defaultMemoryLimit;
 
-        // 3. Judge0로 코드 실행
+        // 4. Judge0로 코드 실행 (languageId 사용)
         try {
             TestRunResponseDto judgeResult = codeExecutorService.judgeCode(
                     optimalCode,
-                    language,
+                    languageId,
                     testCases,
                     effectiveTimeLimit,
                     effectiveMemoryLimit
             ).get(executionTimeoutSeconds, TimeUnit.SECONDS);
 
-            // 4. 결과 분석
+            // 5. 결과 분석
             analyzeJudgeResult(judgeResult, result);
 
         } catch (Exception e) {

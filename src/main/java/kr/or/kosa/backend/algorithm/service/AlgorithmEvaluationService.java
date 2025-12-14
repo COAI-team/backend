@@ -3,6 +3,7 @@ package kr.or.kosa.backend.algorithm.service;
 import kr.or.kosa.backend.algorithm.dto.AlgoProblemDto;
 import kr.or.kosa.backend.algorithm.dto.AlgoSubmissionDto;
 import kr.or.kosa.backend.algorithm.dto.AICodeEvaluationResult;
+import kr.or.kosa.backend.algorithm.dto.LanguageDto;
 import kr.or.kosa.backend.algorithm.dto.ScoreCalculationParams;
 import kr.or.kosa.backend.algorithm.dto.ScoreCalculationResult;
 import kr.or.kosa.backend.algorithm.dto.response.SubmissionAiStatusResponseDto;
@@ -28,6 +29,7 @@ public class AlgorithmEvaluationService {
     private final CodeEvaluationService codeEvaluationService;
     private final ScoreCalculator scoreCalculator;
     private final AlgorithmSubmissionMapper submissionMapper;
+    private final LanguageService languageService;  // 언어 정보 조회 (languageId → languageName)
 
     /**
      * AI 평가 및 점수 계산 처리 (비동기 진입점)
@@ -77,11 +79,20 @@ public class AlgorithmEvaluationService {
         // 문제 토픽 추출 (태그에서 첫 번째 항목 사용)
         String problemTopic = extractPrimaryTopic(problem.getAlgoProblemTags());
 
+        // languageId → languageName 변환 (2025-12-13)
+        String languageName = "Unknown";
+        if (submission.getLanguageId() != null) {
+            LanguageDto language = languageService.getById(submission.getLanguageId());
+            if (language != null) {
+                languageName = language.getLanguageName();
+            }
+        }
+
         CompletableFuture<AICodeEvaluationResult> aiFuture =
                 codeEvaluationService.evaluateCode(
                         submission.getSourceCode(),
                         problem.getAlgoProblemDescription(),
-                        submission.getLanguage(),
+                        languageName,  // languageId → languageName 변환
                         judgeResult.getOverallResult(),
                         problemTopic,
                         problem.getExpectedTimeComplexity(),

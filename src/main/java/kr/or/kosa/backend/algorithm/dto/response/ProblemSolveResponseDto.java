@@ -62,13 +62,17 @@ public class ProblemSolveResponseDto {
         private LocalDateTime submittedAt;
     }
 
+    /**
+     * 언어 옵션 DTO
+     * 변경사항 (2025-12-13): value (String) → languageId (Integer)
+     */
     @Getter
     @Builder
     @AllArgsConstructor
     public static class LanguageOption {
-        private String languageName; // 표시명 (예: "Java 17")
-        private String value; // 제출용 값 (예: "JAVA")
-        private Integer timeLimit; // 계산된 시간 제한
-        private Integer memoryLimit; // 계산된 메모리 제한
+        private Integer languageId;   // LANGUAGES.LANGUAGE_ID (Judge0 API ID)
+        private String languageName;  // 표시명 (예: "Python", "Java")
+        private Integer timeLimit;    // 계산된 시간 제한 (ms)
+        private Integer memoryLimit;  // 계산된 메모리 제한 (MB)
     }
 }

@@ -397,6 +397,65 @@ public class ProblemCrawlerController {
         }
     }
 
+    // ===== Vector DB 통계 API =====
+
+    /**
+     * Vector DB 컬렉션 통계 조회
+     * 난이도별, 토픽별 문서 수 현황 파악
+     *
+     * GET /algo/crawler/vectordb/stats?expectedPerCategory=5
+     */
+    @GetMapping("/vectordb/stats")
+    public ResponseEntity<?> getVectorDbStats(
+            @RequestParam(defaultValue = "5") int expectedPerCategory) {
+        log.info("📊 Vector DB 통계 조회 요청: expectedPerCategory={}", expectedPerCategory);
+
+        try {
+            ProblemVectorStoreService.VectorDbStats stats = vectorStoreService.getCollectionStats();
+
+            if (stats.getError() != null) {
+                return ResponseEntity.status(500).body(Map.of(
+                        "success", false,
+                        "message", "통계 조회 중 오류 발생: " + stats.getError()
+                ));
+            }
+
+            // 기대 수집량 계산: 4 난이도 × 23 토픽 × expectedPerCategory
+            int expectedTotal = 4 * 23 * expectedPerCategory;
+
+            // 부족한 카테고리 목록
+            var missingCategories = stats.getMissingCategories(expectedPerCategory);
+
+            // Map.of()는 최대 10개까지만 지원하므로 HashMap 사용
+            Map<String, Object> response = new java.util.LinkedHashMap<>();
+            response.put("success", true);
+            response.put("totalDocuments", stats.getTotalDocuments());
+            response.put("expectedTotal", expectedTotal);
+            response.put("completionRate", String.format("%.1f%%",
+                    (double) stats.getTotalDocuments() / expectedTotal * 100));
+            response.put("byDifficulty", stats.getByDifficulty());
+            response.put("byTopic", stats.getByTopic());
+            response.put("bySource", stats.getBySource());
+            response.put("byCombination", stats.getByCombination());
+            response.put("missingCategories", missingCategories);
+            response.put("missingCount", missingCategories.size());
+            response.put("summary", Map.of(
+                    "totalCategories", 4 * 23,
+                    "completeCategories", (4 * 23) - missingCategories.size(),
+                    "incompleteCategories", missingCategories.size()
+            ));
+
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            log.error("Vector DB 통계 조회 실패", e);
+            return ResponseEntity.status(500).body(Map.of(
+                    "success", false,
+                    "message", "통계 조회 중 오류 발생: " + e.getMessage()
+            ));
+        }
+    }
+
     // ===== Vector DB 검색 API =====
 
     /**

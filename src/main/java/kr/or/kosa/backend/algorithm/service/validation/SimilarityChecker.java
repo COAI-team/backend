@@ -3,6 +3,7 @@ package kr.or.kosa.backend.algorithm.service.validation;
 import kr.or.kosa.backend.algorithm.dto.AlgoProblemDto;
 import kr.or.kosa.backend.algorithm.dto.ValidationResultDto;
 import kr.or.kosa.backend.algorithm.mapper.AlgorithmProblemMapper;
+import kr.or.kosa.backend.algorithm.service.ProblemVectorStoreService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -12,7 +13,7 @@ import java.util.List;
 
 /**
  * Phase 4-4: 유사도 검사 서비스
- * 생성된 문제가 기존 문제와 유사한지 검사
+ * Vector DB 기반으로 생성된 문제가 기존 문제와 유사한지 검사
  */
 @Slf4j
 @Component
@@ -22,15 +23,20 @@ public class SimilarityChecker {
     private static final String VALIDATOR_NAME = "SimilarityChecker";
 
     private final AlgorithmProblemMapper problemMapper;
+    private final ProblemVectorStoreService vectorStoreService;
 
-    @Value("${algorithm.validation.max-similarity:0.7}")
+    @Value("${algorithm.validation.max-similarity:0.8}")
     private double maxSimilarity;
 
     @Value("${algorithm.validation.similarity-check-limit:100}")
     private int similarityCheckLimit;
 
+    @Value("${algorithm.validation.use-vector-similarity:true}")
+    private boolean useVectorSimilarity;
+
     /**
      * 유사도 검사
+     * Vector DB 기반 의미적 유사도 검사 우선, 실패 시 Jaccard 유사도 사용
      *
      * @param newProblem 새로 생성된 문제
      * @return 검증 결과
@@ -62,55 +68,17 @@ public class SimilarityChecker {
         }
 
         try {
-            // 기존 문제 목록 조회
-            List<AlgoProblemDto> existingProblems = problemMapper.selectProblemsWithFilter(
-                    0, similarityCheckLimit, null, null, null, null);
-
-            if (existingProblems == null || existingProblems.isEmpty()) {
-                log.info("비교할 기존 문제가 없습니다");
-                result.addMetadata("checkedProblems", 0);
-                result.addMetadata("maxFoundSimilarity", 0.0);
-                return result;
-            }
-
-            double maxFoundSimilarity = 0.0;
-            Long mostSimilarProblemId = null;
-            String mostSimilarTitle = null;
-
-            for (AlgoProblemDto existing : existingProblems) {
-                double titleSimilarity = calculateJaccardSimilarity(
-                        newTitle, existing.getAlgoProblemTitle());
-                double descSimilarity = calculateJaccardSimilarity(
-                        newDescription, existing.getAlgoProblemDescription());
-
-                // 가중 평균 (제목 40%, 설명 60%)
-                double combinedSimilarity = titleSimilarity * 0.4 + descSimilarity * 0.6;
-
-                if (combinedSimilarity > maxFoundSimilarity) {
-                    maxFoundSimilarity = combinedSimilarity;
-                    mostSimilarProblemId = existing.getAlgoProblemId();
-                    mostSimilarTitle = existing.getAlgoProblemTitle();
+            // Vector DB 기반 유사도 검사 시도
+            if (useVectorSimilarity) {
+                ValidationResultDto vectorResult = checkVectorSimilarity(newTitle, newDescription, result);
+                if (vectorResult != null) {
+                    return vectorResult;
                 }
+                log.info("Vector DB 유사도 검사 실패, Jaccard 유사도로 폴백");
             }
 
-            result.addMetadata("checkedProblems", existingProblems.size());
-            result.addMetadata("maxFoundSimilarity", Math.round(maxFoundSimilarity * 100) / 100.0);
-            result.addMetadata("maxAllowedSimilarity", maxSimilarity);
-
-            if (mostSimilarProblemId != null) {
-                result.addMetadata("mostSimilarProblemId", mostSimilarProblemId);
-                result.addMetadata("mostSimilarTitle", mostSimilarTitle);
-            }
-
-            if (maxFoundSimilarity > maxSimilarity) {
-                result.addError(String.format(
-                        "기존 문제와 유사도가 너무 높습니다 (유사도: %.1f%%, 기준: %.1f%%). " +
-                        "가장 유사한 문제: [%d] %s",
-                        maxFoundSimilarity * 100, maxSimilarity * 100,
-                        mostSimilarProblemId, mostSimilarTitle));
-            } else {
-                log.info("유사도 검사 통과 - 최대 유사도: {}%", String.format("%.1f", maxFoundSimilarity * 100));
-            }
+            // Jaccard 유사도 검사 (폴백)
+            return checkJaccardSimilarity(newTitle, newDescription, result);
 
         } catch (Exception e) {
             log.error("유사도 검사 중 오류 발생", e);
@@ -118,6 +86,102 @@ public class SimilarityChecker {
         }
 
         log.info("유사도 검사 완료 - 결과: {}", result.getSummary());
+        return result;
+    }
+
+    /**
+     * Vector DB 기반 유사도 검사
+     */
+    private ValidationResultDto checkVectorSimilarity(String title, String description, ValidationResultDto result) {
+        try {
+            ProblemVectorStoreService.SimilarityCheckResult vectorResult =
+                    vectorStoreService.checkSimilarity(title, description, maxSimilarity);
+
+            result.addMetadata("checkMethod", "VectorDB");
+            result.addMetadata("maxFoundSimilarity", Math.round(vectorResult.getMaxSimilarity() * 100) / 100.0);
+            result.addMetadata("maxAllowedSimilarity", maxSimilarity);
+
+            if (vectorResult.getMostSimilarTitle() != null) {
+                result.addMetadata("mostSimilarTitle", vectorResult.getMostSimilarTitle());
+                result.addMetadata("mostSimilarId", vectorResult.getMostSimilarId());
+            }
+
+            if (!vectorResult.isPassed()) {
+                result.addError(String.format(
+                        "기존 문제와 유사도가 너무 높습니다 (유사도: %.1f%%, 기준: %.1f%%). " +
+                        "가장 유사한 문제: %s",
+                        vectorResult.getMaxSimilarity() * 100, maxSimilarity * 100,
+                        vectorResult.getMostSimilarTitle()));
+            } else {
+                log.info("Vector DB 유사도 검사 통과 - 최대 유사도: {}%",
+                        String.format("%.1f", vectorResult.getMaxSimilarity() * 100));
+            }
+
+            log.info("유사도 검사 완료 (VectorDB) - 결과: {}", result.getSummary());
+            return result;
+
+        } catch (Exception e) {
+            log.warn("Vector DB 유사도 검사 실패: {}", e.getMessage());
+            return null;  // 폴백 신호
+        }
+    }
+
+    /**
+     * Jaccard 기반 유사도 검사 (폴백)
+     */
+    private ValidationResultDto checkJaccardSimilarity(String newTitle, String newDescription, ValidationResultDto result) {
+        List<AlgoProblemDto> existingProblems = problemMapper.selectProblemsWithFilter(
+                0, similarityCheckLimit, null, null, null, null);
+
+        if (existingProblems == null || existingProblems.isEmpty()) {
+            log.info("비교할 기존 문제가 없습니다");
+            result.addMetadata("checkMethod", "Jaccard");
+            result.addMetadata("checkedProblems", 0);
+            result.addMetadata("maxFoundSimilarity", 0.0);
+            return result;
+        }
+
+        double maxFoundSimilarity = 0.0;
+        Long mostSimilarProblemId = null;
+        String mostSimilarTitle = null;
+
+        for (AlgoProblemDto existing : existingProblems) {
+            double titleSimilarity = calculateJaccardSimilarity(
+                    newTitle, existing.getAlgoProblemTitle());
+            double descSimilarity = calculateJaccardSimilarity(
+                    newDescription, existing.getAlgoProblemDescription());
+
+            // 가중 평균 (제목 40%, 설명 60%)
+            double combinedSimilarity = titleSimilarity * 0.4 + descSimilarity * 0.6;
+
+            if (combinedSimilarity > maxFoundSimilarity) {
+                maxFoundSimilarity = combinedSimilarity;
+                mostSimilarProblemId = existing.getAlgoProblemId();
+                mostSimilarTitle = existing.getAlgoProblemTitle();
+            }
+        }
+
+        result.addMetadata("checkMethod", "Jaccard");
+        result.addMetadata("checkedProblems", existingProblems.size());
+        result.addMetadata("maxFoundSimilarity", Math.round(maxFoundSimilarity * 100) / 100.0);
+        result.addMetadata("maxAllowedSimilarity", maxSimilarity);
+
+        if (mostSimilarProblemId != null) {
+            result.addMetadata("mostSimilarProblemId", mostSimilarProblemId);
+            result.addMetadata("mostSimilarTitle", mostSimilarTitle);
+        }
+
+        if (maxFoundSimilarity > maxSimilarity) {
+            result.addError(String.format(
+                    "기존 문제와 유사도가 너무 높습니다 (유사도: %.1f%%, 기준: %.1f%%). " +
+                    "가장 유사한 문제: [%d] %s",
+                    maxFoundSimilarity * 100, maxSimilarity * 100,
+                    mostSimilarProblemId, mostSimilarTitle));
+        } else {
+            log.info("Jaccard 유사도 검사 통과 - 최대 유사도: {}%", String.format("%.1f", maxFoundSimilarity * 100));
+        }
+
+        log.info("유사도 검사 완료 (Jaccard) - 결과: {}", result.getSummary());
         return result;
     }
 

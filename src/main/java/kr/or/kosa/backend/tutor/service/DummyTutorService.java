@@ -6,12 +6,14 @@ import kr.or.kosa.backend.tutor.subscription.SubscriptionTier;
 import kr.or.kosa.backend.tutor.subscription.SubscriptionTierResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 
 import java.util.Locale;
 
 @Slf4j
 @Service
+@Profile({"local", "dev"})
 @RequiredArgsConstructor
 public class DummyTutorService implements TutorService {
 

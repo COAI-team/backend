@@ -164,4 +164,29 @@ public class LLMChatService {
             throw new RuntimeException("LLM 구조화 응답 중 오류 발생: " + e.getMessage(), e);
         }
     }
+    /**
+     * Tutor 등 단순 텍스트 응답용 메서드.
+     *
+     * @param systemPrompt 시스템 프롬프트
+     * @param userPrompt   사용자 프롬프트
+     * @return LLM의 텍스트 응답
+     */
+    public String callPlain(String systemPrompt, String userPrompt) {
+        long startTime = System.currentTimeMillis();
+        try {
+            ChatResponse response = chatClient
+                    .prompt()
+                    .system(systemPrompt)
+                    .user(userPrompt)
+                    .call()
+                    .chatResponse();
+
+            String content = response.getResult().getOutput().getText();
+            log.debug("LLM plain 응답 완료 - {}ms", System.currentTimeMillis() - startTime);
+            return content;
+        } catch (Exception e) {
+            log.error("LLM plain 응답 실패", e);
+            throw new RuntimeException("LLM plain 응답 중 오류 발생: " + e.getMessage(), e);
+        }
+    }
 }

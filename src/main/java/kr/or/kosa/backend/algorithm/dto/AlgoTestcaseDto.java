@@ -2,14 +2,16 @@ package kr.or.kosa.backend.algorithm.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 /**
  * 알고리즘 테스트케이스 DTO
  * 데이터베이스 테이블: ALGO_TESTCASES
  */
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder

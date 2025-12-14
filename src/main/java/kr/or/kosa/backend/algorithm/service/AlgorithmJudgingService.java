@@ -23,6 +23,13 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
+/**
+ * 알고리즘 채점 서비스
+ *
+ * 변경사항 (2025-12-13):
+ * - LanguageConstantService → LanguageService 교체
+ * - language (String) → languageId (INT) 사용
+ */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -32,12 +39,14 @@ public class AlgorithmJudgingService {
     private final AlgorithmProblemMapper problemMapper;
     private final CodeExecutorService codeExecutorService;
     private final AlgorithmEvaluationService evaluationService;
-    private final LanguageConstantService languageConstantService;
+    private final LanguageService languageService;  // 언어 정보 조회 (DB 기반)
     private final DailyQuizBonusService dailyQuizBonusService;
 
     /**
      * 통합 채점 및 평가 프로세스 (비동기)
      * - Judge0 채점 후 즉시 AI 평가 시작
+     *
+     * 변경사항 (2025-12-13): language (String) → languageId (INT)
      */
     @Async("judgeExecutor")
     public void processCompleteJudgingFlow(Long submissionId, SubmissionRequestDto request, AlgoProblemDto problem) {
@@ -48,20 +57,20 @@ public class AlgorithmJudgingService {
             // 1. 모든 테스트케이스 조회
             List<AlgoTestcaseDto> testCases = problemMapper.selectTestCasesByProblemId(request.getProblemId());
 
-            // 2. 언어별 제한 시간/메모리 계산
-            String dbLanguageName = request.getLanguage();
+            // 2. 언어별 제한 시간/메모리 계산 (languageId 사용)
+            Integer languageId = request.getLanguageId();
 
-            int realTimeLimit = languageConstantService.calculateRealTimeLimit(
-                    dbLanguageName, problem.getTimelimit());
-            int realMemoryLimit = languageConstantService.calculateRealMemoryLimit(
-                    dbLanguageName, problem.getMemorylimit());
+            int realTimeLimit = languageService.calculateRealTimeLimit(
+                    languageId, problem.getTimelimit());
+            int realMemoryLimit = languageService.calculateRealMemoryLimit(
+                    languageId, problem.getMemorylimit());
 
-            log.info("언어별 제한 적용 - 언어: {}, 시간: {}ms, 메모리: {}MB",
-                    dbLanguageName, realTimeLimit, realMemoryLimit);
+            log.info("언어별 제한 적용 - languageId: {}, 시간: {}ms, 메모리: {}MB",
+                    languageId, realTimeLimit, realMemoryLimit);
 
             // 3. 코드 채점 실행 (Judge0 또는 Piston 사용)
             CompletableFuture<TestRunResponseDto> judgeFuture = codeExecutorService.judgeCode(
-                    request.getSourceCode(), dbLanguageName, testCases, realTimeLimit, realMemoryLimit);
+                    request.getSourceCode(), languageId, testCases, realTimeLimit, realMemoryLimit);
 
             TestRunResponseDto judgeResult = judgeFuture.get();
 

@@ -12,6 +12,8 @@ public class TutorWebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
+        // 운영 시에는 서비스 도메인 + localhost 정도만 Origin을 허용하고
+        // '*' 와일드카드는 사용하지 않는 것이 권장됨. (실제 보안 설정은 Security 쪽에서 관리)
         registry.addEndpoint("/ws/tutor")
                 .setAllowedOrigins(
                         "http://localhost:5173",

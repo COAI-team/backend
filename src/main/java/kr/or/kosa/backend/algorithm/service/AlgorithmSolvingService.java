@@ -3,10 +3,9 @@ package kr.or.kosa.backend.algorithm.service;
 import kr.or.kosa.backend.algorithm.dto.AlgoProblemDto;
 import kr.or.kosa.backend.algorithm.dto.AlgoSubmissionDto;
 import kr.or.kosa.backend.algorithm.dto.AlgoTestcaseDto;
-import kr.or.kosa.backend.algorithm.dto.LanguageConstantDto;
+import kr.or.kosa.backend.algorithm.dto.LanguageDto;
 import kr.or.kosa.backend.algorithm.dto.enums.AiFeedbackStatus;
 import kr.or.kosa.backend.algorithm.dto.enums.AiFeedbackType;
-import kr.or.kosa.backend.algorithm.dto.enums.GithubCommitStatus;
 import kr.or.kosa.backend.algorithm.dto.enums.JudgeResult;
 import kr.or.kosa.backend.algorithm.dto.enums.LanguageType;
 import kr.or.kosa.backend.algorithm.dto.enums.ProblemType;
@@ -56,7 +55,7 @@ public class AlgorithmSolvingService {
     private final MonitoringMapper monitoringMapper;  // 모니터링 세션 데이터 조회용
     private final CodeExecutorService codeExecutorService;  // Judge0 또는 Piston 선택
     private final AlgorithmJudgingService judgingService;
-    private final LanguageConstantService languageConstantService;
+    private final LanguageService languageService;  // 언어 정보 조회 (DB 기반)
 
     /**
      * 문제 풀이 시작 (ALG-04)
@@ -80,32 +79,21 @@ public class AlgorithmSolvingService {
         // 4. Eye Tracking 세션 ID 생성
         String sessionId = UUID.randomUUID().toString();
 
-        // 5. 언어별 제한 정보 구성 (NEW!)
+        // 5. 언어별 제한 정보 구성
+        // 변경사항 (2025-12-13): languageId (INT)를 사용하여 언어 식별
         ProblemType problemType = problem.getProblemType();
         LanguageType languageType = (problemType == ProblemType.SQL)
                 ? LanguageType.DB
                 : LanguageType.GENERAL;
 
-        List<LanguageConstantDto> constants = languageConstantService.getLanguagesByType(languageType);
+        List<LanguageDto> languages = languageService.getLanguagesByType(languageType);
 
-        List<ProblemSolveResponseDto.LanguageOption> availableLanguages = constants.stream()
-                .map(lc -> ProblemSolveResponseDto.LanguageOption.builder()
-                        .languageName(lc.getLanguageName())
-                        // 제출용 값 매핑 필요 (DB 이름 -> Enum 이름 or 그대로)
-                        // 여기서는 프론트엔드가 DB 이름을 그대로 사용하도록 하거나, 별도 매핑이 필요함.
-                        // 기존에는 ProgrammingLanguage Enum을 사용했음.
-                        // 프론트엔드가 "Java"를 보내면 백엔드가 "JAVA" Enum으로 변환함.
-                        // 따라서 여기서 value는 Enum name이어야 함.
-                        // 하지만 DB에는 "Java 17" 등으로 저장되어 있음.
-                        // 역매핑이 필요하거나, 프론트엔드가 "Java 17"을 보내고 백엔드가 이를 처리하도록 변경해야 함.
-                        // 일단은 value에 DB 이름을 그대로 넣고, 프론트엔드에서 이를 선택하게 하고,
-                        // 제출 시 백엔드에서 이를 적절히 처리하도록 하는게 좋음.
-                        // 하지만 기존 로직은 ProgrammingLanguage Enum을 사용함.
-                        // 임시로 value를 languageName과 동일하게 설정하고, 제출 시 처리를 고민해야 함.
-                        // 또는 ProgrammingLanguage Enum을 순회하며 매칭되는 것을 찾을 수도 있음.
-                        .value(mapDbNameToEnumValue(lc.getLanguageName()))
-                        .timeLimit(lc.calculateRealTimeLimit(problem.getTimelimit()))
-                        .memoryLimit(lc.calculateRealMemoryLimit(problem.getMemorylimit()))
+        List<ProblemSolveResponseDto.LanguageOption> availableLanguages = languages.stream()
+                .map(lang -> ProblemSolveResponseDto.LanguageOption.builder()
+                        .languageId(lang.getLanguageId())  // Judge0 API ID (예: 100=Python, 91=Java)
+                        .languageName(lang.getLanguageName())
+                        .timeLimit(lang.calculateRealTimeLimit(problem.getTimelimit()))
+                        .memoryLimit(lang.calculateRealMemoryLimit(problem.getMemorylimit()))
                         .build())
                 .collect(Collectors.toList());
 
@@ -126,44 +114,14 @@ public class AlgorithmSolvingService {
                 .build();
     }
 
-    // DB 언어명을 프론트엔드용 값(Enum name 등)으로 매핑하는 헬퍼
-    private String mapDbNameToEnumValue(String dbLanguageName) {
-        // 간단한 매핑 로직 (필요 시 확장)
-        if (dbLanguageName.startsWith("Java"))
-            return "JAVA";
-        if (dbLanguageName.startsWith("Python"))
-            return "PYTHON";
-        if (dbLanguageName.startsWith("C++"))
-            return "CPP";
-        if (dbLanguageName.startsWith("C"))
-            return "C"; // C++보다 뒤에 와야 함
-        if (dbLanguageName.toLowerCase().contains("node"))
-            return "JAVASCRIPT";
-        if (dbLanguageName.equals("Go"))
-            return "GOLANG";
-        if (dbLanguageName.startsWith("Kotlin"))
-            return "KOTLIN";
-        if (dbLanguageName.startsWith("Rust"))
-            return "RUST";
-        if (dbLanguageName.startsWith("Swift"))
-            return "SWIFT";
-        if (dbLanguageName.equals("C#"))
-            return "CSHARP";
-
-        // SQL 언어
-        if (dbLanguageName.equalsIgnoreCase("MySQL"))
-            return "MYSQL";
-
-        return dbLanguageName.toUpperCase(); // Fallback
-    }
-
     /**
      * 코드 제출 및 채점 (ALG-07) - 통합 플로우
+     * 변경사항 (2025-12-13): language (String) → languageId (INT)
      */
     @Transactional
     public SubmissionResponseDto submitCode(SubmissionRequestDto request, Long userId) {
-        log.info("코드 제출 시작 - problemId: {}, userId: {}, language: {}",
-                request.getProblemId(), userId, request.getLanguage());
+        log.info("코드 제출 시작 - problemId: {}, userId: {}, languageId: {}",
+                request.getProblemId(), userId, request.getLanguageId());
 
         // 1. 요청 데이터 검증
         request.validate();
@@ -194,10 +152,12 @@ public class AlgorithmSolvingService {
      * - DB 저장 없음
      * - AI 평가 없음
      * - 샘플 테스트케이스(isSample=true)만 실행
+     *
+     * 변경사항 (2025-12-13): language (String) → languageId (INT)
      */
     public TestRunResponseDto runSampleTest(TestRunRequestDto request) {
-        log.info("샘플 테스트 실행 시작 - problemId: {}, language: {}",
-                request.getProblemId(), request.getLanguage());
+        log.info("샘플 테스트 실행 시작 - problemId: {}, languageId: {}",
+                request.getProblemId(), request.getLanguageId());
 
         // 1. 문제 존재 확인
         AlgoProblemDto problem = problemMapper.selectProblemById(request.getProblemId());
@@ -214,32 +174,32 @@ public class AlgorithmSolvingService {
 
         log.info("샘플 테스트케이스 {} 개 조회됨", sampleTestcases.size());
 
-        // 3. 언어 검증 및 상수 조회 (Enum 변환 제거 - DB 언어명 직접 사용)
-        String dbLanguageName = request.getLanguage(); // 예: "Python 3", "Java 17", "C++17"
-        LanguageConstantDto constant = languageConstantService.getByLanguageName(dbLanguageName);
+        // 3. 언어 정보 조회 (languageId로 LANGUAGES 테이블 조회)
+        Integer languageId = request.getLanguageId();
+        LanguageDto language = languageService.getById(languageId);
 
-        if (constant == null) {
+        if (language == null) {
             throw new IllegalArgumentException(
-                    "지원하지 않는 프로그래밍 언어입니다: " + dbLanguageName +
-                    ". LANGUAGE_CONSTANTS 테이블에 등록된 언어를 사용해주세요.");
+                    "지원하지 않는 프로그래밍 언어입니다. languageId: " + languageId +
+                    ". LANGUAGES 테이블에 등록된 언어를 사용해주세요.");
         }
 
-        log.info("언어 상수 조회 완료 - language: {}, timeFactor: {}, memoryFactor: {}",
-                dbLanguageName, constant.getTimeFactor(), constant.getMemoryFactor());
+        log.info("언어 정보 조회 완료 - languageId: {}, languageName: {}, timeFactor: {}, memoryFactor: {}",
+                languageId, language.getLanguageName(), language.getTimeFactor(), language.getMemoryFactor());
 
-        // 4. Judge0 실행 (AlgoTestcaseDto 직접 전달)
+        // 4. Judge0 또는 Piston 실행 (AlgoTestcaseDto 직접 전달)
         try {
             // 언어별 제한 시간/메모리 계산
-            Integer realTimeLimit = constant.calculateRealTimeLimit(problem.getTimelimit());
-            Integer realMemoryLimit = constant.calculateRealMemoryLimit(problem.getMemorylimit());
+            Integer realTimeLimit = language.calculateRealTimeLimit(problem.getTimelimit());
+            Integer realMemoryLimit = language.calculateRealMemoryLimit(problem.getMemorylimit());
 
-            log.info("Judge0 제출 - language: {}, timeLimit: {}ms → {}ms, memoryLimit: {}MB → {}MB",
-                    dbLanguageName, problem.getTimelimit(), realTimeLimit,
+            log.info("코드 실행 제출 - languageId: {}, timeLimit: {}ms → {}ms, memoryLimit: {}MB → {}MB",
+                    languageId, problem.getTimelimit(), realTimeLimit,
                     problem.getMemorylimit(), realMemoryLimit);
 
-            // Judge0 또는 Piston 사용 (환경 설정에 따라 자동 선택)
+            // Judge0 또는 Piston 사용 (CodeExecutorService가 적절한 API 선택)
             CompletableFuture<TestRunResponseDto> judgeFuture = codeExecutorService
-                    .judgeCode(request.getSourceCode(), dbLanguageName, sampleTestcases, realTimeLimit, realMemoryLimit);
+                    .judgeCode(request.getSourceCode(), languageId, sampleTestcases, realTimeLimit, realMemoryLimit);
 
             TestRunResponseDto judgeResult = judgeFuture.get();
 
@@ -348,6 +308,7 @@ public class AlgorithmSolvingService {
 
     /**
      * 제출 DTO 생성
+     * 변경사항 (2025-12-13): language (String) → languageId (INT)
      */
     private AlgoSubmissionDto createSubmission(SubmissionRequestDto request, Long userId, AlgoProblemDto problem) {
         LocalDateTime now = LocalDateTime.now();
@@ -361,7 +322,7 @@ public class AlgorithmSolvingService {
                 .algoProblemId(request.getProblemId())
                 .userId(userId)
                 .sourceCode(request.getSourceCode())
-                .language(request.getLanguage())
+                .languageId(request.getLanguageId())  // languageId (INT) 사용
                 .judgeResult(JudgeResult.PENDING)
                 .aiFeedbackStatus(AiFeedbackStatus.PENDING)
                 .aiFeedbackType(request.getFeedbackType() != null ? request.getFeedbackType()
@@ -372,8 +333,8 @@ public class AlgorithmSolvingService {
                 // 풀이 모드 및 모니터링 세션 (focusSessionId, eyetracked 제거됨)
                 .solveMode(request.getSolveMode() != null ? request.getSolveMode() : SolveMode.BASIC)
                 .monitoringSessionId(request.getMonitoringSessionId())
-                .githubCommitRequested(request.getRequestGithubCommit() != null && request.getRequestGithubCommit())
-                .githubCommitStatus(GithubCommitStatus.NONE)
+                // GitHub 커밋 URL은 커밋 시 저장됨 (초기값 null)
+                .githubCommitUrl(null)
                 .isShared(false)
                 .submittedAt(now)
                 .build();
@@ -413,6 +374,13 @@ public class AlgorithmSolvingService {
             monitoringStats = fetchMonitoringStats(submission.getMonitoringSessionId());
         }
 
+        // 언어 정보 조회 (languageId → languageName 매핑)
+        String languageName = null;
+        if (submission.getLanguageId() != null) {
+            LanguageDto language = languageService.getById(submission.getLanguageId());
+            languageName = (language != null) ? language.getLanguageName() : "Unknown";
+        }
+
         return SubmissionResponseDto.builder()
                 .submissionId(submission.getAlgosubmissionId())
                 .problemId(submission.getAlgoProblemId())
@@ -422,7 +390,8 @@ public class AlgorithmSolvingService {
                         ? problem.getAlgoProblemDifficulty().name() : null)
                 .timeLimit(problem != null ? problem.getTimelimit() : null)
                 .memoryLimit(problem != null ? problem.getMemorylimit() : null)
-                .language(submission.getLanguage())
+                .languageId(submission.getLanguageId())
+                .languageName(languageName)
                 .sourceCode(submission.getSourceCode())
                 .judgeResult(submission.getJudgeResult() != null ? submission.getJudgeResult().name() : "PENDING")
                 .judgeStatus(determineJudgeStatus(submission))
@@ -447,6 +416,7 @@ public class AlgorithmSolvingService {
                 .solvingDurationSeconds(submission.getSolvingDurationSeconds())
                 .solvingDurationMinutes(submission.getSolvingDurationMinutes())
                 .isShared(submission.getIsShared())
+                .githubCommitUrl(submission.getGithubCommitUrl())
                 .submittedAt(submission.getSubmittedAt())
                 .build();
     }

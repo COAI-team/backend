@@ -15,6 +15,7 @@ import java.time.LocalDateTime;
  * 변경사항:
  * - focusSessionId → monitoringSessionId 변경
  * - solveMode 추가 (BASIC/FOCUS)
+ * - language (String) → languageId (Integer) 변경 (2025-12-13)
  *
  * Request DTO: JSON 역직렬화용
  * - @NoArgsConstructor: Jackson이 기본 생성자로 객체 생성
@@ -27,7 +28,7 @@ import java.time.LocalDateTime;
 public class SubmissionRequestDto {
 
     private Long problemId;
-    private String language; // DB 언어명 (예: "Python 3", "Java 17", "C++17")
+    private Integer languageId;  // LANGUAGES.LANGUAGE_ID (Judge0 API ID, 예: Python=100, Java=91)
     private String sourceCode;
 
     // 시간 추적 정보
@@ -51,8 +52,8 @@ public class SubmissionRequestDto {
         if (problemId == null) {
             throw new IllegalArgumentException("문제 ID는 필수입니다");
         }
-        if (language == null) {
-            throw new IllegalArgumentException("프로그래밍 언어는 필수입니다");
+        if (languageId == null) {
+            throw new IllegalArgumentException("프로그래밍 언어 ID는 필수입니다");
         }
         if (sourceCode == null || sourceCode.trim().isEmpty()) {
             throw new IllegalArgumentException("소스코드는 필수입니다");
