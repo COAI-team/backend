@@ -16,6 +16,7 @@ import org.springframework.ai.document.Document;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -57,7 +58,7 @@ public class ProblemGenerationOrchestrator {
     private int fewShotCount;
 
     /**
-     * 문제 생성 전체 플로우 실행
+     * 문제 생성 전체 플로우 실행 (생성 + 검증 + DB 저장)
      *
      * @param request          문제 생성 요청
      * @param userId           생성자 ID
@@ -72,7 +73,54 @@ public class ProblemGenerationOrchestrator {
         log.info("문제 생성 플로우 시작 - topic: {}, difficulty: {}",
                 request.getTopic(), request.getDifficulty());
 
-        // 생성 시간 측정 시작
+        try {
+            // 1. 문제 생성 + 검증 (DB 저장 제외)
+            ProblemGenerationResponseDto generatedProblem = generateWithoutSaving(request, progressCallback);
+
+            // 2. DB 저장
+            notifyProgress(progressCallback, "SAVING", "문제 저장 중...", 90);
+            Long problemId = problemService.saveGeneratedProblem(generatedProblem, userId);
+            generatedProblem.setProblemId(problemId);
+
+            notifyProgress(progressCallback, "COMPLETED", "문제 생성 완료", 100);
+            log.info("문제 생성 완료 - problemId: {}, 소요시간: {}초", problemId, generatedProblem.getGenerationTime());
+
+            return generatedProblem;
+
+        } catch (Exception e) {
+            log.error("문제 생성 플로우 중 오류 발생", e);
+            notifyProgress(progressCallback, "ERROR", "오류 발생: " + e.getMessage(), -1);
+            throw new RuntimeException("문제 생성 실패: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * 문제 생성만 수행 (DB 저장 없음) - 풀 채우기용
+     * <p>진행률 콜백 없이 호출하는 오버로드 메서드
+     *
+     * @param request 문제 생성 요청
+     * @return 생성된 문제 응답 (problemId는 null)
+     */
+    public ProblemGenerationResponseDto generateWithoutSaving(ProblemGenerationRequestDto request) {
+        return generateWithoutSaving(request, null);
+    }
+
+    /**
+     * 문제 생성만 수행 (DB 저장 없음)
+     * <p>LLM 생성 → Code-First → 검증 → Self-Correction 수행
+     * <p>풀에 저장된 후, 소비 시점에 saveGeneratedProblem()으로 저장
+     *
+     * @param request          문제 생성 요청
+     * @param progressCallback 진행률 콜백 (nullable, 풀 채우기 시 null)
+     * @return 생성된 문제 응답 (problemId는 null)
+     */
+    public ProblemGenerationResponseDto generateWithoutSaving(
+            ProblemGenerationRequestDto request,
+            Consumer<ProgressEvent> progressCallback) {
+
+        log.info("문제 생성 (저장 없음) 시작 - topic: {}, difficulty: {}",
+                request.getTopic(), request.getDifficulty());
+
         long startTime = System.currentTimeMillis();
 
         try {
@@ -98,10 +146,7 @@ public class ProblemGenerationOrchestrator {
                         String.format("검증 중... (시도 %d/%d)", attempt, selfCorrectionService.getMaxAttempts() + 1),
                         20 + (attempt * 15));
 
-                // 검증 실행
                 validationResults = runAllValidations(generatedProblem);
-
-                // 모든 검증 통과 확인
                 boolean allPassed = validationResults.stream().allMatch(ValidationResultDto::isPassed);
 
                 if (allPassed) {
@@ -109,7 +154,6 @@ public class ProblemGenerationOrchestrator {
                     break;
                 }
 
-                // Self-Correction 시도
                 if (selfCorrectionService.canAttemptMore(attempt)) {
                     notifyProgress(progressCallback, "CORRECTING",
                             String.format("Self-Correction 시도 %d...", attempt), 50 + (attempt * 10));
@@ -126,32 +170,23 @@ public class ProblemGenerationOrchestrator {
                         generatedProblem = corrected;
                     }
                 } else {
-                    log.warn("최대 수정 시도 횟수 초과, 경고와 함께 저장 진행");
+                    log.warn("최대 수정 시도 횟수 초과");
                     break;
                 }
-
             } while (attempt <= selfCorrectionService.getMaxAttempts());
 
-            // 3. 검증 결과 요약 추가
+            // 4. 검증 결과 및 메타데이터 설정
             generatedProblem.setValidationResults(validationResults);
+            generatedProblem.setGeneratedAt(LocalDateTime.now());
 
-            // 4. DB 저장
-            notifyProgress(progressCallback, "SAVING", "문제 저장 중...", 90);
-            Long problemId = problemService.saveGeneratedProblem(generatedProblem, userId);
-            generatedProblem.setProblemId(problemId);
-
-            // 5. 생성 시간 계산 및 설정
             double generationTime = (System.currentTimeMillis() - startTime) / 1000.0;
             generatedProblem.setGenerationTime(generationTime);
 
-            notifyProgress(progressCallback, "COMPLETED", "문제 생성 완료", 100);
-            log.info("문제 생성 완료 - problemId: {}, 소요시간: {}초", problemId, generationTime);
-
+            log.info("문제 생성 완료 (저장 없음) - 소요시간: {}초", generationTime);
             return generatedProblem;
 
         } catch (Exception e) {
-            log.error("문제 생성 플로우 중 오류 발생", e);
-            notifyProgress(progressCallback, "ERROR", "오류 발생: " + e.getMessage(), -1);
+            log.error("문제 생성 (저장 없음) 중 오류 발생", e);
             throw new RuntimeException("문제 생성 실패: " + e.getMessage(), e);
         }
     }
