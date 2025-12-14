@@ -571,6 +571,34 @@ CREATE TABLE `USER_ALGO_LEVELS` (
 ) ENGINE = InnoDB AUTO_INCREMENT = 1 DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '사용자 알고리즘 레벨';
 
 -- =============================================
+-- AI 문제 사전 생성 풀 테이블
+-- =============================================
+-- 목적: 사전 생성된 AI 문제를 조합별로 저장하여 즉시 제공
+-- 흐름: ALGO_PROBLEM_POOL(대기) → 소비 시 삭제 → ALGO_PROBLEMS(영구 저장)으로 이동
+-- 조합: 4 난이도 × 15 주제 × 5 테마 = 300개 조합, 조합당 5개 = 총 1,500개 목표
+CREATE TABLE `ALGO_PROBLEM_POOL` (
+    `ALGO_POOL_ID` BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '풀 문제 고유 식별자',
+
+    -- 문제 분류 (조합 키)
+    `DIFFICULTY` VARCHAR(20) NOT NULL COMMENT '난이도: BRONZE, SILVER, GOLD, PLATINUM',
+    `TOPIC` VARCHAR(50) NOT NULL COMMENT '알고리즘 주제 (15개 - ProblemTopic enum 참조)',
+    `THEME` VARCHAR(50) NOT NULL COMMENT '스토리 테마: 계절별 변경 가능, 현재 5개',
+
+    -- 문제 내용 (JSON - ALGO_PROBLEMS 테이블 구조와 동일한 형태로 저장)
+    `PROBLEM_CONTENT` JSON NOT NULL COMMENT '문제 전체 데이터: title, description, testcases, constraints 등',
+
+    -- 생성 메타데이터
+    `GENERATED_AT` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '문제 생성 시각',
+    `GENERATION_TIME_MS` INT NULL COMMENT 'LLM 생성 소요 시간(ms)',
+
+    `CREATED_AT` TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '레코드 생성 시각',
+
+    -- 인덱스: 조합별 빠른 조회 (SELECT FOR UPDATE 시 사용)
+    INDEX `idx_pool_combination` (`DIFFICULTY`, `TOPIC`, `THEME`),
+    INDEX `idx_pool_difficulty` (`DIFFICULTY`)
+) ENGINE = InnoDB AUTO_INCREMENT = 1 DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = 'AI 사전 생성 문제 풀';
+
+-- =============================================
 -- 성능 최적화 설정
 -- =============================================
 SET GLOBAL innodb_buffer_pool_size = 1073741824;
