@@ -65,11 +65,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             log.info("[JwtFilter] FilterChain passed for URI: {}", path);
 
         } catch (ExpiredJwtException e) {
+            // ✅ 수정: 401 + TOKEN_EXPIRED 응답 보내기
             log.warn("Expired JWT token: {}", e.getMessage());
-            // Token is expired, but we let the request continue as Anonymous.
-            // If the endpoint requires auth, SecurityConfig will block it (403).
-            // If the endpoint is permitAll, it will succeed.
-            filterChain.doFilter(request, response);
+            sendTokenExpiredError(response);
+            return; // ⚠️ filterChain.doFilter() 호출 안 함!
+
         } catch (JwtException e) {
             log.warn("Invalid JWT token: {}", e.getMessage());
             // Token is invalid, treat as Anonymous.
@@ -85,5 +85,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         return null;
+    }
+
+    private void sendTokenExpiredError(HttpServletResponse response) throws IOException {
+        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED); // 401
+        response.setContentType("application/json;charset=UTF-8");
+
+        String jsonError = "{\"code\":\"TOKEN_EXPIRED\",\"message\":\"Access token has expired\"}";
+        response.getWriter().write(jsonError);
     }
 }
