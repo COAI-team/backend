@@ -63,7 +63,7 @@ public class SecurityConfig {
                                 "/codeboard/**",
                                 "/comment",
                                 "/comment/**",
-                                "/like/*/*/users",  // 좋아요 누른 사용자 목록 조회
+                                "/like/*/*/users",               // 좋아요 누른 사용자 목록 조회
                                 "/like/**",
                                 "/notification/**",
                                 "/analysis/**"

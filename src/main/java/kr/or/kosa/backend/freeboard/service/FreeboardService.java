@@ -90,6 +90,7 @@ public class FreeboardService {
         return new PageResponse<>(boardsWithTags, pageRequest, totalCount);
     }
 
+    // 상세 조회
     @Transactional
     public FreeboardDetailResponseDto detail(Long id, Long userId) {
         mapper.increaseClick(id);
