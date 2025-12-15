@@ -1,6 +1,5 @@
 package kr.or.kosa.backend.algorithm.dto;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.Builder;
@@ -15,16 +14,12 @@ import java.util.Map;
 /**
  * 검증 결과 DTO
  * 모든 검증기가 공통으로 사용
- *
- * @JsonIgnoreProperties: Jackson 역직렬화 시 알 수 없는 필드 무시
- * @NoArgsConstructor/@AllArgsConstructor: Jackson 역직렬화용 생성자
  */
 @Getter
 @Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@JsonIgnoreProperties(ignoreUnknown = true)
 public class ValidationResultDto {
 
     /** 검증 통과 여부 */

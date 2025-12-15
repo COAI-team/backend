@@ -34,10 +34,20 @@
             keyColumn="VALIDATION_ID">
         INSERT INTO PROBLEM_VALIDATION_LOGS (
             ALGO_PROBLEM_ID, OPTIMAL_CODE, NAIVE_CODE, EXPECTED_TIME_COMPLEXITY,
-            VALIDATION_STATUS, CORRECTION_ATTEMPTS, CREATED_AT
+            OPTIMAL_CODE_RESULT, NAIVE_CODE_RESULT,
+            OPTIMAL_EXECUTION_TIME, NAIVE_EXECUTION_TIME,
+            TIME_RATIO, TIME_RATIO_VALID,
+            SIMILARITY_SCORE, SIMILARITY_VALID,
+            VALIDATION_STATUS, CORRECTION_ATTEMPTS, FAILURE_REASONS,
+            CREATED_AT, COMPLETED_AT
         ) VALUES (
             #{algoProblemId}, #{optimalCode}, #{naiveCode}, #{expectedTimeComplexity},
-            #{validationStatus}, #{correctionAttempts}, #{createdAt}
+            #{optimalCodeResult}, #{naiveCodeResult},
+            #{optimalExecutionTime}, #{naiveExecutionTime},
+            #{timeRatio}, #{timeRatioValid},
+            #{similarityScore}, #{similarityValid},
+            #{validationStatus}, #{correctionAttempts}, #{failureReasons},
+            #{createdAt}, #{completedAt}
         )
     </insert>
 

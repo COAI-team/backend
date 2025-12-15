@@ -91,6 +91,19 @@ public class ProblemPoolService {
                     ProblemGenerationResponseDto.class
             );
 
+            // 디버그: 역직렬화 결과 확인
+            log.info("🔍 [Pool 역직렬화] poolId: {}, generationTime: {}, validationResults: {}, optimalCode: {}",
+                    poolProblem.getAlgoPoolId(),
+                    response.getGenerationTime(),
+                    response.getValidationResults() != null ? response.getValidationResults().size() + "개" : "null",
+                    response.getOptimalCode() != null ? response.getOptimalCode().length() + "자" : "null");
+
+            if (response.getValidationResults() != null && !response.getValidationResults().isEmpty()) {
+                response.getValidationResults().forEach(vr ->
+                    log.info("🔍 [검증결과] validator: {}, passed: {}, metadata: {}",
+                            vr.getValidatorName(), vr.isPassed(), vr.getMetadata()));
+            }
+
             // 2. ALGO_PROBLEMS, ALGO_TESTCASES, PROBLEM_VALIDATION_LOGS에 저장
             Long problemId = problemService.saveGeneratedProblem(response, userId);
             response.setProblemId(problemId);
@@ -187,6 +200,18 @@ public class ProblemPoolService {
                     .build();
 
             ProblemGenerationResponseDto generated = generationOrchestrator.generateWithoutSaving(request);
+
+            // 디버그: 저장 전 데이터 확인
+            log.info("🔍 [Pool 저장 전] generationTime: {}, validationResults: {}, optimalCode: {}",
+                    generated.getGenerationTime(),
+                    generated.getValidationResults() != null ? generated.getValidationResults().size() + "개" : "null",
+                    generated.getOptimalCode() != null ? generated.getOptimalCode().length() + "자" : "null");
+
+            if (generated.getValidationResults() != null && !generated.getValidationResults().isEmpty()) {
+                generated.getValidationResults().forEach(vr ->
+                    log.info("🔍 [검증결과 저장] validator: {}, passed: {}, metadata: {}",
+                            vr.getValidatorName(), vr.isPassed(), vr.getMetadata()));
+            }
 
             // 2. JSON 직렬화
             String contentJson = objectMapper.writeValueAsString(generated);
