@@ -457,22 +457,28 @@ public class AlgorithmProblemService {
                     Map<String, Object> metadata = result.getMetadata();
 
                     if ("SimilarityChecker".equals(result.getValidatorName())) {
-                        if (metadata != null && metadata.containsKey("maxSimilarity")) {
-                            similarityScore = ((Number) metadata.get("maxSimilarity")).doubleValue();
+                        // SimilarityChecker는 "maxFoundSimilarity" 키로 저장함 (0~1 범위)
+                        if (metadata != null && metadata.containsKey("maxFoundSimilarity")) {
+                            similarityScore = ((Number) metadata.get("maxFoundSimilarity")).doubleValue() * 100; // 0~1 → 0~100 변환
                         }
                         similarityValid = result.isPassed();
                     }
 
                     if ("CodeExecutionValidator".equals(result.getValidatorName())) {
-                        if (metadata != null && metadata.containsKey("optimalExecutionTime")) {
-                            optimalExecutionTime = ((Number) metadata.get("optimalExecutionTime")).intValue();
+                        // CodeExecutionValidator는 "maxExecutionTime" 키로 저장함
+                        if (metadata != null && metadata.containsKey("maxExecutionTime")) {
+                            optimalExecutionTime = ((Number) metadata.get("maxExecutionTime")).intValue();
                         }
                         optimalCodeResult = result.isPassed() ? "PASS" : "FAIL";
                     }
 
                     if ("TimeRatioValidator".equals(result.getValidatorName())) {
-                        if (metadata != null && metadata.containsKey("naiveExecutionTime")) {
-                            naiveExecutionTime = ((Number) metadata.get("naiveExecutionTime")).intValue();
+                        // TimeRatioValidator는 "optimalTime", "naiveTime", "timeRatio" 키로 저장함
+                        if (metadata != null && metadata.containsKey("optimalTime")) {
+                            optimalExecutionTime = ((Number) metadata.get("optimalTime")).intValue();
+                        }
+                        if (metadata != null && metadata.containsKey("naiveTime")) {
+                            naiveExecutionTime = ((Number) metadata.get("naiveTime")).intValue();
                         }
                         if (metadata != null && metadata.containsKey("timeRatio")) {
                             timeRatio = ((Number) metadata.get("timeRatio")).doubleValue();

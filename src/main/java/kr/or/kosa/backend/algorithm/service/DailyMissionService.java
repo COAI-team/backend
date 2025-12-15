@@ -31,6 +31,7 @@ public class DailyMissionService {
     private final PointService pointService;
     private final RateLimitService rateLimitService;
     private final SubscriptionMapper subscriptionMapper;
+    private final ProblemPoolService problemPoolService;  // Pool에서 문제 가져오기용
 
     /**
      * 오늘의 미션 조회 (없으면 생성)
@@ -72,9 +73,17 @@ public class DailyMissionService {
         // 오늘 같은 난이도로 이미 할당된 문제가 있는지 확인 (같은 레벨 유저에게 같은 문제 배정)
         Long problemId = missionMapper.findTodayProblemIdByDifficulty(today, difficulty);
 
-        // 없으면 새로 랜덤 선택
+        // 없으면 새로 선택 (Pool 우선 → 기존 ALGO_PROBLEM fallback)
         if (problemId == null) {
-            problemId = missionMapper.findRandomProblemIdByDifficulty(difficulty);
+            // 1. Pool에서 문제 가져오기 시도 (AI 생성 문제)
+            // ALGO_CREATER = -1 → 시스템(데일리 미션)이 생성한 문제임을 표시
+            problemId = problemPoolService.drawProblemForDailyMission(difficulty, -1L);
+
+            // 2. Pool이 비어있으면 기존 ALGO_PROBLEM에서 랜덤 선택 (fallback)
+            if (problemId == null) {
+                log.info("Pool이 비어있어 기존 문제에서 선택 - difficulty: {}", difficulty);
+                problemId = missionMapper.findRandomProblemIdByDifficulty(difficulty);
+            }
         }
 
         // 미션 1: AI 문제 생성 미션
@@ -100,6 +109,9 @@ public class DailyMissionService {
 
     /**
      * 미션 완료 처리
+     * 미션이 없으면 자동 생성 후 완료 처리
+     * - 0시 이후 가입한 신규 유저
+     * - 데일리미션 페이지를 거치지 않고 직접 문제 생성하는 경우
      */
     @Transactional
     public MissionCompleteResult completeMission(Long userId, MissionType missionType) {
@@ -107,8 +119,17 @@ public class DailyMissionService {
 
         // 미션 조회
         DailyMissionDto mission = missionMapper.findMission(userId, today, missionType);
+
+        // 미션이 없으면 자동 생성 (getTodayMissions와 동일한 로직)
         if (mission == null) {
-            return MissionCompleteResult.notFound();
+            log.info("사용자 {} 오늘 미션이 없어서 자동 생성 - missionType: {}", userId, missionType);
+            createDailyMissionsForUser(userId);
+            mission = missionMapper.findMission(userId, today, missionType);
+
+            if (mission == null) {
+                log.error("미션 자동 생성 후에도 찾을 수 없음 - userId: {}, missionType: {}", userId, missionType);
+                return MissionCompleteResult.notFound();
+            }
         }
 
         // 이미 완료됨

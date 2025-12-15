@@ -63,7 +63,7 @@ public class Judge0Service {
             Integer memoryLimit) {
 
         return CompletableFuture.supplyAsync(() -> {
-            log.info("Judge0 채점 시작 - languageId: {}, testCases: {}, timeLimit: {}ms, memoryLimit: {}MB",
+            log.info("Judge0 채점 시작 - languageId: {}, testCases: {}, timeLimit: {}ms, memoryLimit: {}KB",
                     languageId, testCases.size(), timeLimit, memoryLimit);
 
             if (languageId == null) {
@@ -150,7 +150,11 @@ public class Judge0Service {
         // timeLimit (ms) -> cpu_time_limit (seconds) 변환 필요
         // Judge0는 초 단위 (float) 지원
         float cpuTimeLimitSec = timeLimit != null ? timeLimit / 1000.0f : this.cpuTimeLimit.floatValue();
-        int memoryLimitKb = memoryLimit != null ? memoryLimit * 1000 : this.memoryLimit; // MB -> KB
+        // memoryLimit은 이미 KB 단위로 전달됨 (TestCaseGeneratorService에서 256 * 1024 = 262144 KB)
+        // Judge0 RapidAPI 제한: 최소 2,048 KB (2MB) ~ 최대 2,048,000 KB (2GB)
+        int memoryLimitKb = memoryLimit != null
+                ? Math.max(2048, Math.min(memoryLimit, 2048000))
+                : this.memoryLimit;
 
         Judge0RequestDto request = Judge0RequestDto.builder()
                 .source_code(sourceCode)
@@ -170,7 +174,7 @@ public class Judge0Service {
         log.debug("[Judge0 Source Code]\n{}", truncateForLog(request.getSource_code(), 500));
 
         try {
-            // 2. WebClient로 Judge0에 제출
+            // 2. WebClient로 Judge0에 제출 (에러 응답 본문 캡처 포함)
             Judge0ResponseDto response = judge0WebClient.post()
                     .uri(uriBuilder -> uriBuilder
                             .path("/submissions")
@@ -178,8 +182,19 @@ public class Judge0Service {
                             .queryParam("wait", true)
                             .build())
                     .bodyValue(request)
-                    .retrieve()
-                    .bodyToMono(Judge0ResponseDto.class)
+                    .exchangeToMono(clientResponse -> {
+                        if (clientResponse.statusCode().isError()) {
+                            return clientResponse.bodyToMono(String.class)
+                                    .flatMap(errorBody -> {
+                                        log.error("[Judge0 Error Response] status={}, body={}",
+                                                clientResponse.statusCode(), errorBody);
+                                        return reactor.core.publisher.Mono.error(
+                                                new RuntimeException("Judge0 API 에러 [" +
+                                                        clientResponse.statusCode() + "]: " + errorBody));
+                                    });
+                        }
+                        return clientResponse.bodyToMono(Judge0ResponseDto.class);
+                    })
                     .block(); // 동기 호출
 
             if (response == null) {
@@ -196,7 +211,7 @@ public class Judge0Service {
             return interpretResult(response, testCase, testCaseNumber);
 
         } catch (Exception e) {
-            log.error("Judge0 API 호출 실패", e);
+            log.error("Judge0 API 호출 실패: {}", e.getMessage());
             throw new RuntimeException("Judge0 채점 실패: " + e.getMessage(), e);
         }
     }

@@ -1,5 +1,6 @@
 package kr.or.kosa.backend.algorithm.controller;
 
+import kr.or.kosa.backend.algorithm.dto.LanguageDto;
 import kr.or.kosa.backend.algorithm.dto.request.SubmissionRequestDto;
 import kr.or.kosa.backend.algorithm.dto.request.TestRunRequestDto;
 import kr.or.kosa.backend.algorithm.dto.response.ProblemSolveResponseDto;
@@ -7,6 +8,7 @@ import kr.or.kosa.backend.algorithm.dto.response.SubmissionResponseDto;
 import kr.or.kosa.backend.algorithm.dto.response.TestRunResponseDto;
 import kr.or.kosa.backend.algorithm.exception.AlgoErrorCode;
 import kr.or.kosa.backend.algorithm.service.AlgorithmSolvingService;
+import kr.or.kosa.backend.algorithm.service.LanguageService;
 import kr.or.kosa.backend.commons.exception.custom.CustomBusinessException;
 import kr.or.kosa.backend.commons.pagination.PageResponse;
 import kr.or.kosa.backend.commons.response.ApiResponse;
@@ -21,6 +23,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import javax.validation.Valid;
+import java.util.List;
 
 @RestController
 @RequestMapping("/algo")
@@ -29,6 +32,7 @@ import javax.validation.Valid;
 public class AlgorithmSolvingController {
 
     private final AlgorithmSolvingService solvingService;
+    private final LanguageService languageService;
 
     /**
      * SecurityContext에서 직접 사용자 ID 추출
@@ -211,7 +215,7 @@ public class AlgorithmSolvingController {
      * 사용자 제출 이력 조회 (ALG-11)
      */
     @GetMapping("/submissions/my")
-    public ResponseEntity<ApiResponse<java.util.List<SubmissionResponseDto>>> getMySubmissions(
+    public ResponseEntity<ApiResponse<List<SubmissionResponseDto>>> getMySubmissions(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             @AuthenticationPrincipal JwtAuthentication authentication) {
@@ -221,7 +225,7 @@ public class AlgorithmSolvingController {
         log.info("내 제출 이력 조회 - userId: {}, page: {}, size: {}", userId, page, size);
 
         try {
-            java.util.List<SubmissionResponseDto> response =
+            List<SubmissionResponseDto> response =
                     solvingService.getUserSubmissions(userId, page, size);
 
             return ResponseEntity.ok(new ApiResponse<>("0000", "제출 이력 조회 완료", response));
@@ -252,5 +256,21 @@ public class AlgorithmSolvingController {
             log.error("공유된 제출 목록 조회 중 예외 발생", e);
             throw new CustomBusinessException(AlgoErrorCode.SUBMISSION_NOT_FOUND);
         }
+    }
+
+    /**
+     * 지원 언어 목록 조회
+     * GET /api/algo/languages
+     *
+     * 프론트엔드에서 언어 드롭다운을 동적으로 구성하기 위해 사용
+     * 인증 불필요 (언어 목록은 공개 정보)
+     */
+    @GetMapping("/languages")
+    public ResponseEntity<ApiResponse<List<LanguageDto>>> getLanguages() {
+        log.debug("지원 언어 목록 조회 요청");
+
+        List<LanguageDto> languages = languageService.getAllLanguages();
+
+        return ResponseEntity.ok(new ApiResponse<>("0000", "언어 목록 조회 완료", languages));
     }
 }

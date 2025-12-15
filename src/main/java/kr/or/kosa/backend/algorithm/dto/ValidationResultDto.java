@@ -1,7 +1,10 @@
 package kr.or.kosa.backend.algorithm.dto;
 
 import lombok.Getter;
+import lombok.Setter;
 import lombok.Builder;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -13,26 +16,29 @@ import java.util.Map;
  * 모든 검증기가 공통으로 사용
  */
 @Getter
+@Setter
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class ValidationResultDto {
 
     /** 검증 통과 여부 */
     private boolean passed;
 
     /** 검증 단계 이름 */
-    private final String validatorName;
+    private String validatorName;
 
     /** 오류 메시지 목록 */
     @Builder.Default
-    private final List<String> errors = new ArrayList<>();
+    private List<String> errors = new ArrayList<>();
 
     /** 경고 메시지 목록 */
     @Builder.Default
-    private final List<String> warnings = new ArrayList<>();
+    private List<String> warnings = new ArrayList<>();
 
     /** 추가 메타데이터 (실행 시간, 점수 등) */
     @Builder.Default
-    private final Map<String, Object> metadata = new HashMap<>();
+    private Map<String, Object> metadata = new HashMap<>();
 
     /**
      * 성공 결과 생성

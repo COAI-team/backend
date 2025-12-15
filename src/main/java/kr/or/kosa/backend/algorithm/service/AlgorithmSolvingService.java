@@ -31,6 +31,7 @@ import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
@@ -97,6 +98,17 @@ public class AlgorithmSolvingService {
                         .build())
                 .collect(Collectors.toList());
 
+        // 6. 문제 통계 조회 -> 기존에 있던 로직. 삭제하지 마세요!! 
+        Map<String, Object> statistics = problemMapper.selectProblemStatistics(problemId);
+        Integer totalAttempts = 0;
+        Integer successCount = 0;
+        if (statistics != null) {
+            Object ta = statistics.get("totalAttempts");
+            Object sc = statistics.get("successCount");
+            totalAttempts = ta != null ? ((Number) ta).intValue() : 0;
+            successCount = sc != null ? ((Number) sc).intValue() : 0;
+        }
+
         return ProblemSolveResponseDto.builder()
                 .problemId(problem.getAlgoProblemId())
                 .title(problem.getAlgoProblemTitle())
@@ -104,6 +116,8 @@ public class AlgorithmSolvingService {
                 .difficulty(problem.getAlgoProblemDifficulty().name())
                 .timeLimit(problem.getTimelimit())
                 .memoryLimit(problem.getMemorylimit())
+                .totalAttempts(totalAttempts)
+                .successCount(successCount)
                 .problemType(problemType != null ? problemType.name() : "ALGORITHM")
                 .initScript(problem.getInitScript())
                 .availableLanguages(availableLanguages)

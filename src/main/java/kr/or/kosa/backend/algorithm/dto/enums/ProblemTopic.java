@@ -3,77 +3,69 @@ package kr.or.kosa.backend.algorithm.dto.enums;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
+/**
+ * 알고리즘 문제 토픽 (프론트엔드 TOPIC_CATEGORIES_ALGO와 동기화)
+ */
 @Getter
 @RequiredArgsConstructor
 public enum ProblemTopic {
 
-    // ===== 기초 (6개) =====
-    ARRAY("배열", "array"),
-    IMPLEMENTATION("구현", "implementation"),
-    SIMULATION("시뮬레이션", "implementation"),
-    RECURSION("재귀", "implementation"),
-    MATH("수학", "math"),
-    STRING("문자열", "string"),
+    // ===== 자료구조 =====
+    HASH("해시", "자료구조"),
+    STACK_QUEUE("스택/큐", "자료구조"),
+    HEAP("힙/우선순위 큐", "자료구조"),
+    TREE("트리", "자료구조"),
 
-    // ===== 탐색 (5개) =====
-    SEARCH("탐색", "binary_search"),
-    BFS("너비우선탐색", "bfs"),
-    DFS("깊이우선탐색", "dfs"),
-    BINARY_SEARCH("이분탐색", "binary_search"),
-    BACKTRACKING("백트래킹", "dfs"),
+    // ===== 탐색 =====
+    DFS_BFS("DFS/BFS", "탐색"),
+    BRUTE_FORCE("완전탐색", "탐색"),
+    BACKTRACKING("백트래킹", "탐색"),
+    BINARY_SEARCH("이분탐색", "탐색"),
+    GRAPH_SHORTEST_PATH("그래프/최단경로", "탐색"),
 
-    // ===== 알고리즘 (5개) =====
-    DP("다이나믹 프로그래밍", "dp"),
-    GREEDY("그리디", "greedy"),
-    SORTING("정렬", "sorting"),
-    DIVIDE_CONQUER("분할정복", "divide_conquer"),
-    TWO_POINTER("투포인터", "two_pointer"),
+    // ===== 최적화 =====
+    GREEDY("그리디", "최적화"),
+    DP("동적 프로그래밍(DP)", "최적화"),
 
-    // ===== 그래프 (4개) =====
-    GRAPH("그래프", "graph"),
-    SHORTEST_PATH("최단경로", "dijkstra"),
-    MST("최소신장트리", "mst"),
-    TOPOLOGY_SORT("위상정렬", "topology_sort"),
-
-    // ===== 자료구조 (4개) =====
-    STACK_QUEUE("스택/큐", "stack_queue"),
-    TREE("트리", "tree"),
-    HEAP("힙", "priority_queue"),
-    UNION_FIND("유니온파인드", "union_find");
+    // ===== 구현 =====
+    IMPLEMENTATION("구현/시뮬레이션", "구현"),
+    SORTING("정렬", "구현"),
+    STRING("문자열 처리", "구현"),
+    TWO_POINTER("투포인터/슬라이딩 윈도우", "구현");
 
     private final String displayName;
-    private final String synonymKey;
+    private final String category;
 
-    // 프론트엔드 약어 → Enum 매핑
-    private static final java.util.Map<String, ProblemTopic> ALIAS_MAP = java.util.Map.of(
-            "BFS", BFS,
-            "DFS", DFS,
-            "DP", DP,
-            "MST", MST
-    );
-
+    /**
+     * displayName으로 ProblemTopic 찾기
+     */
     public static ProblemTopic fromDisplayName(String name) {
-        // 약어 먼저 확인
-        if (ALIAS_MAP.containsKey(name)) {
-            return ALIAS_MAP.get(name);
+        if (name == null || name.isBlank()) {
+            return null;
         }
 
-        // displayName으로 검색
         for (ProblemTopic topic : values()) {
             if (topic.displayName.equals(name)) {
                 return topic;
             }
         }
-        throw new IllegalArgumentException("Unknown topic: " + name);
+        return null;
     }
 
+    /**
+     * enum name 또는 displayName으로 찾기
+     */
     public static ProblemTopic fromValue(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+
         for (ProblemTopic topic : values()) {
             if (topic.name().equalsIgnoreCase(value) ||
                 topic.displayName.equals(value)) {
                 return topic;
             }
         }
-        throw new IllegalArgumentException("Unknown topic value: " + value);
+        return null;
     }
 }

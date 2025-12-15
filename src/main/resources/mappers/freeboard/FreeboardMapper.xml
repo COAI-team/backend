@@ -18,20 +18,6 @@
         <result property="freeboardCreatedAt" column="FREEBOARD_CREATED_AT"/>
     </resultMap>
 
-    <!-- 상세 조회용 resultMap -->
-    <resultMap id="freeboardDetailResultMap" type="kr.or.kosa.backend.freeboard.dto.FreeboardDetailResponseDto">
-        <id property="freeboardId" column="FREEBOARD_ID"/>
-        <result property="userId" column="USER_ID"/>
-        <result property="userNickname" column="USER_NICKNAME"/>
-        <result property="freeboardTitle" column="FREEBOARD_TITLE"/>
-        <result property="freeboardContent" column="FREEBOARD_CONTENT"/>
-        <result property="freeboardClick" column="FREEBOARD_CLICK"/>
-        <result property="likeCount" column="LIKE_COUNT"/>
-        <result property="freeboardImage" column="FREEBOARD_IMAGE"/>
-        <result property="freeboardRepresentImage" column="FREEBOARD_REPRESENT_IMAGE"/>
-        <result property="freeboardCreatedAt" column="FREEBOARD_CREATED_AT"/>
-    </resultMap>
-
     <!-- 게시글 목록 조회 (서브쿼리로 좋아요/댓글 수 실시간 집계) -->
     <select id="findPosts" resultMap="freeboardListResultMap">
         SELECT
@@ -111,7 +97,22 @@
         </where>
     </select>
 
-    <!-- 상세 조회 (서브쿼리로 좋아요 수 실시간 집계) -->
+    <!-- 상세 조회용 resultMap -->
+    <resultMap id="freeboardDetailResultMap" type="kr.or.kosa.backend.freeboard.dto.FreeboardDetailResponseDto">
+        <id property="freeboardId" column="FREEBOARD_ID"/>
+        <result property="userId" column="USER_ID"/>
+        <result property="userNickname" column="USER_NICKNAME"/>
+        <result property="freeboardTitle" column="FREEBOARD_TITLE"/>
+        <result property="freeboardContent" column="FREEBOARD_CONTENT"/>
+        <result property="freeboardClick" column="FREEBOARD_CLICK"/>
+        <result property="likeCount" column="LIKE_COUNT"/>
+        <result property="commentCount" column="COMMENT_COUNT"/>
+        <result property="freeboardImage" column="FREEBOARD_IMAGE"/>
+        <result property="freeboardRepresentImage" column="FREEBOARD_REPRESENT_IMAGE"/>
+        <result property="freeboardCreatedAt" column="FREEBOARD_CREATED_AT"/>
+    </resultMap>
+
+    <!-- 상세 조회 (서브쿼리로 좋아요/댓글 수 실시간 집계) -->
     <select id="selectById" resultMap="freeboardDetailResultMap">
         SELECT
         f.FREEBOARD_ID,
@@ -124,6 +125,11 @@
         FROM `LIKE` l
         WHERE l.REFERENCE_ID = f.FREEBOARD_ID
         AND l.REFERENCE_TYPE = 'POST_FREEBOARD') AS LIKE_COUNT,
+        (SELECT COUNT(*)
+        FROM `COMMENT` c
+        WHERE c.BOARD_ID = f.FREEBOARD_ID
+        AND c.BOARD_TYPE = 'FREEBOARD'
+        AND c.IS_DELETED = FALSE) AS COMMENT_COUNT,
         f.FREEBOARD_IMAGE,
         f.FREEBOARD_REPRESENT_IMAGE,
         f.FREEBOARD_CREATED_AT

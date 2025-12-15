@@ -3,6 +3,7 @@ package kr.or.kosa.backend.security.jwt;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -10,6 +11,7 @@ import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
 
+@Slf4j
 @Component
 public class JwtProvider {
 
@@ -55,15 +57,16 @@ public class JwtProvider {
 
             return true;
         } catch (io.jsonwebtoken.security.SecurityException | MalformedJwtException e) {
-            System.out.println("[JwtProvider] Invalid JWT signature: " + e.getMessage());
+            log.warn("[JwtProvider] Invalid JWT signature: {}", e.getMessage());
         } catch (ExpiredJwtException e) {
-            System.out.println("[JwtProvider] Expired JWT token: " + e.getMessage());
+            log.warn("[JwtProvider] Expired JWT token: {}", e.getMessage());
+            throw e;
         } catch (UnsupportedJwtException e) {
-            System.out.println("[JwtProvider] Unsupported JWT token: " + e.getMessage());
+            log.warn("[JwtProvider] Unsupported JWT token: {}", e.getMessage());
         } catch (IllegalArgumentException e) {
-            System.out.println("[JwtProvider] JWT claims string is empty: " + e.getMessage());
+            log.warn("[JwtProvider] JWT claims string is empty: {}", e.getMessage());
         } catch (JwtException e) {
-            System.out.println("[JwtProvider] JWT Error: " + e.getMessage());
+            log.warn("[JwtProvider] JWT Error: {}", e.getMessage());
         }
         return false;
     }
