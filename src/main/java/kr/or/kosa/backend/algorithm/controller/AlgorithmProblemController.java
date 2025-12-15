@@ -4,7 +4,9 @@ import kr.or.kosa.backend.algorithm.dto.AlgoProblemDto;
 import kr.or.kosa.backend.algorithm.dto.request.ProblemGenerationRequestDto;
 import kr.or.kosa.backend.algorithm.dto.response.ProblemGenerationResponseDto;
 import kr.or.kosa.backend.algorithm.dto.response.ProblemStatisticsResponseDto;
+import kr.or.kosa.backend.algorithm.dto.response.TopicResponseDto;
 import kr.or.kosa.backend.algorithm.dto.enums.ProblemDifficulty;
+import kr.or.kosa.backend.algorithm.dto.enums.ProblemTopic;
 import kr.or.kosa.backend.algorithm.exception.AlgoErrorCode;
 import kr.or.kosa.backend.algorithm.service.AIProblemGeneratorService;
 import kr.or.kosa.backend.algorithm.service.AlgorithmProblemService;
@@ -23,9 +25,12 @@ import reactor.core.publisher.Flux;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 알고리즘 문제 컨트롤러
@@ -107,7 +112,12 @@ public class AlgorithmProblemController {
     /**
      * AI 문제 생성 (SSE 스트리밍)
      * GET /api/algo/problems/generate/stream
+     *
+     * @deprecated 검증 없이 PENDING 상태로만 저장됨.
+     *             대신 /api/algo/pool/draw/stream 엔드포인트를 사용하세요.
+     *             해당 엔드포인트는 검증 파이프라인을 수행합니다.
      */
+    @Deprecated(since = "2025-12", forRemoval = true)
     @GetMapping(value = "/generate/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<String> generateProblemStream(
             @RequestParam String difficulty,
@@ -396,6 +406,41 @@ public class AlgorithmProblemController {
             log.error("통계 정보 조회 실패", e);
             throw new CustomBusinessException(AlgoErrorCode.INVALID_INPUT);
         }
+    }
+
+    /**
+     * 알고리즘 토픽 목록 조회
+     * GET /api/algo/problems/topics
+     */
+    @GetMapping("/topics")
+    public ResponseEntity<ApiResponse<List<TopicResponseDto>>> getTopics() {
+
+        log.info("알고리즘 토픽 목록 조회");
+
+        // 카테고리별로 그룹화하여 순서 유지
+        Map<String, List<ProblemTopic>> groupedByCategory = Arrays.stream(ProblemTopic.values())
+                .collect(Collectors.groupingBy(
+                        ProblemTopic::getCategory,
+                        LinkedHashMap::new,
+                        Collectors.toList()
+                ));
+
+        // DTO 변환
+        List<TopicResponseDto> result = groupedByCategory.entrySet().stream()
+                .map(entry -> TopicResponseDto.builder()
+                        .category(entry.getKey())
+                        .topics(entry.getValue().stream()
+                                .map(topic -> TopicResponseDto.TopicItem.builder()
+                                        .value(topic.name())
+                                        .displayName(topic.getDisplayName())
+                                        .build())
+                                .toList())
+                        .build())
+                .toList();
+
+        log.info("토픽 목록 조회 완료 - 카테고리 수: {}", result.size());
+
+        return ResponseEntity.ok(ApiResponse.success(result));
     }
 
     /**

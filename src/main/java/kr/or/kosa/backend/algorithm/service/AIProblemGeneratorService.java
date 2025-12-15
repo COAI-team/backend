@@ -149,7 +149,13 @@ public class AIProblemGeneratorService {
     /**
      * AI 문제 생성 (스트리밍 버전 - Phase 2 통합)
      * SSE를 통해 실시간으로 생성 과정을 클라이언트에 전송
+     *
+     * @deprecated 검증 없이 PENDING 상태로만 저장됨.
+     *             대신 {@link ProblemPoolService#drawProblem} 또는
+     *             {@link ProblemGenerationOrchestrator#generateProblem}을 사용하세요.
+     *             이 메서드들은 검증 파이프라인(구조/유사도/코드실행/시간비율)을 수행합니다.
      */
+    @Deprecated(since = "2024-12", forRemoval = true)
     public Flux<String> generateProblemStream(ProblemGenerationRequestDto request) {
         return Flux.create(sink -> {
             // 별도 스레드에서 실행
