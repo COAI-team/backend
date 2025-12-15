@@ -1,11 +1,11 @@
-package kr.or.kosa.backend.admin.dto.response;
+package kr.or.kosa.backend.admin.dto;
 
-public record AdminDashBoardUserCountResponseDto(
+public record UserCountSummaryDto(
     String year,
     String month,
     int userCount
 ) {
-    public AdminDashBoardUserCountResponseDto{
+    public UserCountSummaryDto {
         year = (year == null) ? "TOTAL" : year;
         month = (month == null) ? "-" : month;
     }

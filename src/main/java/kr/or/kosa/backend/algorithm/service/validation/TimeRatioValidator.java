@@ -1,9 +1,11 @@
 package kr.or.kosa.backend.algorithm.service.validation;
 
 import kr.or.kosa.backend.algorithm.dto.AlgoTestcaseDto;
+import kr.or.kosa.backend.algorithm.dto.LanguageDto;
 import kr.or.kosa.backend.algorithm.dto.ValidationResultDto;
 import kr.or.kosa.backend.algorithm.dto.response.TestRunResponseDto;
 import kr.or.kosa.backend.algorithm.service.CodeExecutorService;
+import kr.or.kosa.backend.algorithm.service.LanguageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -24,6 +26,7 @@ public class TimeRatioValidator {
     private static final String VALIDATOR_NAME = "TimeRatioValidator";
 
     private final CodeExecutorService codeExecutorService;  // Judge0 또는 Piston 선택
+    private final LanguageService languageService;          // 언어 정보 조회
 
     @Value("${algorithm.validation.min-time-ratio:1.5}")
     private double minTimeRatio;
@@ -37,37 +40,58 @@ public class TimeRatioValidator {
     @Value("${algorithm.validation.default-memory-limit:256}")
     private int defaultMemoryLimit;
 
+    /**
+     * 시간 비율 검증
+     *
+     * @param optimalCode  최적 풀이 코드
+     * @param naiveCode    비효율 풀이 코드
+     * @param languageName 프로그래밍 언어명 (예: "Python 3", "Java 17")
+     * @param testCases    테스트케이스 목록
+     * @param timeLimit    시간 제한 (ms, nullable)
+     * @param memoryLimit  메모리 제한 (MB, nullable)
+     * @return 검증 결과
+     *
+     * 변경사항 (2025-12-13): languageName → languageId 변환 후 CodeExecutorService 호출
+     */
     public ValidationResultDto validate(
             String optimalCode,
             String naiveCode,
-            String language,
+            String languageName,
             List<AlgoTestcaseDto> testCases,
             Integer timeLimit,
             Integer memoryLimit) {
 
-        log.info("시간 비율 검증 시작 - language: {}, minTimeRatio: {}", language, minTimeRatio);
+        log.info("시간 비율 검증 시작 - language: {}, minTimeRatio: {}", languageName, minTimeRatio);
 
         ValidationResultDto result = ValidationResultDto.builder()
                 .passed(true)
                 .validatorName(VALIDATOR_NAME)
                 .build();
 
-        if (!validateInputs(optimalCode, naiveCode, language, testCases, result)) {
+        if (!validateInputs(optimalCode, naiveCode, languageName, testCases, result)) {
             return result;
         }
+
+        // 언어명 → languageId 변환
+        LanguageDto language = languageService.getByName(languageName);
+        if (language == null) {
+            result.addError("지원하지 않는 프로그래밍 언어입니다: " + languageName);
+            return result;
+        }
+        Integer languageId = language.getLanguageId();
 
         int effectiveTimeLimit = timeLimit != null && timeLimit > 0 ? timeLimit * 2 : defaultTimeLimit;
         int effectiveMemoryLimit = memoryLimit != null && memoryLimit > 0 ? memoryLimit : defaultMemoryLimit;
 
         try {
-            long optimalTime = executeAndGetMaxTime(optimalCode, language, testCases,
+            long optimalTime = executeAndGetMaxTime(optimalCode, languageId, testCases,
                     effectiveTimeLimit, effectiveMemoryLimit, result, "optimal");
 
             if (optimalTime < 0) {
                 return result;
             }
 
-            long naiveTime = executeAndGetMaxTime(naiveCode, language, testCases,
+            long naiveTime = executeAndGetMaxTime(naiveCode, languageId, testCases,
                     effectiveTimeLimit, effectiveMemoryLimit, result, "naive");
 
             if (naiveTime < 0) {
@@ -121,7 +145,7 @@ public class TimeRatioValidator {
 
     private long executeAndGetMaxTime(
             String code,
-            String language,
+            Integer languageId,
             List<AlgoTestcaseDto> testCases,
             int timeLimit,
             int memoryLimit,
@@ -130,7 +154,7 @@ public class TimeRatioValidator {
 
         try {
             TestRunResponseDto judgeResult = codeExecutorService.judgeCode(
-                    code, language, testCases, timeLimit, memoryLimit
+                    code, languageId, testCases, timeLimit, memoryLimit
             ).get(executionTimeoutSeconds, TimeUnit.SECONDS);
 
             if (!"AC".equals(judgeResult.getOverallResult())) {

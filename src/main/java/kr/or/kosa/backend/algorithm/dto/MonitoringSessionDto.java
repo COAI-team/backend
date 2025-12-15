@@ -3,8 +3,9 @@ package kr.or.kosa.backend.algorithm.dto;
 import kr.or.kosa.backend.algorithm.dto.enums.SessionStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.time.LocalDateTime;
 
@@ -15,7 +16,8 @@ import java.time.LocalDateTime;
  * 집중 모드(FOCUS)에서만 생성됨
  * 모니터링은 점수에 반영되지 않고, 경고/정보 제공 목적으로만 사용
  */
-@Data
+@Getter
+@Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor

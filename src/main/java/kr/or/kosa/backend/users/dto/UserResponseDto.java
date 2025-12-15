@@ -17,4 +17,5 @@ public class UserResponseDto {
     private Boolean userIssubscribed;
     private String githubId;
     private Boolean hasGithubToken;
+    private String subscriptionTier;
 }

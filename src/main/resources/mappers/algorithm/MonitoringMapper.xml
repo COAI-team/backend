@@ -86,11 +86,13 @@
                 <when test="violationType == 'GAZE_AWAY'">GAZE_AWAY_COUNT = GAZE_AWAY_COUNT + 1</when>
                 <when test="violationType == 'SLEEPING'">SLEEPING_COUNT = SLEEPING_COUNT + 1</when>
                 <when test="violationType == 'NO_FACE'">NO_FACE_COUNT = NO_FACE_COUNT + 1</when>
+                <when test="violationType == 'NO_FACE_SUSTAINED'">NO_FACE_COUNT = NO_FACE_COUNT + 1</when>
                 <when test="violationType == 'MASK_DETECTED'">MASK_DETECTED_COUNT = MASK_DETECTED_COUNT + 1</when>
                 <when test="violationType == 'MULTIPLE_FACES'">MULTIPLE_FACES_COUNT = MULTIPLE_FACES_COUNT + 1</when>
                 <when test="violationType == 'MOUSE_LEAVE'">MOUSE_LEAVE_COUNT = MOUSE_LEAVE_COUNT + 1</when>
                 <when test="violationType == 'TAB_SWITCH'">TAB_SWITCH_COUNT = TAB_SWITCH_COUNT + 1</when>
                 <when test="violationType == 'FULLSCREEN_EXIT'">FULLSCREEN_EXIT_COUNT = FULLSCREEN_EXIT_COUNT + 1</when>
+                <otherwise>NO_FACE_COUNT = NO_FACE_COUNT</otherwise>
             </choose>,
             TOTAL_VIOLATIONS = TOTAL_VIOLATIONS + 1
         WHERE SESSION_ID = #{sessionId}

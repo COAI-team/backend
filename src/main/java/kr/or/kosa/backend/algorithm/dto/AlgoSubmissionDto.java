@@ -3,12 +3,12 @@ package kr.or.kosa.backend.algorithm.dto;
 import kr.or.kosa.backend.algorithm.dto.enums.JudgeResult;
 import kr.or.kosa.backend.algorithm.dto.enums.AiFeedbackStatus;
 import kr.or.kosa.backend.algorithm.dto.enums.AiFeedbackType;
-import kr.or.kosa.backend.algorithm.dto.enums.GithubCommitStatus;
 import kr.or.kosa.backend.algorithm.dto.enums.SolveMode;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.time.LocalDateTime;
 import java.math.BigDecimal;
@@ -21,8 +21,11 @@ import java.math.BigDecimal;
  * - focusScore, focusSessionId, eyetracked 제거 (모니터링이 점수에 미반영)
  * - solveMode 추가: BASIC(자유 풀이) vs FOCUS(집중 모드)
  * - monitoringSessionId 추가: FOCUS 모드에서 모니터링 세션 연결
+ * - language (String) → languageId (Integer) 변경 (2025-12-13)
+ * - githubCommitRequested, githubCommitStatus → githubCommitUrl 변경 (2025-12-13)
  */
-@Data
+@Getter
+@Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
@@ -35,7 +38,7 @@ public class AlgoSubmissionDto {
 
     // 제출 코드 및 언어
     private String sourceCode;
-    private String language;
+    private Integer languageId;  // LANGUAGES.LANGUAGE_ID (Judge0 API ID)
 
     // Judge0 채점 결과
     private JudgeResult judgeResult;
@@ -64,9 +67,8 @@ public class AlgoSubmissionDto {
     private LocalDateTime endSolving;
     private Integer solvingDurationSeconds;
 
-    // GitHub 연동 관련
-    private Boolean githubCommitRequested;
-    private GithubCommitStatus githubCommitStatus;
+    // GitHub 커밋 URL (NULL: 미커밋, 값: 커밋완료)
+    private String githubCommitUrl;
 
     // 공유 설정
     private Boolean isShared;

@@ -31,7 +31,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         String path = request.getRequestURI();
 
-        // 🔥 GitHub 관련 URL은 JWT 검사 제외
+        // 🔥 JWT 검사 제외 경로
         if (path.startsWith("/auth/github/login-url") ||
                 path.startsWith("/auth/github/callback") ||
                 path.startsWith("/auth/github/user")) {

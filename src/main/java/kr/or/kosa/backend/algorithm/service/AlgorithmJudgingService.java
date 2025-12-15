@@ -13,14 +13,23 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Duration;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
+/**
+ * 알고리즘 채점 서비스
+ *
+ * 변경사항 (2025-12-13):
+ * - LanguageConstantService → LanguageService 교체
+ * - language (String) → languageId (INT) 사용
+ */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -28,13 +37,16 @@ public class AlgorithmJudgingService {
 
     private final AlgorithmSubmissionMapper submissionMapper;
     private final AlgorithmProblemMapper problemMapper;
-    private final CodeExecutorService codeExecutorService;  // Judge0 또는 Piston 선택
+    private final CodeExecutorService codeExecutorService;
     private final AlgorithmEvaluationService evaluationService;
-    private final LanguageConstantService languageConstantService;
+    private final LanguageService languageService;  // 언어 정보 조회 (DB 기반)
+    private final DailyQuizBonusService dailyQuizBonusService;
 
     /**
      * 통합 채점 및 평가 프로세스 (비동기)
      * - Judge0 채점 후 즉시 AI 평가 시작
+     *
+     * 변경사항 (2025-12-13): language (String) → languageId (INT)
      */
     @Async("judgeExecutor")
     public void processCompleteJudgingFlow(Long submissionId, SubmissionRequestDto request, AlgoProblemDto problem) {
@@ -45,30 +57,39 @@ public class AlgorithmJudgingService {
             // 1. 모든 테스트케이스 조회
             List<AlgoTestcaseDto> testCases = problemMapper.selectTestCasesByProblemId(request.getProblemId());
 
-            // 2. 언어별 제한 시간/메모리 계산
-            String dbLanguageName = request.getLanguage(); // DB 언어명 직접 사용 (예: "Python 3", "Java 17")
+            // 2. 언어별 제한 시간/메모리 계산 (languageId 사용)
+            Integer languageId = request.getLanguageId();
 
-            int realTimeLimit = languageConstantService.calculateRealTimeLimit(
-                    dbLanguageName, problem.getTimelimit());
-            int realMemoryLimit = languageConstantService.calculateRealMemoryLimit(
-                    dbLanguageName, problem.getMemorylimit());
+            int realTimeLimit = languageService.calculateRealTimeLimit(
+                    languageId, problem.getTimelimit());
+            int realMemoryLimit = languageService.calculateRealMemoryLimit(
+                    languageId, problem.getMemorylimit());
 
-            log.info("언어별 제한 적용 - 언어: {}, 시간: {}ms, 메모리: {}MB",
-                    dbLanguageName, realTimeLimit, realMemoryLimit);
+            log.info("언어별 제한 적용 - languageId: {}, 시간: {}ms, 메모리: {}MB",
+                    languageId, realTimeLimit, realMemoryLimit);
 
             // 3. 코드 채점 실행 (Judge0 또는 Piston 사용)
             CompletableFuture<TestRunResponseDto> judgeFuture = codeExecutorService.judgeCode(
-                    request.getSourceCode(), dbLanguageName, testCases, realTimeLimit, realMemoryLimit);
+                    request.getSourceCode(), languageId, testCases, realTimeLimit, realMemoryLimit);
 
             TestRunResponseDto judgeResult = judgeFuture.get();
 
             // 4. Judge 결과만으로 기본 제출 정보 업데이트
-            updateSubmissionWithJudgeResult(submissionId, judgeResult, request);
+            AlgoSubmissionDto updatedSubmission = updateSubmissionWithJudgeResult(submissionId, judgeResult, request);
 
             log.info("Judge0 채점 완료 - submissionId: {}, result: {}",
                     submissionId, judgeResult.getOverallResult());
 
-            // 5. AI 평가 및 점수 계산 비동기 시작 (분리된 서비스)
+            // 5. Daily Quiz 보너스 처리
+            if (updatedSubmission != null && updatedSubmission.getJudgeResult() == JudgeResult.AC) {
+                dailyQuizBonusService.handleDailyQuizSolved(
+                        updatedSubmission.getUserId(),
+                        updatedSubmission.getAlgoProblemId(),
+                        LocalDate.now()
+                );
+            }
+
+            // 6. AI 평가 및 점수 계산 비동기 시작 (분리된 서비스)
             log.info("🤖 AI 평가 서비스 호출 시작 - submissionId: {}, 현재 스레드: {}",
                     submissionId, Thread.currentThread().getName());
             try {
@@ -76,7 +97,7 @@ public class AlgorithmJudgingService {
                 log.info("✅ AI 평가 서비스 호출 완료 - submissionId: {}", submissionId);
             } catch (Exception aiEx) {
                 log.error("❌ AI 평가 서비스 호출 실패 - submissionId: {}", submissionId, aiEx);
-                throw aiEx; // 상위 catch 블록에서 처리하도록 재던짐
+                throw aiEx;
             }
 
         } catch (Exception e) {
@@ -88,11 +109,11 @@ public class AlgorithmJudgingService {
     /**
      * Judge 결과로만 제출 업데이트 (기본 점수)
      */
-    private void updateSubmissionWithJudgeResult(Long submissionId, TestRunResponseDto judgeResult,
-            SubmissionRequestDto request) {
+    private AlgoSubmissionDto updateSubmissionWithJudgeResult(Long submissionId, TestRunResponseDto judgeResult,
+                                                              SubmissionRequestDto request) {
         AlgoSubmissionDto submission = submissionMapper.selectSubmissionById(submissionId);
         if (submission == null)
-            return;
+            return null;
 
         // Judge 결과 설정
         submission.setJudgeResult(JudgeResult.valueOf(judgeResult.getOverallResult()));
@@ -113,8 +134,9 @@ public class AlgorithmJudgingService {
         // 기본 점수 계산 (Judge 결과만으로)
         BigDecimal basicScore = calculateBasicScore(judgeResult);
         submission.setFinalScore(basicScore);
-
+        // DB 업데이트
         submissionMapper.updateSubmission(submission);
+        return submission;
     }
 
     /**

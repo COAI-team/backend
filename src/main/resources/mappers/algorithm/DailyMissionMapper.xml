@@ -80,6 +80,18 @@
         LIMIT 1
     </select>
 
+    <!-- 오늘 날짜 + 난이도로 이미 할당된 문제 ID 조회 (같은 레벨 유저에게 같은 문제 배정용) -->
+    <select id="findTodayProblemIdByDifficulty" resultType="Long">
+        SELECT dm.PROBLEM_ID
+        FROM DAILY_MISSIONS dm
+        JOIN ALGO_PROBLEMS ap ON dm.PROBLEM_ID = ap.ALGO_PROBLEM_ID
+        WHERE dm.MISSION_DATE = #{date}
+          AND dm.MISSION_TYPE = 'PROBLEM_SOLVE'
+          AND ap.ALGO_PROBLEM_DIFFICULTY = #{difficulty}
+          AND dm.PROBLEM_ID IS NOT NULL
+        LIMIT 1
+    </select>
+
     <!-- ===== 사용자 레벨 ===== -->
 
     <!-- 사용자 레벨 조회 -->

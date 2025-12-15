@@ -1,5 +1,7 @@
 package kr.or.kosa.backend.algorithm.service.validation;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import kr.or.kosa.backend.algorithm.dto.AlgoProblemDto;
 import kr.or.kosa.backend.algorithm.dto.AlgoTestcaseDto;
 import kr.or.kosa.backend.algorithm.dto.ValidationResultDto;
@@ -10,6 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -22,6 +25,7 @@ import java.util.List;
 public class SelfCorrectionService {
 
     private final LLMChatService llmChatService;
+    private final ObjectMapper objectMapper;
 
     @Value("${algorithm.validation.max-correction-attempts:3}")
     private int maxCorrectionAttempts;
@@ -179,22 +183,244 @@ public class SelfCorrectionService {
         try {
             log.debug("Self-Correction 응답 파싱 중...");
 
-            // TODO: 실제 구현에서는 LLMResponseParser를 사용하여 응답 파싱
-            // 현재는 원본 데이터를 유지하면서 반환 (LLM 응답에서 수정된 부분만 업데이트)
+            // JSON 정제 (마크다운 코드 블록 제거 등)
+            String cleanedJson = sanitizeJson(response);
 
-            // 원본 데이터를 유지하면서 반환
-            // 실제 구현 시 LLM 응답에서 수정된 데이터를 파싱하여 적용
+            if (cleanedJson == null || cleanedJson.isBlank() || cleanedJson.equals("{}")) {
+                log.warn("Self-Correction 응답이 비어있음, 원본 데이터 반환");
+                return buildResponseWithOriginals(originalProblem, originalTestCases, originalOptimalCode, originalNaiveCode);
+            }
+
+            JsonNode root = objectMapper.readTree(cleanedJson);
+
+            // 수정된 문제 정보 파싱 (없으면 원본 유지)
+            AlgoProblemDto correctedProblem = parseCorrectedProblem(root, originalProblem);
+
+            // 수정된 테스트케이스 파싱 (없으면 원본 유지)
+            List<AlgoTestcaseDto> correctedTestCases = parseCorrectedTestCases(root, originalTestCases);
+
+            // 수정된 코드 파싱 (없으면 원본 유지)
+            String correctedOptimalCode = getTextOrDefault(root, "optimalCode", originalOptimalCode);
+            String correctedNaiveCode = getTextOrDefault(root, "naiveCode", originalNaiveCode);
+
+            // 수정 내용 로깅
+            String correctionNotes = getText(root, "correctionNotes");
+            if (correctionNotes != null && !correctionNotes.isBlank()) {
+                log.info("Self-Correction 수정 내용: {}", correctionNotes);
+            }
+
+            // 변경 사항 요약 로그
+            logChangeSummary(originalProblem, correctedProblem,
+                            originalTestCases, correctedTestCases,
+                            originalOptimalCode, correctedOptimalCode,
+                            originalNaiveCode, correctedNaiveCode);
+
             return ProblemGenerationResponseDto.builder()
-                    .problem(originalProblem)
-                    .testCases(originalTestCases != null ? originalTestCases : List.of())
-                    .optimalCode(originalOptimalCode)
-                    .naiveCode(originalNaiveCode)
+                    .problem(correctedProblem)
+                    .testCases(correctedTestCases)
+                    .optimalCode(correctedOptimalCode)
+                    .naiveCode(correctedNaiveCode)
                     .build();
 
         } catch (Exception e) {
-            log.error("Self-Correction 응답 파싱 실패", e);
+            log.error("Self-Correction 응답 파싱 실패: {}", e.getMessage());
+            log.debug("파싱 실패한 응답: {}", truncate(response, 500));
+            // 파싱 실패 시 원본 데이터 반환
+            return buildResponseWithOriginals(originalProblem, originalTestCases, originalOptimalCode, originalNaiveCode);
+        }
+    }
+
+    /**
+     * JSON 응답 정제 - 마크다운 코드 블록 제거
+     */
+    private String sanitizeJson(String rawResponse) {
+        if (rawResponse == null || rawResponse.isBlank()) {
+            return "{}";
+        }
+
+        return rawResponse
+                .replaceAll("```json\\s*", "")
+                .replaceAll("```\\s*$", "")
+                .replaceAll("```", "")
+                .trim();
+    }
+
+    /**
+     * 수정된 문제 정보 파싱
+     */
+    private AlgoProblemDto parseCorrectedProblem(JsonNode root, AlgoProblemDto original) {
+        JsonNode problemNode = root.get("problem");
+
+        if (problemNode == null || problemNode.isNull()) {
+            log.debug("problem 필드 없음, 원본 문제 유지");
+            return original;
+        }
+
+        // 원본을 기반으로 수정된 필드만 업데이트
+        return AlgoProblemDto.builder()
+                .algoProblemTitle(getTextOrDefault(problemNode, "title", original.getAlgoProblemTitle()))
+                .algoProblemDescription(getTextOrDefault(problemNode, "description", original.getAlgoProblemDescription()))
+                .algoProblemDifficulty(original.getAlgoProblemDifficulty()) // 난이도는 변경하지 않음
+                .algoProblemSource(original.getAlgoProblemSource())
+                .problemType(original.getProblemType())
+                .constraints(getTextOrDefault(problemNode, "constraints", original.getConstraints()))
+                .inputFormat(getTextOrDefault(problemNode, "inputFormat", original.getInputFormat()))
+                .outputFormat(getTextOrDefault(problemNode, "outputFormat", original.getOutputFormat()))
+                .expectedTimeComplexity(getTextOrDefault(problemNode, "expectedTimeComplexity", original.getExpectedTimeComplexity()))
+                .timelimit(original.getTimelimit())
+                .memorylimit(original.getMemorylimit())
+                .algoProblemTags(original.getAlgoProblemTags())
+                .algoProblemStatus(original.getAlgoProblemStatus())
+                .algoCreatedAt(original.getAlgoCreatedAt())
+                .algoUpdatedAt(original.getAlgoUpdatedAt())
+                .build();
+    }
+
+    /**
+     * 수정된 테스트케이스 파싱
+     */
+    private List<AlgoTestcaseDto> parseCorrectedTestCases(JsonNode root, List<AlgoTestcaseDto> original) {
+        JsonNode testCasesNode = root.get("testCases");
+
+        if (testCasesNode == null || !testCasesNode.isArray() || testCasesNode.isEmpty()) {
+            log.debug("testCases 필드 없거나 비어있음, 원본 테스트케이스 유지");
+            return original != null ? original : List.of();
+        }
+
+        List<AlgoTestcaseDto> correctedTestCases = new ArrayList<>();
+        int sampleIndex = 0;
+
+        for (JsonNode tcNode : testCasesNode) {
+            String inputData = getText(tcNode, "inputData");
+            if (inputData == null) {
+                inputData = getText(tcNode, "input"); // 대체 필드명
+            }
+
+            String expectedOutput = getText(tcNode, "expectedOutput");
+            if (expectedOutput == null) {
+                expectedOutput = getText(tcNode, "output"); // 대체 필드명
+            }
+
+            if (inputData == null || inputData.isBlank()) {
+                log.debug("입력 데이터 없는 테스트케이스 건너뜀");
+                continue;
+            }
+
+            boolean isSample = sampleIndex < 2; // 처음 2개는 샘플로 설정
+            sampleIndex++;
+
+            correctedTestCases.add(AlgoTestcaseDto.builder()
+                    .inputData(inputData)
+                    .expectedOutput(expectedOutput) // null일 수 있음 (Code-First에서 재생성 필요)
+                    .isSample(isSample)
+                    .build());
+        }
+
+        if (correctedTestCases.isEmpty()) {
+            log.debug("파싱된 테스트케이스 없음, 원본 유지");
+            return original != null ? original : List.of();
+        }
+
+        log.info("테스트케이스 수정됨: 원본 {}개 → 수정 {}개",
+                original != null ? original.size() : 0, correctedTestCases.size());
+
+        return correctedTestCases;
+    }
+
+    /**
+     * 원본 데이터로 응답 생성
+     */
+    private ProblemGenerationResponseDto buildResponseWithOriginals(
+            AlgoProblemDto problem,
+            List<AlgoTestcaseDto> testCases,
+            String optimalCode,
+            String naiveCode) {
+        return ProblemGenerationResponseDto.builder()
+                .problem(problem)
+                .testCases(testCases != null ? testCases : List.of())
+                .optimalCode(optimalCode)
+                .naiveCode(naiveCode)
+                .build();
+    }
+
+    /**
+     * JSON 필드에서 텍스트 추출
+     */
+    private String getText(JsonNode node, String field) {
+        if (node == null) return null;
+        JsonNode fieldNode = node.get(field);
+        if (fieldNode == null || fieldNode.isNull()) {
             return null;
         }
+        return fieldNode.asText();
+    }
+
+    /**
+     * JSON 필드에서 텍스트 추출 (기본값 지원)
+     */
+    private String getTextOrDefault(JsonNode node, String field, String defaultValue) {
+        String value = getText(node, field);
+        return (value != null && !value.isBlank()) ? value : defaultValue;
+    }
+
+    /**
+     * 변경 사항 요약 로그
+     */
+    private void logChangeSummary(
+            AlgoProblemDto originalProblem, AlgoProblemDto correctedProblem,
+            List<AlgoTestcaseDto> originalTestCases, List<AlgoTestcaseDto> correctedTestCases,
+            String originalOptimalCode, String correctedOptimalCode,
+            String originalNaiveCode, String correctedNaiveCode) {
+
+        StringBuilder changes = new StringBuilder("Self-Correction 변경 사항: ");
+        boolean hasChanges = false;
+
+        // 제목 변경 확인
+        if (!safeEquals(originalProblem.getAlgoProblemTitle(), correctedProblem.getAlgoProblemTitle())) {
+            changes.append("[제목 수정] ");
+            hasChanges = true;
+        }
+
+        // 설명 변경 확인
+        if (!safeEquals(originalProblem.getAlgoProblemDescription(), correctedProblem.getAlgoProblemDescription())) {
+            changes.append("[설명 수정] ");
+            hasChanges = true;
+        }
+
+        // 테스트케이스 변경 확인
+        int originalCount = originalTestCases != null ? originalTestCases.size() : 0;
+        int correctedCount = correctedTestCases != null ? correctedTestCases.size() : 0;
+        if (originalCount != correctedCount) {
+            changes.append(String.format("[테스트케이스 %d→%d개] ", originalCount, correctedCount));
+            hasChanges = true;
+        }
+
+        // optimalCode 변경 확인
+        if (!safeEquals(originalOptimalCode, correctedOptimalCode)) {
+            changes.append("[optimalCode 수정] ");
+            hasChanges = true;
+        }
+
+        // naiveCode 변경 확인
+        if (!safeEquals(originalNaiveCode, correctedNaiveCode)) {
+            changes.append("[naiveCode 수정] ");
+            hasChanges = true;
+        }
+
+        if (hasChanges) {
+            log.info(changes.toString());
+        } else {
+            log.debug("Self-Correction: 변경 사항 없음 (원본 유지)");
+        }
+    }
+
+    /**
+     * null-safe 문자열 비교
+     */
+    private boolean safeEquals(String a, String b) {
+        if (a == null && b == null) return true;
+        if (a == null || b == null) return false;
+        return a.equals(b);
     }
 
     /**

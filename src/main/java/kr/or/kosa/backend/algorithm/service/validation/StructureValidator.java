@@ -133,7 +133,9 @@ public class StructureValidator {
             if (tc.getInputData() == null) {
                 result.addError(prefix + ": 입력 데이터가 없습니다");
             }
-            if (tc.getExpectedOutput() == null || tc.getExpectedOutput().isBlank()) {
+            // 빈 문자열("")은 유효한 출력임 (예: 입력이 0인 경우 출력 없음)
+            // null만 에러로 처리
+            if (tc.getExpectedOutput() == null) {
                 result.addError(prefix + ": 예상 출력이 없습니다");
             }
         }

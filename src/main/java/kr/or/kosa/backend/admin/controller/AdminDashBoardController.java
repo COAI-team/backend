@@ -1,6 +1,9 @@
 package kr.or.kosa.backend.admin.controller;
 
+import kr.or.kosa.backend.admin.dto.response.AdminDashBoardResponseDto;
 import kr.or.kosa.backend.admin.service.AdminDashBoardService;
+import kr.or.kosa.backend.commons.response.ApiResponse;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -13,10 +16,9 @@ public class AdminDashBoardController {
         this.adminDashBoardService = adminDashBoardService;
     }
 
-    @GetMapping("/usersignupcount")
-    public int userSignupCount() {
-        System.out.println("??");
-        return adminDashBoardService.dashBoards();
+    @GetMapping("/dashboard")
+    public ResponseEntity<ApiResponse<AdminDashBoardResponseDto>> userSignupCount() {
+        return ResponseEntity.ok(ApiResponse.success(adminDashBoardService.dashBoards()));
     }
 
 }

@@ -28,11 +28,11 @@ public class AlgorithmProblemService {
 
     private final AlgorithmProblemMapper algorithmProblemMapper;
     private final ProblemValidationLogMapper validationLogMapper;
-
+    private final ProblemVectorStoreService vectorStoreService;
 
     /**
      * 전체 문제 수 조회
-     * 
+     *
      * @return 전체 문제 개수
      */
     public int getTotalProblemsCount() {
@@ -52,108 +52,133 @@ public class AlgorithmProblemService {
 
     /**
      * 문제 목록 조회 (필터 포함)
-     *
      * @param offset     시작 위치
      * @param limit      조회 개수
      * @param difficulty 난이도 필터 (nullable)
      * @param source     출처 필터 (nullable)
      * @param keyword    검색어 (nullable)
      * @param topic      주제 필터 (nullable)
+     * @param problemType 문제 유형 필터 (nullable)
      * @return 문제 목록
      */
     public List<AlgoProblemDto> getProblemsWithFilter(int offset, int limit, String difficulty, String source,
-            String keyword, String topic) {
-        log.debug("문제 목록 조회 (필터) - offset: {}, limit: {}, difficulty: {}, source: {}, keyword: {}, topic: {}",
-                offset, limit, difficulty, source, keyword, topic);
+                                                      String keyword, String topic, String problemType) {
+        log.debug("문제 목록 조회 (필터) - offset: {}, limit: {}, difficulty: {}, source: {}, keyword: {}, topic: {}, problemType: {}",
+                offset, limit, difficulty, source, keyword, topic, problemType);
 
         try {
             List<AlgoProblemDto> problems = algorithmProblemMapper.selectProblemsWithFilter(offset, limit, difficulty,
-                    source, keyword);
+                    source, keyword, problemType);
             log.debug("문제 목록 조회 완료 - 조회된 문제 수: {}", problems.size());
 
             return problems;
 
         } catch (Exception e) {
-            log.error("문제 목록 조회 실패 - offset: {}, limit: {}, difficulty: {}, source: {}, keyword: {}, topic: {}",
-                    offset, limit, difficulty, source, keyword, topic, e);
+            log.error("문제 목록 조회 실패 - offset: {}, limit: {}, difficulty: {}, source: {}, keyword: {}, topic: {}, problemType: {}",
+                    offset, limit, difficulty, source, keyword, topic, problemType, e);
+            throw new RuntimeException("문제 목록 조회 중 오류가 발생했습니다.", e);
+        }
+    }
+
+
+//     문제 목록 조회 (V2 - 통계 포함 제거할 예정
+//     @param request 문제 목록 조회 요청 DTO
+//     @return 문제 목록 및 페이징 정보
+//
+//    public Map<String, Object> getProblemListWithStats(ProblemListRequestDto request) {
+//        log.debug("문제 목록 조회 (V2) - request: {}", request);
+//
+//        try {
+//            // 문제 목록 조회
+//            List<AlgoProblemDto> problems = getProblemsWithFilter(
+//                    request.getOffset(),
+//                    request.getLimit(),
+//                    request.getDifficulty(),
+//                    request.getSource(),
+//                    request.getKeyword(),
+//                    request.getTopic(),
+//                    request.getProblemType()
+//            );
+//
+//            // 전체 개수 조회
+//            int totalCount = getTotalProblemsCountWithFilter(
+//                    request.getDifficulty(),
+//                    request.getSource(),
+//                    request.getKeyword(),
+//                    request.getTopic(),
+//                    request.getProblemType(),
+//                    null,
+//                    null
+//            );
+//
+//            // 페이징 정보 계산
+//            int totalPages = (int) Math.ceil((double) totalCount / request.getLimit());
+//
+//            // 응답 데이터 구성
+//            Map<String, Object> responseData = new HashMap<>();
+//            responseData.put("problems", problems);
+//            responseData.put("totalCount", totalCount);
+//            responseData.put("currentPage", request.getPage());
+//            responseData.put("pageSize", request.getLimit());
+//            responseData.put("totalPages", totalPages);
+//            responseData.put("hasNext", request.getPage() < totalPages);
+//            responseData.put("hasPrevious", request.getPage() > 1);
+//
+//            log.debug("문제 목록 조회 완료 - totalCount: {}, problems: {}", totalCount, problems.size());
+//
+//            return responseData;
+//
+//        } catch (Exception e) {
+//            log.error("문제 목록 조회 실패 (V2)", e);
+//            throw new RuntimeException("문제 목록 조회 중 오류가 발생했습니다.", e);
+//        }
+//    }
+
+    /**
+     * 사용자 풀이 상태 포함 문제 목록 조회
+     */
+    public List<Map<String, Object>> getProblemsWithUserStatus(
+            Long userId, int offset, int limit, String difficulty,
+            String source, String keyword, String topic, String problemType, String solved) {
+
+        log.debug("문제 목록 조회 (풀이 상태 포함) - userId: {}, offset: {}, limit: {}, solved: {}",
+                userId, offset, limit, solved);
+
+        try {
+            List<Map<String, Object>> problems = algorithmProblemMapper.selectProblemsWithUserStatus(
+                    userId, difficulty, topic, offset, limit, solved);
+
+            log.debug("문제 목록 조회 완료 - 조회된 문제 수: {}", problems.size());
+
+            return problems;
+
+        } catch (Exception e) {
+            log.error("문제 목록 조회 실패", e);
             throw new RuntimeException("문제 목록 조회 중 오류가 발생했습니다.", e);
         }
     }
 
     /**
      * 전체 문제 수 조회 (필터 포함)
-     *
-     * @param difficulty 난이도 필터 (nullable)
-     * @param source     출처 필터 (nullable)
-     * @param keyword    검색어 (nullable)
-     * @param topic      주제 필터 (nullable)
-     * @return 필터링된 문제 개수
      */
-    public int getTotalProblemsCountWithFilter(String difficulty, String source, String keyword, String topic) {
-        log.debug("전체 문제 수 조회 (필터) - difficulty: {}, source: {}, keyword: {}, topic: {}",
-                difficulty, source, keyword, topic);
+    public int getTotalProblemsCountWithFilter(String difficulty, String source,
+                                               String keyword, String topic, String problemType,
+                                               Long userId, String solved) {
+
+        log.debug("전체 문제 수 조회 (필터) - difficulty: {}, userId: {}, solved: {}",
+                difficulty, userId, solved);
 
         try {
-            int count = algorithmProblemMapper.countProblemsWithFilter(difficulty, source, keyword);
+            int count = algorithmProblemMapper.countProblemsWithFilter(
+                    difficulty, source, keyword, problemType, userId, solved);
+
             log.debug("전체 문제 수 조회 완료 - count: {}", count);
 
             return count;
 
         } catch (Exception e) {
-            log.error("전체 문제 수 조회 실패 (필터) - difficulty: {}, source: {}, keyword: {}, topic: {}",
-                    difficulty, source, keyword, topic, e);
+            log.error("전체 문제 수 조회 실패 (필터)", e);
             throw new RuntimeException("전체 문제 수 조회 중 오류가 발생했습니다.", e);
-        }
-    }
-
-    /**
-     * 문제 목록 조회 (V2 - 통계 포함)
-     *
-     * @param request 문제 목록 조회 요청 DTO
-     * @return 문제 목록 및 페이징 정보
-     */
-    public Map<String, Object> getProblemListWithStats(ProblemListRequestDto request) {
-        log.debug("문제 목록 조회 (V2) - request: {}", request);
-
-        try {
-            // 문제 목록 조회
-            List<AlgoProblemDto> problems = getProblemsWithFilter(
-                    request.getOffset(),
-                    request.getLimit(),
-                    request.getDifficulty(),
-                    request.getSource(),
-                    request.getKeyword(),
-                    request.getTopic()
-            );
-
-            // 전체 개수 조회
-            int totalCount = getTotalProblemsCountWithFilter(
-                    request.getDifficulty(),
-                    request.getSource(),
-                    request.getKeyword(),
-                    request.getTopic()
-            );
-
-            // 페이징 정보 계산
-            int totalPages = (int) Math.ceil((double) totalCount / request.getLimit());
-
-            // 응답 데이터 구성
-            Map<String, Object> responseData = new HashMap<>();
-            responseData.put("problems", problems);
-            responseData.put("totalCount", totalCount);
-            responseData.put("currentPage", request.getPage());
-            responseData.put("pageSize", request.getLimit());
-            responseData.put("totalPages", totalPages);
-            responseData.put("hasNext", request.getPage() < totalPages);
-            responseData.put("hasPrevious", request.getPage() > 1);
-
-            log.debug("문제 목록 조회 완료 - totalCount: {}, problems: {}", totalCount, problems.size());
-
-            return responseData;
-
-        } catch (Exception e) {
-            log.error("문제 목록 조회 실패 (V2)", e);
-            throw new RuntimeException("문제 목록 조회 중 오류가 발생했습니다.", e);
         }
     }
 
@@ -174,9 +199,9 @@ public class AlgorithmProblemService {
             // 현재는 기본값 반환 (merge 충돌 해결을 위한 임시 구현)
             return ProblemStatisticsResponseDto.builder()
                     .totalProblems(totalProblems)
-                    .solvedProblems(0)      // TODO: 사용자별 해결 문제 수 조회
-                    .averageAccuracy(0.0)   // TODO: 평균 정답률 계산
-                    .totalAttempts(0)       // TODO: 총 응시자 수 조회
+                    .solvedProblems(0)
+                    .averageAccuracy(0.0)
+                    .totalAttempts(0)
                     .build();
 
         } catch (Exception e) {
@@ -209,8 +234,18 @@ public class AlgorithmProblemService {
             List<AlgoTestcaseDto> testcases = algorithmProblemMapper.selectTestCasesByProblemId(problemId);
             problem.setTestcases(testcases);
 
-            log.debug("문제 상세 조회 완료 - problemId: {}, title: {}, testcases: {}",
-                    problemId, problem.getAlgoProblemTitle(), testcases != null ? testcases.size() : 0);
+            // 문제별 통계 조회 및 설정
+            Map<String, Object> statistics = algorithmProblemMapper.selectProblemStatistics(problemId);
+            if (statistics != null) {
+                Object totalAttempts = statistics.get("totalAttempts");
+                Object successCount = statistics.get("successCount");
+                problem.setTotalAttempts(totalAttempts != null ? ((Number) totalAttempts).intValue() : 0);
+                problem.setSuccessCount(successCount != null ? ((Number) successCount).intValue() : 0);
+            }
+
+            log.debug("문제 상세 조회 완료 - problemId: {}, title: {}, testcases: {}, totalAttempts: {}, successCount: {}",
+                    problemId, problem.getAlgoProblemTitle(), testcases != null ? testcases.size() : 0,
+                    problem.getTotalAttempts(), problem.getSuccessCount());
 
             return problem;
 
@@ -222,7 +257,7 @@ public class AlgorithmProblemService {
 
     /**
      * 문제 존재 여부 확인
-     * 
+     *
      * @param problemId 문제 ID
      * @return 존재 여부
      */
@@ -247,7 +282,7 @@ public class AlgorithmProblemService {
 
     /**
      * 페이지 번호 검증
-     * 
+     *
      * @param page 페이지 번호 (1부터 시작)
      * @param size 페이지 크기
      * @return 검증된 페이지 번호
@@ -272,7 +307,7 @@ public class AlgorithmProblemService {
 
     /**
      * 페이지 크기 검증
-     * 
+     *
      * @param size 페이지 크기
      * @return 검증된 페이지 크기
      */
@@ -293,7 +328,7 @@ public class AlgorithmProblemService {
     // ===== AI 생성 문제 저장 메서드 =====
     /**
      * AI 생성 문제를 DB에 저장
-     * 
+     *
      * @param responseDto AI 생성 결과
      * @param userId      생성자 ID (null 가능)
      * @return 저장된 문제 ID
@@ -305,7 +340,7 @@ public class AlgorithmProblemService {
 
             // 1. 문제 엔티티 준비
             AlgoProblemDto problem = responseDto.getProblem();
-            problem.setAlgoCreater(userId); // 생성자 ID 설정
+            problem.setAlgoCreater(userId);
 
             // 2. 문제 저장 (AUTO_INCREMENT로 ID 자동 생성)
             int insertResult = algorithmProblemMapper.insertProblem(problem);
@@ -330,7 +365,27 @@ public class AlgorithmProblemService {
                 saveValidationLog(problem.getAlgoProblemId(), responseDto);
             }
 
-            // 5. ResponseDto에 생성된 ID 설정
+            // 5. Vector DB에 저장 (유사도 검사용)
+            try {
+                List<String> tags = parseTagsFromJson(problem.getAlgoProblemTags());
+                String difficulty = problem.getAlgoProblemDifficulty() != null
+                        ? problem.getAlgoProblemDifficulty().name()
+                        : "UNKNOWN";
+
+                vectorStoreService.storeGeneratedProblem(
+                        problem.getAlgoProblemId(),
+                        problem.getAlgoProblemTitle(),
+                        problem.getAlgoProblemDescription(),
+                        difficulty,
+                        tags
+                );
+                log.info("Vector DB 저장 완료 - problemId: {}", problem.getAlgoProblemId());
+            } catch (Exception e) {
+                log.warn("Vector DB 저장 실패 (무시하고 계속 진행): {}", e.getMessage());
+                // Vector DB 저장 실패해도 MySQL 저장은 성공으로 처리
+            }
+
+            // 6. ResponseDto에 생성된 ID 설정
             responseDto.setProblemId(problem.getAlgoProblemId());
 
             return problem.getAlgoProblemId();
@@ -450,7 +505,7 @@ public class AlgorithmProblemService {
                     .similarityScore(similarityScore)
                     .similarityValid(similarityValid)
                     .validationStatus(validationStatus)
-                    .correctionAttempts(0)  // 저장 시점에서는 수정 시도 전
+                    .correctionAttempts(0)
                     .failureReasons(failureReasons)
                     .createdAt(LocalDateTime.now())
                     .completedAt(LocalDateTime.now())
@@ -468,7 +523,6 @@ public class AlgorithmProblemService {
 
         } catch (Exception e) {
             log.error("검증 로그 저장 중 오류 발생 - problemId: {}", problemId, e);
-            // 검증 로그 저장 실패가 전체 프로세스를 중단하지 않도록 예외를 던지지 않음
         }
     }
 
@@ -490,5 +544,31 @@ public class AlgorithmProblemService {
         }
 
         return "[" + String.join(",", failures) + "]";
+    }
+
+    /**
+     * JSON 형태의 태그 문자열을 List로 파싱
+     * 예: "[\"배열\", \"정렬\"]" -> ["배열", "정렬"]
+     */
+    private List<String> parseTagsFromJson(String tagsJson) {
+        if (tagsJson == null || tagsJson.isBlank()) {
+            return List.of();
+        }
+
+        try {
+            // JSON 배열 형태인 경우
+            if (tagsJson.startsWith("[")) {
+                com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                return mapper.readValue(tagsJson, new com.fasterxml.jackson.core.type.TypeReference<List<String>>() {});
+            }
+            // 쉼표로 구분된 문자열인 경우
+            return java.util.Arrays.stream(tagsJson.split(","))
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .collect(Collectors.toList());
+        } catch (Exception e) {
+            log.warn("태그 파싱 실패: {}", tagsJson);
+            return List.of();
+        }
     }
 }

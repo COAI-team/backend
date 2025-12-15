@@ -8,6 +8,7 @@ import kr.or.kosa.backend.algorithm.dto.response.TestRunResponseDto;
 import kr.or.kosa.backend.algorithm.exception.AlgoErrorCode;
 import kr.or.kosa.backend.algorithm.service.AlgorithmSolvingService;
 import kr.or.kosa.backend.commons.exception.custom.CustomBusinessException;
+import kr.or.kosa.backend.commons.pagination.PageResponse;
 import kr.or.kosa.backend.commons.response.ApiResponse;
 import kr.or.kosa.backend.security.jwt.JwtAuthentication;
 import kr.or.kosa.backend.security.jwt.JwtUserDetails;
@@ -29,17 +30,28 @@ public class AlgorithmSolvingController {
 
     private final AlgorithmSolvingService solvingService;
 
-    // 테스트용
+    /**
+     * SecurityContext에서 직접 사용자 ID 추출
+     * @AuthenticationPrincipal이 JwtUserDetails를 JwtAuthentication으로 캐스팅 실패하므로
+     * SecurityContextHolder에서 직접 Authentication을 가져옴
+     */
     private Long extractUserId(JwtAuthentication authentication) {
-        if (authentication == null) {
-            log.warn("🧪 테스트 모드: authentication이 null이므로 기본 userId=1 사용");
-            return 1L;  // ✅ 예외 대신 기본값 반환
+        // @AuthenticationPrincipal이 null인 경우 SecurityContextHolder에서 직접 조회
+        org.springframework.security.core.Authentication auth = authentication;
+        if (auth == null) {
+            auth = org.springframework.security.core.context.SecurityContextHolder
+                    .getContext().getAuthentication();
         }
 
-        Object principal = authentication.getPrincipal();
+        if (auth == null) {
+            log.warn("❌ 인증 정보가 없습니다.");
+            throw new CustomBusinessException(AlgoErrorCode.LOGIN_REQUIRED);
+        }
+
+        Object principal = auth.getPrincipal();
         if (!(principal instanceof JwtUserDetails userDetails)) {
-            log.warn("🧪 테스트 모드: principal이 JwtUserDetails가 아니므로 기본 userId=1 사용: {}", principal);
-            return 1L;  // ✅ 예외 대신 기본값 반환
+            log.warn("❌ 유효하지 않은 인증 정보입니다: {}", principal);
+            throw new CustomBusinessException(AlgoErrorCode.LOGIN_REQUIRED);
         }
 
         Long userId = userDetails.id().longValue();
@@ -84,7 +96,7 @@ public class AlgorithmSolvingController {
         Long userId = extractUserId(authentication);
 
         log.info("코드 제출 요청 - problemId: {}, userId: {}, language: {}",
-                request.getProblemId(), userId, request.getLanguage());
+                request.getProblemId(), userId, request.getLanguageId());
 
         try {
             SubmissionResponseDto response =
@@ -121,7 +133,7 @@ public class AlgorithmSolvingController {
         Long userId = extractUserId(authentication);
 
         log.info("샘플 테스트 실행 요청 - problemId: {}, language: {}, userId: {}",
-                request.getProblemId(), request.getLanguage(), userId);
+                request.getProblemId(), request.getLanguageId(), userId);
 
         try {
             TestRunResponseDto response = solvingService.runSampleTest(request);
@@ -216,6 +228,28 @@ public class AlgorithmSolvingController {
 
         } catch (Exception e) {
             log.error("제출 이력 조회 중 예외 발생", e);
+            throw new CustomBusinessException(AlgoErrorCode.SUBMISSION_NOT_FOUND);
+        }
+    }
+
+    /**
+     * 문제별 공유된 제출 목록 조회 (다른 사람의 풀이)
+     */
+    @GetMapping("/problems/{problemId}/solutions")
+    public ResponseEntity<ApiResponse<PageResponse<SubmissionResponseDto>>> getSharedSubmissions(
+            @PathVariable("problemId") Long problemId,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size) {
+
+        log.info("공유된 제출 목록 조회 - problemId: {}, page: {}, size: {}", problemId, page, size);
+
+        try {
+            PageResponse<SubmissionResponseDto> response = solvingService.getSharedSubmissions(problemId, page, size);
+
+            return ResponseEntity.ok(new ApiResponse<>("0000", "공유된 제출 목록 조회 완료", response));
+
+        } catch (Exception e) {
+            log.error("공유된 제출 목록 조회 중 예외 발생", e);
             throw new CustomBusinessException(AlgoErrorCode.SUBMISSION_NOT_FOUND);
         }
     }

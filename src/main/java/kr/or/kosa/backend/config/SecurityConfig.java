@@ -56,6 +56,7 @@ public class SecurityConfig {
                                                                 "/api/mistake-report/**",
                                                                 "/api/mcp/**",
                                                                 "/api/**",
+                                                                "/ws/**",
                                                                 "/chat/messages")
                                                 .permitAll()
                                                 .requestMatchers(HttpMethod.GET,
@@ -88,6 +89,8 @@ public class SecurityConfig {
                 return config.getAuthenticationManager();
         }
 
+        <<<<<<<HEAD
+
         @Bean
         public CorsConfigurationSource corsConfigurationSource() {
                 CorsConfiguration configuration = new CorsConfiguration();
@@ -96,6 +99,17 @@ public class SecurityConfig {
                 configuration.setAllowedHeaders(List.of("*"));
                 configuration.setAllowCredentials(true);
                 configuration.setExposedHeaders(List.of("Authorization"));
+=======
+
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+        configuration.setAllowedOrigins(List.of("https://localhost:5173", "http://localhost:5173"));
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
+        configuration.setAllowedHeaders(List.of("*"));
+        configuration.setAllowCredentials(true);
+        configuration.setExposedHeaders(List.of("Authorization"));
+>>>>>>> 0d8d0b7eaed474324cfa2b89adee0e307219fdba
 
                 UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
                 source.registerCorsConfiguration("/**", configuration);
