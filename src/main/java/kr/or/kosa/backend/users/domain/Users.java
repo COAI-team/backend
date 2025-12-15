@@ -26,7 +26,8 @@ public class Users {
     private Boolean userIssubscribed;
     private String githubId;
     private String githubToken; // Encrypted
-    
+    private String mcpToken; // MCP Access Token
+
     @Builder.Default
     private Boolean needLink = false;
 

@@ -1,7 +1,11 @@
 package kr.or.kosa.backend.codenose.service.pipeline;
 
+import kr.or.kosa.backend.codenose.service.LangfuseService;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Service;
+
+import java.time.Instant;
+import java.util.Collections;
 
 /**
  * 스타일 추출 모듈 (StyleExtractorModule)
@@ -13,9 +17,12 @@ import org.springframework.stereotype.Service;
 public class StyleExtractorModule {
 
     private final ChatClient chatClient;
+    private final LangfuseService langfuseService;
 
-    public StyleExtractorModule(ChatClient.Builder builder) {
+    public StyleExtractorModule(ChatClient.Builder builder,
+            LangfuseService langfuseService) {
         this.chatClient = builder.build();
+        this.langfuseService = langfuseService;
     }
 
     /**
@@ -31,17 +38,32 @@ public class StyleExtractorModule {
             return context;
         }
 
-        String prompt = """
-                Extract explicit coding style rules from the following user history.
-                Focus on naming conventions, error handling patterns, and library preferences.
-                Output ONLY the rules as a bulleted list.
+        Instant start = Instant.now();
+        // Langfuse 스팬 시작
+        langfuseService.startSpan("StyleExtractor", start, Collections.emptyMap());
 
-                History:
-                %s
-                """.formatted(context.getUserContext());
+        try {
+            String prompt = """
+                    Extract explicit coding style rules from the following user history.
+                    Focus on naming conventions, error handling patterns, and library preferences.
+                    Output ONLY the rules as a bulleted list.
 
-        String rules = chatClient.prompt(prompt).call().content();
-        context.setStyleRules(rules);
-        return context;
+                    History:
+                    %s
+                    """.formatted(context.getUserContext());
+
+            Instant genStart = Instant.now();
+            String rules = chatClient.prompt(prompt).call().content();
+            Instant genEnd = Instant.now();
+
+            // Langfuse Generation 기록
+            langfuseService.sendGeneration("StyleGeneration", genStart, genEnd, "gpt-4o", prompt, rules, 0);
+
+            context.setStyleRules(rules);
+            return context;
+        } finally {
+            // Langfuse 스팬 종료
+            langfuseService.endSpan(null, Instant.now(), Collections.emptyMap());
+        }
     }
 }

@@ -293,4 +293,45 @@
         ORDER BY FREQUENCY DESC
     </select>
 
+    <!-- ========== 사용자 실수 통계 (USER_MISTAKE_STATS) ========== -->
+
+    <insert id="saveOrUpdateMistakeStat" parameterType="kr.or.kosa.backend.codenose.dto.UserMistakeStatDTO">
+        INSERT INTO USER_MISTAKE_STATS (
+            USER_ID, MISTAKE_TYPE, OCCURRENCE_COUNT, SOLVED_COUNT, LAST_DETECTED_AT, LAST_REPORT_GENERATED_AT
+        ) VALUES (
+            #{userId}, #{mistakeType}, #{occurrenceCount}, #{solvedCount}, #{lastDetectedAt}, #{lastReportGeneratedAt}
+        ) ON DUPLICATE KEY UPDATE
+            OCCURRENCE_COUNT = #{occurrenceCount},
+            SOLVED_COUNT = #{solvedCount},
+            LAST_DETECTED_AT = #{lastDetectedAt},
+            LAST_REPORT_GENERATED_AT = #{lastReportGeneratedAt}
+    </insert>
+
+    <select id="findMistakeStat" resultType="kr.or.kosa.backend.codenose.dto.UserMistakeStatDTO">
+        SELECT
+            STAT_ID as statId,
+            USER_ID as userId,
+            MISTAKE_TYPE as mistakeType,
+            OCCURRENCE_COUNT as occurrenceCount,
+            SOLVED_COUNT as solvedCount,
+            LAST_DETECTED_AT as lastDetectedAt,
+            LAST_REPORT_GENERATED_AT as lastReportGeneratedAt
+        FROM USER_MISTAKE_STATS
+        WHERE USER_ID = #{userId} AND MISTAKE_TYPE = #{mistakeType}
+    </select>
+
+    <select id="findMistakeStatsByUserId" resultType="kr.or.kosa.backend.codenose.dto.UserMistakeStatDTO">
+        SELECT
+            STAT_ID as statId,
+            USER_ID as userId,
+            MISTAKE_TYPE as mistakeType,
+            OCCURRENCE_COUNT as occurrenceCount,
+            SOLVED_COUNT as solvedCount,
+            LAST_DETECTED_AT as lastDetectedAt,
+            LAST_REPORT_GENERATED_AT as lastReportGeneratedAt
+        FROM USER_MISTAKE_STATS
+        WHERE USER_ID = #{userId}
+        ORDER BY OCCURRENCE_COUNT DESC
+    </select>
+
 </mapper>

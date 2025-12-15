@@ -1,7 +1,6 @@
 package kr.or.kosa.backend.codenose.service;
 
 import kr.or.kosa.backend.codenose.config.PromptManager;
-
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import kr.or.kosa.backend.codenose.dto.RagDto;
@@ -11,8 +10,8 @@ import kr.or.kosa.backend.codenose.dto.GithubFileDTO;
 import kr.or.kosa.backend.codenose.dto.UserCodePatternDTO;
 import kr.or.kosa.backend.codenose.mapper.AnalysisMapper;
 import kr.or.kosa.backend.codenose.service.agent.AgenticWorkflowService;
-
 import kr.or.kosa.backend.codenose.service.search.HybridSearchService;
+import kr.or.kosa.backend.codenose.service.trace.LangfuseContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
@@ -20,10 +19,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.sql.Timestamp;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.Collections;
 
 /**
  * 코드 분석 서비스 (AnalysisService)
@@ -44,10 +45,11 @@ public class AnalysisService {
     private final RagService ragService;
     private final HybridSearchService hybridSearchService;
     private final AgenticWorkflowService agenticWorkflowService;
+    private final MistakeService mistakeService;
 
     // 설정 및 프롬프트 관리
-    // 설정 및 프롬프트 관리
     private final PromptGenerator promptGenerator;
+    private final LangfuseService langfuseService;
 
     @Autowired
     public AnalysisService(
@@ -57,16 +59,19 @@ public class AnalysisService {
             RagService ragService,
             HybridSearchService hybridSearchService,
             AgenticWorkflowService agenticWorkflowService,
-            PromptManager promptManager,
-            PromptGenerator promptGenerator) {
+            MistakeService mistakeService,
+            PromptGenerator promptGenerator,
+            LangfuseService langfuseService) {
         this.chatClient = chatClientBuilder.build();
         this.analysisMapper = analysisMapper;
         this.objectMapper = objectMapper;
         this.ragService = ragService;
         this.hybridSearchService = hybridSearchService;
+        this.mistakeService = mistakeService;
 
         this.agenticWorkflowService = agenticWorkflowService;
         this.promptGenerator = promptGenerator;
+        this.langfuseService = langfuseService;
     }
 
     /**
@@ -85,6 +90,14 @@ public class AnalysisService {
      * @return AI 분석 결과 (JSON 문자열)
      */
     public String analyzeStoredFile(AnalysisRequestDTO requestDto) {
+        // Langfuse 트레이스 시작
+        String traceId = UUID.randomUUID().toString();
+        langfuseService.startTrace(
+                traceId,
+                "analyzeStoredFile",
+                String.valueOf(requestDto.getUserId()),
+                Map.of("filePath", requestDto.getFilePath()));
+
         try {
             // 1. DB에서 저장된 GitHub 파일 내용 조회
             GithubFileDTO storedFile = analysisMapper.findFileById(requestDto.getAnalysisId());
@@ -100,13 +113,19 @@ public class AnalysisService {
                     storedFile.getFileContent().length());
 
             // 2. 사용자 컨텍스트 조회 (Hybrid Search)
-            // 유사한 패턴이나 실수를 검색하여, AI가 "아, 이 사용자는 이런 실수를 자주 했었지"라고 인지하게 함
+            Instant searchStart = Instant.now();
             String language = getLanguageFromExtension(storedFile.getFileName());
+
+            // 스팬 시작
+            langfuseService.startSpan("HybridSearch", searchStart, Map.of("query", "mistakes patterns"));
+
             List<org.springframework.ai.document.Document> contextDocs = hybridSearchService.search(
                     "mistakes patterns errors improvement",
                     storedFile.getFileContent(),
                     3,
                     language);
+
+            langfuseService.endSpan(null, Instant.now(), Collections.emptyMap()); // HybridSearch 스팬 종료
 
             String userContext = contextDocs.stream()
                     .map(org.springframework.ai.document.Document::getText)
@@ -143,21 +162,40 @@ public class AnalysisService {
                     userContext.substring(0, Math.min(userContext.length(), 100)) + "...");
 
             // 3. 프롬프트 생성 (시스템 프롬프트 + 사용자 컨텍스트 + 요청사항)
+            Instant promptStart = Instant.now();
+            langfuseService.startSpan("PromptGeneration", promptStart, Collections.emptyMap());
+
             String systemPromptWithTone = promptGenerator.createSystemPrompt(
                     requestDto.getAnalysisTypes(),
                     requestDto.getToneLevel(),
                     requestDto.getCustomRequirements(),
                     userContext);
 
-            // 3.1. 메타데이터 별도 추출 (파일의 기술적 특성 파악용)
             String metadataPrompt = promptGenerator.createMetadataPrompt(storedFile.getFileContent());
+
+            langfuseService.endSpan(null, Instant.now(), Collections.emptyMap()); // PromptGeneration 스팬 종료
+
+            // 3.1. 메타데이터 별도 추출 (파일의 기술적 특성 파악용)
+            // 메타데이터 추출은 LLM을 사용하므로, 내부 호출이나 여기서 암시적으로 스팬에 래핑해야 할 수 있습니다.
+            // extractMetadata는 chatClient를 호출하므로 추적이 필요합니다.
+            // 현재는 Spring AI 수동 호출이므로, 자동 계측되지 않습니다.
+
             String metadataJson = extractMetadata(metadataPrompt);
             log.info("메타데이터 추출 상태: {}", metadataJson != null ? "성공" : "실패");
 
             // 4. Agentic Workflow 실행
-            // 단순 1회성 호출이 아니라, 에이전트가 생각하고 판단하는 워크플로우를 태웁니다.
+            // AgenticWorkflowService는 LangChain4j를 사용하므로 리스너가 Generation을 감지합니다.
+            // 전체 워크플로우를 하나의 스팬으로 감쌉니다.
+            Instant genStart = Instant.now();
+            langfuseService.startSpan("AgenticWorkflow", genStart, Map.of("model", "gpt-4o"));
+
             String aiResponseContent = agenticWorkflowService.executeWorkflow(storedFile.getFileContent(),
                     systemPromptWithTone);
+
+            langfuseService.endSpan(null, Instant.now(), Collections.emptyMap()); // AgenticWorkflow 스팬 종료
+
+            // 참고: 'executeWorkflow' 내부의 Generation 로그는 이제 Listener + Context에 의해 자동으로
+            // 처리됩니다.
 
             String cleanedResponse = cleanMarkdownCodeBlock(aiResponseContent);
 
@@ -165,24 +203,27 @@ public class AnalysisService {
             String analysisId = saveAnalysisResult(storedFile, requestDto, cleanedResponse, metadataJson,
                     relatedAnalysisIdsJson);
 
-            // 6. 사용자 코드 패턴 업데이트 (WordCloud나 통계에 활용됨)
-            updateUserPatterns(requestDto.getUserId(), objectMapper.readTree(cleanedResponse).path("codeSmells"));
+            // 6. 사용자 코드 패턴 업데이트
+            JsonNode smellNode = objectMapper.readTree(cleanedResponse).path("codeSmells");
+            updateUserPatterns(requestDto.getUserId(), smellNode);
+
+            // 6.5 실수 트래킹
+            mistakeService.trackMistakes(requestDto.getUserId(), smellNode);
 
             log.info("AI 분석 완료 - analysisId: {}, fileId: {}, toneLevel: {}",
                     analysisId, storedFile.getFileId(), requestDto.getToneLevel());
 
             // 7. RAG VectorDB에 저장 (Ingest)
-            // 이번 분석 결과를 지식베이스에 추가하여, 다음 분석 때 참조할 수 있게 합니다.
             try {
                 RagDto.IngestRequest ingestRequest = new RagDto.IngestRequest(
                         String.valueOf(requestDto.getUserId()),
-                        metadataJson, // 메타데이터를 컨텐츠로 활용
+                        metadataJson,
                         cleanedResponse,
-                        storedFile.getFileName().substring(storedFile.getFileName().lastIndexOf(".") + 1), // 확장자 추출
+                        storedFile.getFileName().substring(storedFile.getFileName().lastIndexOf(".") + 1),
                         storedFile.getFilePath(),
                         "Stored File Metadata",
                         requestDto.getCustomRequirements(),
-                        analysisId); // 분석 ID 연결
+                        analysisId);
                 ragService.ingestCode(ingestRequest);
             } catch (Exception e) {
                 log.error("RAG 시스템에 분석 결과 저장 실패", e);
@@ -193,6 +234,9 @@ public class AnalysisService {
         } catch (Exception e) {
             log.error("파일 분석 실패: {}", e.getMessage(), e);
             throw new RuntimeException("파일 분석에 실패했습니다: " + e.getMessage());
+        } finally {
+            // ThreadLocal 정리
+            LangfuseContext.clean();
         }
     }
 
@@ -376,6 +420,62 @@ public class AnalysisService {
     }
 
     /**
+     * MCP 등 외부에서 요청된 Raw Code 분석
+     * DB에 저장된 파일이 아니므로, 즉석에서 분석하고 결과만 반환합니다.
+     * (선택적으로 기록을 남길 수도 있습니다)
+     */
+    public String analyzeRawCode(String code, String language, Long userId) {
+        try {
+            log.info("Raw Code Analysis Requested - User: {}, Language: {}, Length: {}", userId, language,
+                    code.length());
+
+            // 1. 사용자 컨텍스트 조회 (Hybrid Search)
+            List<org.springframework.ai.document.Document> contextDocs = hybridSearchService.search(
+                    "mistakes patterns errors improvement",
+                    code,
+                    3,
+                    language);
+
+            String userContext = contextDocs.stream()
+                    .map(org.springframework.ai.document.Document::getText)
+                    .collect(java.util.stream.Collectors.joining("\n\n---\n\n"));
+
+            if (userContext.isEmpty()) {
+                userContext = "No prior history available.";
+            }
+
+            // 2. 프롬프트 생성
+            // Tone, Requirements는 기본값 사용
+            String systemPromptWithTone = promptGenerator.createSystemPrompt(
+                    List.of("Code Review", "Bug Detection"), // Default analysis types
+                    1, // Default Tone (Level 1: The Tired Mentor)
+                    "Focus on logic and security",
+                    userContext);
+
+            // 3. Agentic Workflow 실행
+            String aiResponseContent = agenticWorkflowService.executeWorkflow(code, systemPromptWithTone);
+
+            String cleanedResponse = cleanMarkdownCodeBlock(aiResponseContent);
+
+            // 4. (Optional) Tracking mistakes even for raw code?
+            // Yes, let's track it so the "Angry Teacher" learns from MCP usage too!
+            try {
+                JsonNode smellNode = objectMapper.readTree(cleanedResponse).path("codeSmells");
+                updateUserPatterns(userId, smellNode);
+                mistakeService.trackMistakes(userId, smellNode);
+            } catch (Exception e) {
+                log.warn("Failed to track mistakes for raw code analysis", e);
+            }
+
+            return cleanedResponse;
+
+        } catch (Exception e) {
+            log.error("Raw Code Analysis Failed", e);
+            throw new RuntimeException("Code Analysis failed: " + e.getMessage());
+        }
+    }
+
+    /**
      * 파일 확장자로 언어 추정
      */
     private String getLanguageFromExtension(String fileName) {
@@ -384,6 +484,8 @@ public class AnalysisService {
         String lower = fileName.toLowerCase();
         if (lower.endsWith(".py"))
             return "python";
+        if (lower.endsWith(".cs"))
+            return "csharp";
         if (lower.endsWith(".js") || lower.endsWith(".jsx") || lower.endsWith(".ts") || lower.endsWith(".tsx"))
             return "javascript";
         return "java";

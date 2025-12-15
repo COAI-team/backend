@@ -20,10 +20,11 @@ public class LangChainConfig {
     private String openAiApiKey;
 
     @Bean
-    public ChatLanguageModel chatLanguageModel() {
+    public ChatLanguageModel chatLanguageModel(LangfuseChatModelListener listener) {
         return OpenAiChatModel.builder()
                 .apiKey(openAiApiKey)
                 .modelName("gpt-4o") // 고성능 모델 사용
+                .listeners(java.util.Collections.singletonList(listener))
                 .build();
     }
 }
