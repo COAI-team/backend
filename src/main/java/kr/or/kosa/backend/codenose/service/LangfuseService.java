@@ -1,5 +1,6 @@
 package kr.or.kosa.backend.codenose.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import kr.or.kosa.backend.codenose.dto.langfuse.LangfuseDto;
 import kr.or.kosa.backend.codenose.service.trace.LangfuseContext;
 import lombok.extern.slf4j.Slf4j;
@@ -19,11 +20,15 @@ public class LangfuseService {
 
     private final RestClient restClient;
     private final boolean enabled;
+    private final ObjectMapper objectMapper;
 
     public LangfuseService(
             @Value("${langfuse.host:http://localhost:3000}") String host,
             @Value("${langfuse.public-key:}") String publicKey,
-            @Value("${langfuse.secret-key:}") String secretKey) {
+            @Value("${langfuse.secret-key:}") String secretKey,
+            ObjectMapper objectMapper) {
+
+        this.objectMapper = objectMapper;
 
         if (publicKey.isEmpty() || secretKey.isEmpty()) {
             log.warn("Langfuse 자격 증명 미설정. Langfuse 연동 비활성화."); // Translated comment
@@ -81,7 +86,7 @@ public class LangfuseService {
         String parentId = LangfuseContext.getCurrentParentId();
         String spanId = UUID.randomUUID().toString();
 
-        LangfuseContext.pushParentId(spanId); // 스택에 현재 스팬 추가
+        LangfuseContext.pushParentSpan(new LangfuseContext.SpanInfo(spanId, name, startTime.toString(), input));
 
         sendEvent(new LangfuseDto.Event(
                 UUID.randomUUID().toString(),
@@ -104,16 +109,49 @@ public class LangfuseService {
     /**
      * Span 종료 - LangfuseContext 스택 관리
      */
+    /**
+     * Span 종료 - LangfuseContext 스택 관리 및 결과 전송
+     */
     public void endSpan(String spanId, Instant endTime, Map<String, Object> output) {
         if (!enabled)
             return;
 
-        // spanId가 null이면 현재 컨텍스트의 최상위 스팬 종료
-        LangfuseContext.popParentId();
+        // spanId가 null이면 현재 컨텍스트의 최상위 스팬 ID를 가져옵니다.
+        String currentSpanId = (spanId != null) ? spanId : LangfuseContext.getCurrentParentId();
 
-        // 실제로는 span-update 이벤트를 보내거나 해야 하지만, Fire-and-forget 방식의 현재 구현에서는
-        // startSpan 시점에 create 이벤트를 보냈으므로 여기서는 Context 정리만 수행합니다.
-        // 추후 정확한 지속시간 기록이 필요하면 span-update 구현이 필요합니다.
+        // 스택에서 제거 및 메타데이터 복원
+        LangfuseContext.SpanInfo spanInfo = LangfuseContext.popParentSpan();
+
+        if (currentSpanId == null || spanInfo == null)
+            return;
+
+        String traceId = LangfuseContext.getTraceId();
+
+        // Upsert를 위해 startSpan과 동일한 정보를 최대한 포함하여 전송
+        LangfuseDto.SpanBody body = new LangfuseDto.SpanBody(
+                currentSpanId,
+                traceId,
+                null,
+                spanInfo.name(), // 복원된 Name
+                spanInfo.startTime(), // 복원된 StartTime
+                endTime.toString(),
+                (Map<String, Object>) spanInfo.input(), // 복원된 Input (Map 캐스팅 필요)
+                output,
+                Collections.emptyMap(),
+                "DEFAULT", null);
+
+        sendEvent(new LangfuseDto.Event(
+                UUID.randomUUID().toString(),
+                "span-create",
+                Instant.now().toString(),
+                body));
+
+        // 스택이 비었으면 컨텍스트 정리 (Root Span 종료 시 Trace Context 정리)
+        // 주의: 비동기 처리가 중첩된 경우 메인 스레드에서 먼저 정리될 위험이 있으나,
+        // 현재 구조상 동기식 호출이므로 이 방식이 리소스 누수를 방지함.
+        if (!LangfuseContext.hasParent()) {
+            LangfuseContext.clean();
+        }
     }
 
     /**
@@ -121,11 +159,13 @@ public class LangfuseService {
      */
     public void sendGeneration(String name, Instant startTime, Instant endTime, String model,
             Object input, Object output, int totalTokens) {
+        log.info(">>>>> [sendGeneration] Called. enabled={}", enabled);
         if (!enabled)
             return;
 
         String traceId = LangfuseContext.getTraceId();
         String parentId = LangfuseContext.getCurrentParentId();
+        log.info(">>>>> [sendGeneration] traceId={}, parentId={}", traceId, parentId);
 
         sendGeneration(UUID.randomUUID().toString(), traceId, parentId, name, startTime, endTime, model, input, output,
                 totalTokens);
@@ -138,6 +178,7 @@ public class LangfuseService {
             Instant startTime, Instant endTime, String model,
             Object input, Object output,
             int totalTokens) {
+        log.info(">>>>> [sendGeneration Legacy] id={}, traceId={}, parentId={}", id, traceId, parentObservationId);
         if (!enabled)
             return;
 
@@ -149,6 +190,7 @@ public class LangfuseService {
                 model, Collections.emptyMap(),
                 input, output, Collections.emptyMap(),
                 "DEFAULT", null, usage);
+        log.info(">>>>> [sendGeneration Legacy] About to send generation-create event.");
         sendEvent(new LangfuseDto.Event(UUID.randomUUID().toString(), "generation-create", Instant.now().toString(),
                 body));
     }
@@ -192,6 +234,8 @@ public class LangfuseService {
 
     private void sendEvent(LangfuseDto.Event event) {
         try {
+            log.info(">>>> [Langfuse JSON] Payload: {}", objectMapper.writeValueAsString(event));
+
             LangfuseDto.BatchRequest batch = new LangfuseDto.BatchRequest(Collections.singletonList(event));
 
             restClient.post()

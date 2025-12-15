@@ -10,7 +10,10 @@ import java.util.Stack;
  */
 public class LangfuseContext {
     private static final ThreadLocal<String> currentTraceId = new ThreadLocal<>();
-    private static final ThreadLocal<Stack<String>> parentStack = ThreadLocal.withInitial(Stack::new);
+    private static final ThreadLocal<Stack<SpanInfo>> parentStack = ThreadLocal.withInitial(Stack::new);
+
+    public record SpanInfo(String id, String name, String startTime, Object input) {
+    }
 
     public static void setTraceId(String traceId) {
         currentTraceId.set(traceId);
@@ -27,31 +30,43 @@ public class LangfuseContext {
     }
 
     /**
-     * Pushes a new parent observation ID (Span ID or Generation ID) onto the stack.
-     * This usually happens when entering a span.
+     * Pushes a new parent observation.
      */
-    public static void pushParentId(String parentId) {
-        parentStack.get().push(parentId);
+    public static void pushParentSpan(SpanInfo spanInfo) {
+        parentStack.get().push(spanInfo);
     }
 
     /**
-     * Pops the last parent observation ID.
-     * This usually happens when exiting a span.
+     * Pops the last parent observation info.
      */
-    public static String popParentId() {
+    public static SpanInfo popParentSpan() {
         if (!parentStack.get().isEmpty()) {
             return parentStack.get().pop();
         }
-        return null; // Should not happen if balanced
+        return null;
     }
 
     /**
-     * Peeks at the current parent ID (the most recent one).
+     * Peeks at the current parent SpanInfo.
      */
-    public static String getCurrentParentId() {
+    public static SpanInfo getCurrentSpanInfo() {
         if (!parentStack.get().isEmpty()) {
             return parentStack.get().peek();
         }
-        return null; // Top-level within trace
+        return null;
+    }
+
+    /**
+     * Helper to get just the ID for compatibility.
+     */
+    public static String getCurrentParentId() {
+        if (!parentStack.get().isEmpty()) {
+            return parentStack.get().peek().id();
+        }
+        return null;
+    }
+
+    public static boolean hasParent() {
+        return !parentStack.get().isEmpty();
     }
 }

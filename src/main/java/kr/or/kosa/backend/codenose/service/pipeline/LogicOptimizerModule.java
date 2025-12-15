@@ -1,7 +1,7 @@
 package kr.or.kosa.backend.codenose.service.pipeline;
 
+import dev.langchain4j.model.chat.ChatLanguageModel;
 import kr.or.kosa.backend.codenose.service.LangfuseService;
-import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -17,12 +17,12 @@ import java.util.Collections;
 @Service
 public class LogicOptimizerModule {
 
-    private final ChatClient chatClient;
+    private final ChatLanguageModel chatLanguageModel;
     private final LangfuseService langfuseService;
 
-    public LogicOptimizerModule(ChatClient.Builder builder,
+    public LogicOptimizerModule(ChatLanguageModel chatLanguageModel,
             LangfuseService langfuseService) {
-        this.chatClient = builder.build();
+        this.chatLanguageModel = chatLanguageModel;
         this.langfuseService = langfuseService;
     }
 
@@ -47,12 +47,7 @@ public class LogicOptimizerModule {
                     %s
                     """.formatted(context.getOriginalCode());
 
-            Instant genStart = Instant.now();
-            String optimized = chatClient.prompt(prompt).call().content();
-            Instant genEnd = Instant.now();
-
-            // Langfuse Generation 기록
-            langfuseService.sendGeneration("OptimizeGeneration", genStart, genEnd, "gpt-4o", prompt, optimized, 0);
+            String optimized = chatLanguageModel.generate(prompt);
 
             context.setOptimizedLogic(optimized);
             return context;

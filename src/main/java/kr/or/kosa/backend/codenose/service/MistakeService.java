@@ -2,47 +2,37 @@ package kr.or.kosa.backend.codenose.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.langchain4j.model.chat.ChatLanguageModel;
 import kr.or.kosa.backend.codenose.dto.UserMistakeStatDTO;
 import kr.or.kosa.backend.codenose.mapper.AnalysisMapper;
-import kr.or.kosa.backend.codenose.service.LangfuseService;
-import kr.or.kosa.backend.codenose.service.trace.LangfuseContext;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Service;
 
 import java.sql.Timestamp;
-import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
-/**
- * 사용자 실수(Mistake) 관리 및 리포트/퀴즈 생성 서비스
- */
 @Slf4j
 @Service
 public class MistakeService {
 
     private final AnalysisMapper analysisMapper;
-    private final ChatClient chatClient;
+    private final ChatLanguageModel chatLanguageModel;
     private final ObjectMapper objectMapper;
     private final PromptGenerator promptGenerator;
-    private final LangfuseService langfuseService;
 
-    public MistakeService(AnalysisMapper analysisMapper, ChatClient.Builder chatClientBuilder,
-            ObjectMapper objectMapper, PromptGenerator promptGenerator, LangfuseService langfuseService) {
+    public MistakeService(AnalysisMapper analysisMapper, ChatLanguageModel chatLanguageModel,
+            ObjectMapper objectMapper, PromptGenerator promptGenerator) {
         this.analysisMapper = analysisMapper;
-        this.chatClient = chatClientBuilder.build();
+        this.chatLanguageModel = chatLanguageModel;
         this.objectMapper = objectMapper;
         this.promptGenerator = promptGenerator;
-        this.langfuseService = langfuseService;
     }
 
     // 30회 이상 반복 시 경고 트리거
-    private static final int MISTAKE_THRESHOLD = 2;
+    private static final int MISTAKE_THRESHOLD = 30;
 
     /**
      * 분석 결과에서 발견된 에러를 카운팅 (AnalysisService에서 호출)
@@ -81,6 +71,9 @@ public class MistakeService {
         log.info("Checking alert for userId: {}, Found {} stats", userId, stats.size());
 
         for (UserMistakeStatDTO stat : stats) {
+            if ("Analysis Summary".equals(stat.getMistakeType()))
+                continue;
+
             int netCount = stat.getOccurrenceCount() - (stat.getSolvedCount() * MISTAKE_THRESHOLD);
             log.info("Mistake: {}, Occurr: {}, Solved: {}, Net: {}, Threshold: {}",
                     stat.getMistakeType(), stat.getOccurrenceCount(), stat.getSolvedCount(), netCount,
@@ -97,17 +90,17 @@ public class MistakeService {
     /**
      * AI를 통한 상세 리포트 및 O/X 퀴즈 생성
      */
+    @kr.or.kosa.backend.codenose.aop.LangfuseObserve(name = "MistakeReportGeneration")
     public String generateMistakeReport(Long userId) {
-        // 트레이스 시작
-        String traceId = UUID.randomUUID().toString();
-        langfuseService.startTrace(traceId, "generateMistakeReport", String.valueOf(userId), Collections.emptyMap());
-
         try {
             // 1. Threshold 넘긴 실수 상위 3개 조회
             List<UserMistakeStatDTO> criticalMistakes = new ArrayList<>();
             List<UserMistakeStatDTO> allStats = analysisMapper.findMistakeStatsByUserId(userId);
 
             for (UserMistakeStatDTO stat : allStats) {
+                if ("Analysis Summary".equals(stat.getMistakeType()))
+                    continue;
+
                 int netCount = stat.getOccurrenceCount() - (stat.getSolvedCount() * MISTAKE_THRESHOLD);
                 if (netCount >= MISTAKE_THRESHOLD) {
                     criticalMistakes.add(stat);
@@ -116,7 +109,12 @@ public class MistakeService {
 
             if (criticalMistakes.isEmpty()) {
                 // 임계치 넘지 않아도, 발생 빈도 높은 순으로 3개 제공 (Quiz 모드 아님)
-                criticalMistakes = new ArrayList<>(allStats);
+                // Filter Analysis Summary here too just in case
+                for (UserMistakeStatDTO stat : allStats) {
+                    if (!"Analysis Summary".equals(stat.getMistakeType())) {
+                        criticalMistakes.add(stat);
+                    }
+                }
                 criticalMistakes.sort((a, b) -> b.getOccurrenceCount() - a.getOccurrenceCount());
             }
 
@@ -133,31 +131,14 @@ public class MistakeService {
             // 2. AI 호출 (MISTAKE_REPORT_PROMPT 사용)
             String prompt = promptGenerator.createMistakeReportPrompt(mistakesContext.toString());
 
-            // 수동 스팬 시작 (Spring AI ChatClient 사용 - LangChain4j 리스너가 커버하지 않음)
-            Instant start = Instant.now();
-            langfuseService.startSpan("MistakeReportGeneration", start, Collections.emptyMap());
-
-            String response = chatClient.prompt(prompt).call().content();
-
-            // Spring AI 사용이므로 수동으로 Generation 로그 기록
-            langfuseService.sendGeneration(
-                    "MistakeReport",
-                    start,
-                    Instant.now(),
-                    "gpt-4o",
-                    prompt,
-                    response,
-                    0);
-
-            langfuseService.endSpan(null, Instant.now(), Collections.emptyMap());
+            // LangChain4j ChatLanguageModel 사용 (자동으로 LangfuseChatModelListener가 동작함)
+            String response = chatLanguageModel.generate(prompt);
 
             return response;
 
         } catch (Exception e) {
             log.error("Mistake Report Generation Failed", e);
             throw new RuntimeException("리포트 생성 실패", e);
-        } finally {
-            LangfuseContext.clean();
         }
     }
 
@@ -174,15 +155,42 @@ public class MistakeService {
 
     /**
      * 퀴즈 통과 시, 현재 임계치를 넘은 모든 실수에 대해 해결 처리
+     * (리포트에 포함된 상위 3개 항목만 차감)
      */
     public void solveAllCriticalMistakes(Long userId) {
+        List<UserMistakeStatDTO> criticalMistakes = new ArrayList<>();
         List<UserMistakeStatDTO> allStats = analysisMapper.findMistakeStatsByUserId(userId);
+
         for (UserMistakeStatDTO stat : allStats) {
+            if ("Analysis Summary".equals(stat.getMistakeType()))
+                continue;
+
             int netCount = stat.getOccurrenceCount() - (stat.getSolvedCount() * MISTAKE_THRESHOLD);
             if (netCount >= MISTAKE_THRESHOLD) {
-                stat.setSolvedCount(stat.getSolvedCount() + 1);
-                analysisMapper.saveOrUpdateMistakeStat(stat);
+                criticalMistakes.add(stat);
             }
+        }
+
+        // Limit to Top 3 (same logic as report generation) to solve only the ones in
+        // the quiz/report
+        if (criticalMistakes.size() > 3) {
+            // Sort to ensure we pick the same top 3 as the report did?
+            // Report logic: iterates allStats in order (DB order?) then adds criticals.
+            // If report didn't sort criticals explicitly (it only sorts if criticals is
+            // EMPTY),
+            // then strict order depends on `allStats` order (DB query order).
+            // To be consistent, we assume `allStats` has stable order or rely on index.
+            // However, report logic: `if (criticalMistakes.size() > 3) subList(0, 3)`.
+            // So we should do the exact same here.
+            // Note: Report logic for criticals (when not empty) does NOT sort. It takes
+            // first 3 found.
+            // So we must do the same.
+            criticalMistakes = criticalMistakes.subList(0, 3);
+        }
+
+        for (UserMistakeStatDTO stat : criticalMistakes) {
+            stat.setSolvedCount(stat.getSolvedCount() + 1);
+            analysisMapper.saveOrUpdateMistakeStat(stat);
         }
     }
 
@@ -190,6 +198,7 @@ public class MistakeService {
      * 특정 실수(Mistake Type)가 발생한 코드 내역 상세 조회
      * mistakeType이 null이면, 현재 Alert 조건을 만족하는(임계치 초과) 모든 실수에 대한 상세 내역을 반환합니다.
      */
+    @kr.or.kosa.backend.codenose.aop.LangfuseObserve(name = "getMistakeReports")
     public List<Map<String, Object>> getMistakeDetails(Long userId, String mistakeType) {
         List<kr.or.kosa.backend.codenose.dto.CodeResultDTO> history = analysisMapper.findCodeResultByUserId(userId);
         List<Map<String, Object>> details = new ArrayList<>();

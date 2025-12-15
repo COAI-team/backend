@@ -1,41 +1,32 @@
 package kr.or.kosa.backend.codenose.service.agent;
 
-import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.model.chat.listener.ChatModelErrorContext;
 import dev.langchain4j.model.chat.listener.ChatModelListener;
 import dev.langchain4j.model.chat.listener.ChatModelRequestContext;
 import dev.langchain4j.model.chat.listener.ChatModelResponseContext;
 import kr.or.kosa.backend.codenose.service.LangfuseService;
-import kr.or.kosa.backend.codenose.service.trace.LangfuseContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * Listen to LangChain4j events and send generations to Langfuse.
- * Uses ThreadLocal trace context to link generations to the parent trace/span.
- */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class LangfuseChatModelListener implements ChatModelListener {
 
     private final LangfuseService langfuseService;
-    private final Map<String, Instant> startTimes = new ConcurrentHashMap<>();
 
     @Override
     public void onRequest(ChatModelRequestContext context) {
-        // 요청 ID 또는 고유 식별자로 시작 시간 저장
-        // LangChain4j 컨텍스트의 attributes 맵을 사용할 수 있습니다.
+        log.info(">>>>> [LangfuseChatModelListener] onRequest triggered.");
         context.attributes().put("startTime", Instant.now());
     }
 
     @Override
     public void onResponse(ChatModelResponseContext context) {
+        log.info(">>>>> [LangfuseChatModelListener] onResponse triggered.");
         try {
             Instant startTime = (Instant) context.attributes().get("startTime");
             if (startTime == null)

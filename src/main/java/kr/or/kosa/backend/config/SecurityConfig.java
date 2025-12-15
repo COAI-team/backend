@@ -37,44 +37,44 @@ public class SecurityConfig {
                                 .sessionManagement(session -> session
                                                 .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                                 .authorizeHttpRequests(auth -> auth
+
                                                 // 인증 없이 접근 허용
                                                 .requestMatchers(
                                                                 "/",
                                                                 "/auth/github/**",
                                                                 "/oauth2/**",
-                                                                "/users/**",
+                                                                "/users/register",
+                                                                "/users/login",
+                                                                "/users/github/link",
+                                                                "/users/password/**",
                                                                 "/email/**",
-                                                                "/algo/missions/**",
                                                                 "/algo/**",
-                                                                "/github/**",
                                                                 "/admin/**",
                                                                 "/codeAnalysis/**",
-                                                                "/codeAnalysis/new/**",
-                                                                "/api/**", // 임시추가
-                                                                "/analysis/**", // 임시추가
-                                                                "/chat/messages",
-                                                                "/ws/**")
+                                                                "/api/analysis/**",
+                                                                "/api/mistakes/**",
+                                                                "/api/mistake-report/**",
+                                                                "/api/mcp/**",
+                                                                "/api/**",
+                                                                "/ws/**",
+                                                                "/chat/messages")
                                                 .permitAll()
                                                 .requestMatchers(HttpMethod.GET,
                                                                 "/freeboard/**",
                                                                 "/codeboard/**",
                                                                 "/comment",
                                                                 "/comment/**",
-                                                                "/like/*/*/users", // 좋아요 누른 사용자 목록 조회
                                                                 "/like/**",
-                                                                "/notification/**",
                                                                 "/analysis/**")
                                                 .permitAll()
-                                                .requestMatchers(HttpMethod.POST,
-                                                                "/api/analysis/save", // 명시적으로 POST 허용
-                                                                "/like/*/*")
-                                                .permitAll()
-                                                .requestMatchers("/api/mcp/token").authenticated()
+                                                // (Token Auth)
+                                                .requestMatchers("/api/mcp/token").authenticated() // User Token Issue
+                                                                                                   // (JWT Auth)
                                                 .anyRequest().authenticated())
-                                // JWT 인증 필터 (한 번만 등록)
                                 .addFilterBefore(
                                                 new JwtAuthenticationFilter(jwtProvider),
                                                 UsernamePasswordAuthenticationFilter.class);
+
                 return http.build();
         }
 
@@ -92,7 +92,7 @@ public class SecurityConfig {
         @Bean
         public CorsConfigurationSource corsConfigurationSource() {
                 CorsConfiguration configuration = new CorsConfiguration();
-                configuration.setAllowedOrigins(List.of("http://localhost:5173"));
+                configuration.setAllowedOrigins(List.of("https://localhost:5173"));
                 configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
                 configuration.setAllowedHeaders(List.of("*"));
                 configuration.setAllowCredentials(true);

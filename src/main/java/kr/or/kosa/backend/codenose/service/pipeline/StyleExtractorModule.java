@@ -1,7 +1,7 @@
 package kr.or.kosa.backend.codenose.service.pipeline;
 
+import dev.langchain4j.model.chat.ChatLanguageModel;
 import kr.or.kosa.backend.codenose.service.LangfuseService;
-import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -16,12 +16,12 @@ import java.util.Collections;
 @Service
 public class StyleExtractorModule {
 
-    private final ChatClient chatClient;
+    private final ChatLanguageModel chatLanguageModel;
     private final LangfuseService langfuseService;
 
-    public StyleExtractorModule(ChatClient.Builder builder,
+    public StyleExtractorModule(ChatLanguageModel chatLanguageModel,
             LangfuseService langfuseService) {
-        this.chatClient = builder.build();
+        this.chatLanguageModel = chatLanguageModel;
         this.langfuseService = langfuseService;
     }
 
@@ -52,12 +52,7 @@ public class StyleExtractorModule {
                     %s
                     """.formatted(context.getUserContext());
 
-            Instant genStart = Instant.now();
-            String rules = chatClient.prompt(prompt).call().content();
-            Instant genEnd = Instant.now();
-
-            // Langfuse Generation 기록
-            langfuseService.sendGeneration("StyleGeneration", genStart, genEnd, "gpt-4o", prompt, rules, 0);
+            String rules = chatLanguageModel.generate(prompt);
 
             context.setStyleRules(rules);
             return context;

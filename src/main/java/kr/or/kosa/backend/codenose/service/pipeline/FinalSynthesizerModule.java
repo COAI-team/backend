@@ -1,9 +1,9 @@
 package kr.or.kosa.backend.codenose.service.pipeline;
 
+import dev.langchain4j.model.chat.ChatLanguageModel;
 import kr.or.kosa.backend.codenose.service.LangfuseService;
 import com.samskivert.mustache.Mustache;
 import com.samskivert.mustache.Template;
-import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -20,13 +20,13 @@ import java.util.Map;
 @Service
 public class FinalSynthesizerModule {
 
-    private final ChatClient chatClient;
+    private final ChatLanguageModel chatLanguageModel;
     private final Mustache.Compiler mustacheCompiler;
     private final LangfuseService langfuseService;
 
-    public FinalSynthesizerModule(ChatClient.Builder builder, Mustache.Compiler mustacheCompiler,
+    public FinalSynthesizerModule(ChatLanguageModel chatLanguageModel, Mustache.Compiler mustacheCompiler,
             LangfuseService langfuseService) {
-        this.chatClient = builder.build();
+        this.chatLanguageModel = chatLanguageModel;
         this.mustacheCompiler = mustacheCompiler;
         this.langfuseService = langfuseService;
     }
@@ -61,12 +61,7 @@ public class FinalSynthesizerModule {
                     "styleRules", context.getStyleRules(),
                     "optimizedLogic", context.getOptimizedLogic()));
 
-            Instant genStart = Instant.now();
-            String finalCode = chatClient.prompt(prompt).call().content();
-            Instant genEnd = Instant.now();
-
-            // Langfuse Generation 기록
-            langfuseService.sendGeneration("SynthesizeGeneration", genStart, genEnd, "gpt-4o", prompt, finalCode, 0);
+            String finalCode = chatLanguageModel.generate(prompt);
 
             context.setFinalResult(finalCode);
             return context;
