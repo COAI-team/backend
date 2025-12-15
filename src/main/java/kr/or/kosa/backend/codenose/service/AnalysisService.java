@@ -1,8 +1,8 @@
 package kr.or.kosa.backend.codenose.service;
 
-import kr.or.kosa.backend.codenose.config.PromptManager;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.langchain4j.model.chat.ChatLanguageModel;
 import kr.or.kosa.backend.codenose.dto.RagDto;
 import kr.or.kosa.backend.codenose.dto.AnalysisRequestDTO;
 import kr.or.kosa.backend.codenose.dto.CodeResultDTO;
@@ -11,10 +11,9 @@ import kr.or.kosa.backend.codenose.dto.UserCodePatternDTO;
 import kr.or.kosa.backend.codenose.mapper.AnalysisMapper;
 import kr.or.kosa.backend.codenose.service.agent.AgenticWorkflowService;
 import kr.or.kosa.backend.codenose.service.search.HybridSearchService;
-import kr.or.kosa.backend.codenose.service.trace.LangfuseContext;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -41,7 +40,7 @@ public class AnalysisService {
 
     private final AnalysisMapper analysisMapper;
     private final ObjectMapper objectMapper;
-    private final ChatClient chatClient;
+    private final ChatLanguageModel chatLanguageModel;
     private final RagService ragService;
     private final HybridSearchService hybridSearchService;
     private final AgenticWorkflowService agenticWorkflowService;
@@ -53,7 +52,7 @@ public class AnalysisService {
 
     @Autowired
     public AnalysisService(
-            ChatClient.Builder chatClientBuilder,
+            ChatLanguageModel chatLanguageModel,
             AnalysisMapper analysisMapper,
             ObjectMapper objectMapper,
             RagService ragService,
@@ -62,7 +61,7 @@ public class AnalysisService {
             MistakeService mistakeService,
             PromptGenerator promptGenerator,
             LangfuseService langfuseService) {
-        this.chatClient = chatClientBuilder.build();
+        this.chatLanguageModel = chatLanguageModel;
         this.analysisMapper = analysisMapper;
         this.objectMapper = objectMapper;
         this.ragService = ragService;
@@ -89,14 +88,10 @@ public class AnalysisService {
      * @param requestDto 분석 요청 DTO
      * @return AI 분석 결과 (JSON 문자열)
      */
+    @kr.or.kosa.backend.codenose.aop.LangfuseObserve(name = "analyzeStoredFile")
     public String analyzeStoredFile(AnalysisRequestDTO requestDto) {
-        // Langfuse 트레이스 시작
-        String traceId = UUID.randomUUID().toString();
-        langfuseService.startTrace(
-                traceId,
-                "analyzeStoredFile",
-                String.valueOf(requestDto.getUserId()),
-                Map.of("filePath", requestDto.getFilePath()));
+        // AOP가 자동으로 Trace/Span 시작 및 Input 캡처 수행
+        // LangfuseContext는 AOP Aspect와 LangfuseService에서 관리됨
 
         try {
             // 1. DB에서 저장된 GitHub 파일 내용 조회
@@ -116,7 +111,7 @@ public class AnalysisService {
             Instant searchStart = Instant.now();
             String language = getLanguageFromExtension(storedFile.getFileName());
 
-            // 스팬 시작
+            // 내부 스팬 시작 (Manual Instrument - Granular Trace)
             langfuseService.startSpan("HybridSearch", searchStart, Map.of("query", "mistakes patterns"));
 
             List<org.springframework.ai.document.Document> contextDocs = hybridSearchService.search(
@@ -175,17 +170,11 @@ public class AnalysisService {
 
             langfuseService.endSpan(null, Instant.now(), Collections.emptyMap()); // PromptGeneration 스팬 종료
 
-            // 3.1. 메타데이터 별도 추출 (파일의 기술적 특성 파악용)
-            // 메타데이터 추출은 LLM을 사용하므로, 내부 호출이나 여기서 암시적으로 스팬에 래핑해야 할 수 있습니다.
-            // extractMetadata는 chatClient를 호출하므로 추적이 필요합니다.
-            // 현재는 Spring AI 수동 호출이므로, 자동 계측되지 않습니다.
-
+            // 3.1. 메타데이터 별도 추출
             String metadataJson = extractMetadata(metadataPrompt);
             log.info("메타데이터 추출 상태: {}", metadataJson != null ? "성공" : "실패");
 
             // 4. Agentic Workflow 실행
-            // AgenticWorkflowService는 LangChain4j를 사용하므로 리스너가 Generation을 감지합니다.
-            // 전체 워크플로우를 하나의 스팬으로 감쌉니다.
             Instant genStart = Instant.now();
             langfuseService.startSpan("AgenticWorkflow", genStart, Map.of("model", "gpt-4o"));
 
@@ -193,9 +182,6 @@ public class AnalysisService {
                     systemPromptWithTone);
 
             langfuseService.endSpan(null, Instant.now(), Collections.emptyMap()); // AgenticWorkflow 스팬 종료
-
-            // 참고: 'executeWorkflow' 내부의 Generation 로그는 이제 Listener + Context에 의해 자동으로
-            // 처리됩니다.
 
             String cleanedResponse = cleanMarkdownCodeBlock(aiResponseContent);
 
@@ -234,9 +220,6 @@ public class AnalysisService {
         } catch (Exception e) {
             log.error("파일 분석 실패: {}", e.getMessage(), e);
             throw new RuntimeException("파일 분석에 실패했습니다: " + e.getMessage());
-        } finally {
-            // ThreadLocal 정리
-            LangfuseContext.clean();
         }
     }
 
@@ -411,7 +394,7 @@ public class AnalysisService {
      */
     private String extractMetadata(String prompt) {
         try {
-            String response = chatClient.prompt(prompt).call().content();
+            String response = chatLanguageModel.generate(prompt);
             return cleanMarkdownCodeBlock(response);
         } catch (Exception e) {
             log.error("메타데이터 추출 실패", e);
