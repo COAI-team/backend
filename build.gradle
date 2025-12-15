@@ -67,6 +67,9 @@ dependencies {
     implementation 'dev.langchain4j:langchain4j-spring-boot-starter:0.35.0'
     implementation 'dev.langchain4j:langchain4j-open-ai-spring-boot-starter:0.35.0'
 
+    // com.langfuse:langfuse-java dependency removed due to version/compatibility issues.
+    // Implemented custom LangfuseService using RestClient instead.
+
     /* ANTLR */
     antlr "org.antlr:antlr4:4.13.1"
     implementation 'org.antlr:antlr4-runtime:4.13.1'

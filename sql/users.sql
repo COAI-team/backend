@@ -15,6 +15,7 @@ create table USERS (
     USER_ISSUBSCRIBED tinyint(1) default 0 not null,
     GITHUB_ID varchar(255) null,
     GITHUB_TOKEN text null,
+    MCP_TOKEN varchar(255) null,
     constraint UQ_USERS_EMAIL unique (USER_EMAIL),
     constraint UQ_USERS_NICKNAME unique (USER_NICKNAME)
 );
