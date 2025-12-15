@@ -238,16 +238,16 @@ ALTER TABLE `USER_GITHUB_SETTINGS` AUTO_INCREMENT = 1;
 -- LANGUAGE_ID = Judge0 API language_id
 -- PISTON_LANGUAGE = Piston API용 언어명
 INSERT INTO LANGUAGES (LANGUAGE_ID, LANGUAGE_NAME, PISTON_LANGUAGE, LANGUAGE_TYPE, TIME_FACTOR, TIME_ADDITION, MEMORY_FACTOR, MEMORY_ADDITION) VALUES
-(100, 'Python', 'python', 'GENERAL', 3.0, 2000, 2.0, 32),
-(93, 'JavaScript', 'javascript', 'GENERAL', 3.0, 2000, 2.0, 2),
-(91, 'Java', 'java', 'GENERAL', 2.0, 1000, 2.0, 16),
+(71, 'Python', 'python', 'GENERAL', 3.0, 2000, 2.0, 32),
+(63, 'JavaScript', 'javascript', 'GENERAL', 3.0, 2000, 2.0, 2),
+(62, 'Java', 'java', 'GENERAL', 2.0, 1000, 2.0, 16),
 (51, 'C#', 'csharp.net', 'GENERAL', 2.0, 1000, 2.0, 16),
-(105, 'C++', 'c++', 'GENERAL', 1.0, 0, 1.0, 0),
-(106, 'Go', 'go', 'GENERAL', 1.0, 2000, 1.0, 512),
-(94, 'TypeScript', 'typescript', 'GENERAL', 3.0, 2000, 2.0, 2),
-(111, 'Kotlin', 'kotlin', 'GENERAL', 2.0, 1000, 2.0, 16),
+(54, 'C++', 'c++', 'GENERAL', 1.0, 0, 1.0, 0),
+(60, 'Go', 'go', 'GENERAL', 1.0, 2000, 1.0, 512),
+(74, 'TypeScript', 'typescript', 'GENERAL', 3.0, 2000, 2.0, 2),
+(78, 'Kotlin', 'kotlin', 'GENERAL', 2.0, 1000, 2.0, 16),
 (83, 'Swift', 'swift', 'GENERAL', 1.0, 0, 1.0, 512),
-(108, 'Rust', 'rust', 'GENERAL', 1.0, 0, 1.0, 0),
+(73, 'Rust', 'rust', 'GENERAL', 1.0, 0, 1.0, 0),
 (82, 'SQLite', 'sqlite3', 'DB', 1.0, 0, 1.0, 0);
 -- =============================================
 -- 샘플 데이터 삽입 (문제)
