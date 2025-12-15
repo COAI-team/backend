@@ -16,6 +16,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 
@@ -37,6 +38,35 @@ public class ProblemPoolController {
     private final ObjectMapper objectMapper;
 
     /**
+     * SecurityContext에서 사용자 ID 추출
+     * <p>@AuthenticationPrincipal이 null인 경우 SecurityContextHolder에서 직접 조회
+     *
+     * @param authentication 인증 정보 (nullable)
+     * @return 사용자 ID, 비로그인 시 null
+     */
+    private Long extractUserId(JwtAuthentication authentication) {
+        org.springframework.security.core.Authentication auth = authentication;
+        if (auth == null) {
+            auth = SecurityContextHolder.getContext().getAuthentication();
+        }
+
+        if (auth == null || auth.getPrincipal() == null) {
+            log.debug("인증 정보 없음 - 비로그인 사용자");
+            return null;
+        }
+
+        Object principal = auth.getPrincipal();
+        if (principal instanceof JwtUserDetails userDetails) {
+            Long userId = userDetails.id().longValue();
+            log.debug("✅ 인증된 사용자 - userId: {}", userId);
+            return userId;
+        }
+
+        log.debug("유효하지 않은 인증 정보 - principal: {}", principal.getClass().getSimpleName());
+        return null;
+    }
+
+    /**
      * 현재 활성화된 테마 목록 (프론트엔드와 동기화 필요)
      */
     private static final List<String> ACTIVE_THEMES = List.of(
@@ -50,23 +80,19 @@ public class ProblemPoolController {
     /**
      * 풀에서 문제 꺼내기 (SSE 스트리밍)
      * <p>풀에 문제가 있으면 즉시 반환, 없으면 실시간 생성
+     * <p>SSE는 Authorization 헤더를 지원하지 않으므로 userId를 쿼리 파라미터로 받음
      *
-     * GET /api/algo/pool/draw/stream?difficulty=GOLD&topic=DFS/BFS&theme=SANTA_DELIVERY
+     * GET /api/algo/pool/draw/stream?difficulty=GOLD&topic=DFS/BFS&theme=SANTA_DELIVERY&userId=3
      */
     @GetMapping(value = "/draw/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<String> drawProblemStream(
             @RequestParam String difficulty,
             @RequestParam String topic,
             @RequestParam String theme,
-            @AuthenticationPrincipal JwtAuthentication authentication) {
+            @RequestParam(required = false) Long userId) {
 
-        log.info("풀에서 문제 꺼내기 요청 - difficulty: {}, topic: {}, theme: {}", difficulty, topic, theme);
-
-        Long userId = null;
-        if (authentication != null) {
-            JwtUserDetails userDetails = (JwtUserDetails) authentication.getPrincipal();
-            userId = userDetails.id().longValue();
-        }
+        log.info("풀에서 문제 꺼내기 요청 - difficulty: {}, topic: {}, theme: {}, userId: {}",
+                difficulty, topic, theme, userId);
 
         final Long finalUserId = userId;
 
@@ -144,15 +170,11 @@ public class ProblemPoolController {
             @RequestParam String theme,
             @AuthenticationPrincipal JwtAuthentication authentication) {
 
-        log.info("풀에서 문제 꺼내기 요청 (동기) - difficulty: {}, topic: {}, theme: {}", difficulty, topic, theme);
+        Long userId = extractUserId(authentication);
+        log.info("풀에서 문제 꺼내기 요청 (동기) - difficulty: {}, topic: {}, theme: {}, userId: {}",
+                difficulty, topic, theme, userId);
 
         try {
-            Long userId = null;
-            if (authentication != null) {
-                JwtUserDetails userDetails = (JwtUserDetails) authentication.getPrincipal();
-                userId = userDetails.id().longValue();
-            }
-
             ProblemGenerationResponseDto response = poolService.drawProblem(
                     difficulty, topic, theme, userId, null);
 

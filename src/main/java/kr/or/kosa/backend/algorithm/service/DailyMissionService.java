@@ -76,7 +76,8 @@ public class DailyMissionService {
         // 없으면 새로 선택 (Pool 우선 → 기존 ALGO_PROBLEM fallback)
         if (problemId == null) {
             // 1. Pool에서 문제 가져오기 시도 (AI 생성 문제)
-            problemId = problemPoolService.drawProblemForDailyMission(difficulty, null);
+            // ALGO_CREATER = -1 → 시스템(데일리 미션)이 생성한 문제임을 표시
+            problemId = problemPoolService.drawProblemForDailyMission(difficulty, -1L);
 
             // 2. Pool이 비어있으면 기존 ALGO_PROBLEM에서 랜덤 선택 (fallback)
             if (problemId == null) {
