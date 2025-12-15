@@ -388,4 +388,62 @@ public class AnalysisService {
             return "javascript";
         return "java";
     }
+
+    /**
+     * 분석 결과만 저장 (프론트엔드에서 분석 완료 후 호출용)
+     *
+     * @param analysisData 프론트엔드에서 전달받은 분석 결과 데이터
+     * @param userId 현재 사용자 ID
+     * @return 생성된 분석 ID
+     */
+    public String saveAnalysisOnly(java.util.Map<String, Object> analysisData, Long userId) {
+        try {
+            // 필수 데이터 추출
+            String fileId = (String) analysisData.get("fileId");
+            String repositoryUrl = (String) analysisData.get("repositoryUrl");
+            String filePath = (String) analysisData.get("filePath");
+            Object analysisResultObj = analysisData.get("analysisResult");
+
+            // analysisResult를 JSON 문자열로 변환
+            String analysisResultJson;
+            if (analysisResultObj instanceof String) {
+                analysisResultJson = (String) analysisResultObj;
+            } else {
+                analysisResultJson = objectMapper.writeValueAsString(analysisResultObj);
+            }
+
+            // JSON 파싱하여 상세 정보 추출
+            JsonNode jsonNode = objectMapper.readTree(analysisResultJson);
+
+            // CodeResultDTO 생성
+            CodeResultDTO result = new CodeResultDTO();
+            result.setAnalysisId(UUID.randomUUID().toString());
+            result.setUserId(userId);
+            result.setRepositoryUrl(repositoryUrl);
+            result.setFilePath(filePath);
+            result.setAnalysisResult(analysisResultJson);
+
+            // 점수 및 상세 항목 매핑
+            result.setAiScore(jsonNode.path("aiScore").asInt(-1));
+            result.setCodeSmells(objectMapper.writeValueAsString(jsonNode.path("codeSmells")));
+            result.setSuggestions(objectMapper.writeValueAsString(jsonNode.path("suggestions")));
+
+            // 타임스탬프 설정
+            result.setCreatedAt(Timestamp.valueOf(LocalDateTime.now()));
+
+            // DB 저장
+            analysisMapper.saveCodeResult(result);
+
+            log.info("분석 결과 저장 완료 - analysisId: {}, userId: {}", result.getAnalysisId(), userId);
+
+            // 사용자 코드 패턴 업데이트
+            updateUserPatterns(userId, jsonNode.path("codeSmells"));
+
+            return result.getAnalysisId();
+
+        } catch (Exception e) {
+            log.error("분석 결과 저장 실패: {}", e.getMessage(), e);
+            throw new RuntimeException("분석 결과 저장에 실패했습니다: " + e.getMessage());
+        }
+    }
 }

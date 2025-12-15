@@ -52,10 +52,9 @@ public class SecurityConfig {
                                 "/github/**",
                                 "/admin/**",
                                 "/codeAnalysis/**",
-                                "/api/analysis/**",
+                                "/codeAnalysis/new/**",
                                 "/api/**",            // 임시추가
                                 "/analysis/**",       // 임시추가
-                                "/api/analysis/**",
                                 "/chat/messages",
                                 "/ws/**"
                         ).permitAll()
@@ -67,6 +66,9 @@ public class SecurityConfig {
                                 "/like/**",
                                 "/analysis/**"
                                 ).permitAll()
+                        .requestMatchers(HttpMethod.POST,
+                                "/api/analysis/save"    // 명시적으로 POST 허용
+                        ).permitAll()
                         .anyRequest().authenticated()
                 )
                 // JWT 인증 필터 (한 번만 등록)
