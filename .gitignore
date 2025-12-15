@@ -84,3 +84,6 @@ keystore.p12
 src/main/resources/keystore.p12
 *.p12
 *.jks
+
+# Node modules
+node_modules/
