@@ -68,7 +68,7 @@ public class PistonService {
                     log.debug("테스트케이스 {} 실행 중...", i + 1);
 
                     TestRunResponseDto.TestCaseResultDto result = executeSingleTestCase(
-                            sourceCode, pistonLanguage, testCase, i + 1);
+                            sourceCode, pistonLanguage, testCase, i + 1, timeLimit, memoryLimit);
 
                     results.add(result);
 
@@ -120,17 +120,31 @@ public class PistonService {
             String sourceCode,
             String pistonLanguage,
             AlgoTestcaseDto testCase,
-            Integer testCaseNumber) {
+            Integer testCaseNumber,
+            Integer timeLimit,
+            Integer memoryLimit) {
 
         long startTime = System.currentTimeMillis();
 
         // Piston API 요청 생성
-        Map<String, Object> request = Map.of(
-                "language", pistonLanguage,
-                "version", "*",  // 최신 버전 사용
-                "files", List.of(Map.of("content", sourceCode)),
-                "stdin", testCase.getInputData() != null ? testCase.getInputData() : ""
-        );
+        // timeLimit: ms 단위로 전달됨
+        // memoryLimit: KB 단위로 전달됨 → bytes로 변환 필요 (KB * 1024)
+        Map<String, Object> request = new java.util.HashMap<>();
+        request.put("language", pistonLanguage);
+        request.put("version", "*");  // 최신 버전 사용
+        request.put("files", List.of(Map.of("content", sourceCode)));
+        request.put("stdin", testCase.getInputData() != null ? testCase.getInputData() : "");
+
+        // 시간 제한 설정 (ms)
+        if (timeLimit != null) {
+            request.put("run_timeout", timeLimit);
+        }
+
+        // 메모리 제한 설정 (KB → bytes 변환, 최대 512MB 제한)
+        if (memoryLimit != null) {
+            long memoryLimitBytes = Math.min((long) memoryLimit * 1024, 512L * 1024 * 1024);
+            request.put("run_memory_limit", memoryLimitBytes);
+        }
 
         try {
             // Piston API 호출

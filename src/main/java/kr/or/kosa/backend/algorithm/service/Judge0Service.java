@@ -151,8 +151,10 @@ public class Judge0Service {
         // Judge0는 초 단위 (float) 지원
         float cpuTimeLimitSec = timeLimit != null ? timeLimit / 1000.0f : this.cpuTimeLimit.floatValue();
         // memoryLimit은 이미 KB 단위로 전달됨 (TestCaseGeneratorService에서 256 * 1024 = 262144 KB)
-        // Judge0 RapidAPI 최대 제한: 2,048,000 KB
-        int memoryLimitKb = memoryLimit != null ? Math.min(memoryLimit, 2048000) : this.memoryLimit;
+        // Judge0 RapidAPI 제한: 최소 2,048 KB (2MB) ~ 최대 2,048,000 KB (2GB)
+        int memoryLimitKb = memoryLimit != null
+                ? Math.max(2048, Math.min(memoryLimit, 2048000))
+                : this.memoryLimit;
 
         Judge0RequestDto request = Judge0RequestDto.builder()
                 .source_code(sourceCode)
