@@ -59,8 +59,21 @@
         WHERE COMMENT_ID = #{commentId}
     </select>
 
-    <!-- 댓글 + 답글 조회 (커서 기반 무한 스크롤) - MySQL 호환 버전 -->
+    <!-- 댓글 + 답글 조회 (커서 기반 무한 스크롤)-->
     <select id="selectCommentsWithReplies" resultMap="commentResponseMap">
+        WITH parent_comments AS (
+        SELECT COMMENT_ID
+        FROM COMMENT
+        WHERE BOARD_ID = #{boardId}
+        AND BOARD_TYPE = #{boardType}
+        AND PARENT_COMMENT_ID IS NULL
+        AND IS_DELETED = FALSE
+        <if test="cursor.hasCursor()">
+            AND COMMENT_ID &gt; #{cursor.cursor}
+        </if>
+        ORDER BY COMMENT_ID ASC
+        LIMIT #{cursor.size}
+        )
         SELECT
         c.COMMENT_ID,
         c.BOARD_ID,
@@ -98,30 +111,8 @@
         AND c.BOARD_TYPE = #{boardType}
         AND c.IS_DELETED = FALSE
         AND (
-        -- 댓글: 커서 조건 적용
-        (c.PARENT_COMMENT_ID IS NULL
-        <if test="cursor.hasCursor()">
-            AND c.COMMENT_ID &gt; #{cursor.cursor}
-        </if>
-        )
-        OR
-        -- 답글: 위에서 조회한 댓글들의 답글
-        c.PARENT_COMMENT_ID IN (
-        SELECT parent_ids.COMMENT_ID
-        FROM (
-        SELECT COMMENT_ID
-        FROM COMMENT
-        WHERE BOARD_ID = #{boardId}
-        AND BOARD_TYPE = #{boardType}
-        AND PARENT_COMMENT_ID IS NULL
-        AND IS_DELETED = FALSE
-        <if test="cursor.hasCursor()">
-            AND COMMENT_ID &gt; #{cursor.cursor}
-        </if>
-        ORDER BY COMMENT_ID ASC
-        LIMIT #{cursor.size}
-        ) AS parent_ids
-        )
+        c.COMMENT_ID IN (SELECT COMMENT_ID FROM parent_comments)
+        OR c.PARENT_COMMENT_ID IN (SELECT COMMENT_ID FROM parent_comments)
         )
         ORDER BY
         COALESCE(c.PARENT_COMMENT_ID, c.COMMENT_ID) ASC,
