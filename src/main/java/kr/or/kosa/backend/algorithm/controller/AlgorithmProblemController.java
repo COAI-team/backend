@@ -112,7 +112,12 @@ public class AlgorithmProblemController {
     /**
      * AI 문제 생성 (SSE 스트리밍)
      * GET /api/algo/problems/generate/stream
+     *
+     * @deprecated 검증 없이 PENDING 상태로만 저장됨.
+     *             대신 /api/algo/pool/draw/stream 엔드포인트를 사용하세요.
+     *             해당 엔드포인트는 검증 파이프라인을 수행합니다.
      */
+    @Deprecated(since = "2025-12", forRemoval = true)
     @GetMapping(value = "/generate/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<String> generateProblemStream(
             @RequestParam String difficulty,
