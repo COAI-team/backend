@@ -12,5 +12,4 @@ public interface AdminUserService {
     AdminUserDetailResponseDto userDetail(long userId);
     boolean subscribeCheck(long userId);
     Users banUser(long userId);
-
 }

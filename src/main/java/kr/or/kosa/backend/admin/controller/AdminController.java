@@ -25,7 +25,6 @@ public class AdminController {
     public ResponseEntity<ApiResponse<PageResponseDto<UserFindResponseDto>>> findUserByCondition(
        @ModelAttribute SearchConditionRequestDto req
     ){
-        System.out.println("req users ==>> " + req);
         PageResponseDto<UserFindResponseDto> result = adminService.findByCondotion(req);
         return  ResponseEntity.ok(ApiResponse.success(result));
     }
@@ -35,7 +34,6 @@ public class AdminController {
         @PathVariable("userId") Long userId
     ) {
         AdminUserDetailResponseDto result = adminService.userDetail(userId);
-        System.out.println("컨트롤러에서 result => " + result.toString());
         return ResponseEntity.ok(ApiResponse.success(result));
     }
 

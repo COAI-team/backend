@@ -5,22 +5,129 @@
 
 <mapper namespace="kr.or.kosa.backend.admin.mapper.AdminUserBoardMapper">
 
-<!--    <select id="">-->
-<!--        select c.CODEBOARD_ID, c.CODEBOARD_TITLE, u.USER_NICKNAME-->
-<!--        from CODEBOARD c-->
-<!--        join USERS u on u.USER_ID = c.USER_ID-->
-<!--    </select>-->
+    <select id="userBoards" resultType="kr.or.kosa.backend.admin.dto.BoardItem">
+        SELECT *
+        FROM (
+        SELECT
+        T.ALGOSUBMISSION_ID AS id,
+        AP.ALGO_PROBLEM_TITLE AS title,
+        U.USER_NICKNAME AS userNickName,
+        T.SUBMITTED_AT AS createdAt,
+        'algo' AS boardType
+        FROM ALGO_SUBMISSIONS T
+        JOIN USERS U ON U.USER_ID = T.USER_ID
+        JOIN ALGO_PROBLEMS AP ON AP.ALGO_PROBLEM_ID = T.ALGO_PROBLEM_ID
 
-<!--    <select id="">-->
-<!--        select t.ALGOSUBMISSION_ID, u.USER_NICKNAME-->
-<!--        from ALGO_SUBMISSIONS t-->
-<!--        join USERS u on u.USER_ID = t.USER_ID;-->
-<!--    </select>-->
+        UNION ALL
 
-<!--    <select id="">-->
-<!--        select f.FREEBOARD_ID, f.FREEBOARD_TITLE, u.USER_NICKNAME-->
-<!--        from FREEBOARD f-->
-<!--        join USERS u on u.USER_ID = f.USER_ID;-->
-<!--    </select>-->
+        SELECT
+        C.CODEBOARD_ID AS id,
+        C.CODEBOARD_TITLE AS title,
+        U.USER_NICKNAME AS userNickName,
+        C.CODEBOARD_CREATED_AT AS createdAt,
+        'code' AS boardType
+        FROM CODEBOARD C
+        JOIN USERS U ON U.USER_ID = C.USER_ID
+
+        UNION ALL
+
+        SELECT
+        F.FREEBOARD_ID AS id,
+        F.FREEBOARD_TITLE AS title,
+        U.USER_NICKNAME AS userNickName,
+        F.FREEBOARD_CREATED_AT AS createdAt,
+        'free' AS boardType
+        FROM FREEBOARD F
+        JOIN USERS U ON U.USER_ID = F.USER_ID
+        ) AS combined
+        <where>
+            <if test="cond.boardType != null and cond.boardType != ''">
+                AND boardType = #{cond.boardType}
+            </if>
+
+            <!-- ✅ 검색조건 추가 -->
+            <if test="cond.keyword != null and cond.keyword != ''">
+                <choose>
+                    <!-- 제목 검색 -->
+                    <when test="cond.searchType == 'title'">
+                        AND title LIKE CONCAT('%', #{cond.keyword}, '%')
+                    </when>
+                    <!-- 작성자 검색 -->
+                    <when test="cond.searchType == 'user'">
+                        AND userNickName LIKE CONCAT('%', #{cond.keyword}, '%')
+                    </when>
+                </choose>
+            </if>
+        </where>
+        ORDER BY
+        <choose>
+            <when test="cond.sortField != null and cond.sortField != ''">
+                ${cond.sortField}
+            </when>
+            <otherwise>createdAt</otherwise>
+        </choose>
+        <choose>
+            <when test="cond.sortOrder == 'asc'">ASC</when>
+            <otherwise>DESC</otherwise>
+        </choose>
+        LIMIT #{cond.size} OFFSET #{cond.offset}
+    </select>
+
+    <select id="countUserBoards" resultType="int">
+        SELECT COUNT(*)
+        FROM (
+        SELECT
+        T.ALGOSUBMISSION_ID AS id,
+        AP.ALGO_PROBLEM_TITLE AS title,
+        U.USER_NICKNAME AS userNickName,
+        T.SUBMITTED_AT AS createdAt,
+        'algo' AS boardType
+        FROM ALGO_SUBMISSIONS T
+        JOIN USERS U ON U.USER_ID = T.USER_ID
+        JOIN ALGO_PROBLEMS AP ON AP.ALGO_PROBLEM_ID = T.ALGO_PROBLEM_ID
+
+        UNION ALL
+
+        SELECT
+        C.CODEBOARD_ID AS id,
+        C.CODEBOARD_TITLE AS title,
+        U.USER_NICKNAME AS userNickName,
+        C.CODEBOARD_CREATED_AT AS createdAt,
+        'code' AS boardType
+        FROM CODEBOARD C
+        JOIN USERS U ON U.USER_ID = C.USER_ID
+
+        UNION ALL
+
+        SELECT
+        F.FREEBOARD_ID AS id,
+        F.FREEBOARD_TITLE AS title,
+        U.USER_NICKNAME AS userNickName,
+        F.FREEBOARD_CREATED_AT AS createdAt,
+        'free' AS boardType
+        FROM FREEBOARD F
+        JOIN USERS U ON U.USER_ID = F.USER_ID
+        ) AS combined
+        <where>
+            <if test="cond.boardType != null and cond.boardType != ''">
+                AND boardType = #{cond.boardType}
+            </if>
+
+            <if test="cond.keyword != null and cond.keyword != ''">
+                <choose>
+                    <when test="cond.searchType == 'title'">
+                        AND title LIKE CONCAT('%', #{cond.keyword}, '%')
+                    </when>
+                    <when test="cond.searchType == 'user'">
+                        AND userNickName LIKE CONCAT('%', #{cond.keyword}, '%')
+                    </when>
+                </choose>
+            </if>
+        </where>
+    </select>
+
+
+
+
 </mapper>
 
