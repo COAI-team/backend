@@ -98,6 +98,10 @@ public class ProblemPoolController {
 
         return Flux.create(sink -> {
             reactor.core.scheduler.Schedulers.boundedElastic().schedule(() -> {
+                // 요청 시작 시간 측정
+                long requestStartTime = System.currentTimeMillis();
+                final boolean[] fromPoolFlag = {false};  // 풀에서 가져왔는지 여부
+
                 try {
                     // 풀에서 문제 꺼내기 (없으면 실시간 생성)
                     ProblemGenerationResponseDto response = poolService.drawProblem(
@@ -106,7 +110,8 @@ public class ProblemPoolController {
                             theme,
                             finalUserId,
                             progressEvent -> {
-                                // 실시간 생성 시 진행률 전송
+                                // 실시간 생성 시 진행률 전송 → 풀에서 가져온 게 아님
+                                fromPoolFlag[0] = false;
                                 try {
                                     Map<String, Object> event = new HashMap<>();
                                     event.put("type", "PROGRESS");
@@ -120,6 +125,15 @@ public class ProblemPoolController {
                             }
                     );
 
+                    // 요청 처리 시간 측정 (fetchTime)
+                    double fetchTime = (System.currentTimeMillis() - requestStartTime) / 1000.0;
+
+                    // 풀에서 가져왔는지 판단: 진행률 콜백이 호출되지 않았고, fetchTime이 짧으면 풀에서 가져온 것
+                    // progressCallback이 한번도 호출되지 않았으면 fromPoolFlag[0]은 초기값 false 유지
+                    // 하지만 실제로 풀에서 가져온 경우에는 progressCallback이 호출되지 않음
+                    // fetchTime < 3초이고 generationTime이 있으면 풀에서 가져온 것으로 판단
+                    boolean fromPool = fetchTime < 3.0 && response.getGenerationTime() != null;
+
                     // 완료 이벤트 전송
                     Map<String, Object> completeEvent = new HashMap<>();
                     completeEvent.put("type", "COMPLETE");
@@ -128,15 +142,15 @@ public class ProblemPoolController {
                     completeEvent.put("description", response.getProblem().getAlgoProblemDescription());
                     completeEvent.put("difficulty", response.getProblem().getAlgoProblemDifficulty().name());
                     completeEvent.put("testCaseCount", response.getTestCases() != null ? response.getTestCases().size() : 0);
-                    completeEvent.put("generationTime", response.getGenerationTime());
-                    completeEvent.put("fromPool", response.getGenerationTime() != null && response.getGenerationTime() < 1.0);
+                    completeEvent.put("generationTime", response.getGenerationTime());  // LLM이 생성하는데 걸린 시간 (풀에 저장된 값)
+                    completeEvent.put("fetchTime", fromPool ? fetchTime : null);  // 풀에서 꺼내오는데 걸린 시간
+                    completeEvent.put("fromPool", fromPool);
 
                     sink.next("data: " + objectMapper.writeValueAsString(completeEvent) + "\n\n");
                     sink.complete();
 
-                    log.info("문제 전달 완료 - problemId: {}, fromPool: {}",
-                            response.getProblemId(),
-                            response.getGenerationTime() != null && response.getGenerationTime() < 1.0);
+                    log.info("문제 전달 완료 - problemId: {}, fromPool: {}, fetchTime: {}초, generationTime: {}초",
+                            response.getProblemId(), fromPool, fetchTime, response.getGenerationTime());
 
                     // 비동기로 풀 보충 (풀에서 꺼낸 경우)
                     refillPoolAsync(difficulty, topic, theme);
