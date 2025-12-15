@@ -63,11 +63,14 @@ public class SecurityConfig {
                                 "/codeboard/**",
                                 "/comment",
                                 "/comment/**",
+                                "/like/*/*/users",  // 좋아요 누른 사용자 목록 조회
                                 "/like/**",
+                                "/notification/**",
                                 "/analysis/**"
                                 ).permitAll()
                         .requestMatchers(HttpMethod.POST,
-                                "/api/analysis/save"    // 명시적으로 POST 허용
+                                "/api/analysis/save",    // 명시적으로 POST 허용
+                                "/like/*/*"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )
