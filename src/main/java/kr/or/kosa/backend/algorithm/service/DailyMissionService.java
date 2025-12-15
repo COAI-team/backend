@@ -109,6 +109,9 @@ public class DailyMissionService {
 
     /**
      * 미션 완료 처리
+     * 미션이 없으면 자동 생성 후 완료 처리
+     * - 0시 이후 가입한 신규 유저
+     * - 데일리미션 페이지를 거치지 않고 직접 문제 생성하는 경우
      */
     @Transactional
     public MissionCompleteResult completeMission(Long userId, MissionType missionType) {
@@ -116,8 +119,17 @@ public class DailyMissionService {
 
         // 미션 조회
         DailyMissionDto mission = missionMapper.findMission(userId, today, missionType);
+
+        // 미션이 없으면 자동 생성 (getTodayMissions와 동일한 로직)
         if (mission == null) {
-            return MissionCompleteResult.notFound();
+            log.info("사용자 {} 오늘 미션이 없어서 자동 생성 - missionType: {}", userId, missionType);
+            createDailyMissionsForUser(userId);
+            mission = missionMapper.findMission(userId, today, missionType);
+
+            if (mission == null) {
+                log.error("미션 자동 생성 후에도 찾을 수 없음 - userId: {}, missionType: {}", userId, missionType);
+                return MissionCompleteResult.notFound();
+            }
         }
 
         // 이미 완료됨
