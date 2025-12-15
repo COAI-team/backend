@@ -2,6 +2,7 @@ package kr.or.kosa.backend.codenose.service.agent;
 
 import dev.langchain4j.model.chat.ChatLanguageModel;
 import dev.langchain4j.model.openai.OpenAiChatModel;
+import java.util.Collections;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -20,10 +21,11 @@ public class LangChainConfig {
     private String openAiApiKey;
 
     @Bean
-    public ChatLanguageModel chatLanguageModel() {
+    public ChatLanguageModel chatLanguageModel(LangfuseChatModelListener listener) {
         return OpenAiChatModel.builder()
                 .apiKey(openAiApiKey)
                 .modelName("gpt-4o") // 고성능 모델 사용
+                .listeners(Collections.singletonList(listener))
                 .build();
     }
 }

@@ -5,7 +5,6 @@ import kr.or.kosa.backend.codenose.config.PromptManager;
 import kr.or.kosa.backend.codenose.dto.RagDto;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
@@ -30,7 +29,7 @@ import java.util.stream.Collectors;
 public class RagService {
 
         private final VectorStore vectorStore;
-        private final ChatClient.Builder chatClientBuilder;
+        private final dev.langchain4j.model.chat.ChatLanguageModel chatLanguageModel;
         private final PromptManager promptManager;
 
         /**
@@ -86,8 +85,6 @@ public class RagService {
         public String getPersonalizedFeedback(RagDto.FeedbackRequest request) {
                 log.info("개인화 피드백 생성 - userId: {}", request.getUserId());
 
-                ChatClient chatClient = chatClientBuilder.build();
-
                 // 1. 해당 사용자의 데이터만 검색하도록 필터 설정
                 String filterExpression = String.format("userId == '%s'", request.getUserId());
 
@@ -122,10 +119,7 @@ public class RagService {
                 // 5. 최종 LLM 호출
                 String finalPrompt = prompt + "\n\nUser Question: " + request.getQuestion();
 
-                return chatClient.prompt()
-                                .user(finalPrompt)
-                                .call()
-                                .content();
+                return chatLanguageModel.generate(finalPrompt);
         }
 
         /**

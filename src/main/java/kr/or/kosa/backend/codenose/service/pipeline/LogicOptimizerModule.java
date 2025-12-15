@@ -1,7 +1,11 @@
 package kr.or.kosa.backend.codenose.service.pipeline;
 
-import org.springframework.ai.chat.client.ChatClient;
+import dev.langchain4j.model.chat.ChatLanguageModel;
+import kr.or.kosa.backend.codenose.service.LangfuseService;
 import org.springframework.stereotype.Service;
+
+import java.time.Instant;
+import java.util.Collections;
 
 /**
  * 로직 최적화 모듈 (LogicOptimizerModule)
@@ -13,10 +17,13 @@ import org.springframework.stereotype.Service;
 @Service
 public class LogicOptimizerModule {
 
-    private final ChatClient chatClient;
+    private final ChatLanguageModel chatLanguageModel;
+    private final LangfuseService langfuseService;
 
-    public LogicOptimizerModule(ChatClient.Builder builder) {
-        this.chatClient = builder.build();
+    public LogicOptimizerModule(ChatLanguageModel chatLanguageModel,
+            LangfuseService langfuseService) {
+        this.chatLanguageModel = chatLanguageModel;
+        this.langfuseService = langfuseService;
     }
 
     /**
@@ -26,17 +33,27 @@ public class LogicOptimizerModule {
      * @return 업데이트된 컨텍스트 (최적화된 로직 설정됨)
      */
     public PipelineContext optimizeLogic(PipelineContext context) {
-        String prompt = """
-                Optimize the following Java code for performance and readability.
-                Ignore specific style conventions for now; focus on algorithmic efficiency and best practices.
-                Output ONLY the optimized code snippet.
+        Instant start = Instant.now();
+        // Langfuse 스팬 시작
+        langfuseService.startSpan("LogicOptimizer", start, Collections.emptyMap());
 
-                Code:
-                %s
-                """.formatted(context.getOriginalCode());
+        try {
+            String prompt = """
+                    Optimize the following Java code for performance and readability.
+                    Ignore specific style conventions for now; focus on algorithmic efficiency and best practices.
+                    Output ONLY the optimized code snippet.
 
-        String optimized = chatClient.prompt(prompt).call().content();
-        context.setOptimizedLogic(optimized);
-        return context;
+                    Code:
+                    %s
+                    """.formatted(context.getOriginalCode());
+
+            String optimized = chatLanguageModel.generate(prompt);
+
+            context.setOptimizedLogic(optimized);
+            return context;
+        } finally {
+            // Langfuse 스팬 종료
+            langfuseService.endSpan(null, Instant.now(), Collections.emptyMap());
+        }
     }
 }
