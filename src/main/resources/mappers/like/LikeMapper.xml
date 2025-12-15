@@ -50,4 +50,26 @@
         </foreach>
     </select>
 
+    <resultMap id="LikeUserResultMap" type="kr.or.kosa.backend.like.dto.LikeUserDto">
+        <result property="userId" column="USER_ID"/>
+        <result property="userNickname" column="USER_NICKNAME"/>
+        <result property="userImage" column="USER_IMAGE"/>
+        <result property="likedAt" column="CREATED_AT"/>
+    </resultMap>
+
+    <!-- 좋아요 누른 사용자 목록 조회 -->
+    <select id="selectLikeUsers" resultMap="LikeUserResultMap">
+        SELECT
+        l.USER_ID,
+        u.USER_NICKNAME,
+        u.USER_IMAGE,
+        l.CREATED_AT
+        FROM `LIKE` l
+        INNER JOIN USERS u ON l.USER_ID = u.USER_ID
+        WHERE l.REFERENCE_TYPE = #{referenceType}
+        AND l.REFERENCE_ID = #{referenceId}
+        ORDER BY l.CREATED_AT DESC
+        LIMIT #{limit}
+    </select>
+
 </mapper>

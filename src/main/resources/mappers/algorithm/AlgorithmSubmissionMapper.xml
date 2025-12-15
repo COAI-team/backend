@@ -136,13 +136,37 @@
     <!--
     <select id="selectPublicSubmissionsByProblemId" resultMap="algoSubmissionResultMap">
         SELECT
-        s.*,
-        u.USER_NAME
+        s.ALGOSUBMISSION_ID,
+        s.ALGO_PROBLEM_ID,
+        s.USER_ID,
+        s.SOURCE_CODE,
+        s.LANGUAGE,
+        s.EXECUTION_TIME,
+        s.MEMORY_USAGE,
+        s.PASSED_TEST_COUNT,
+        s.TOTAL_TEST_COUNT,
+        s.AI_FEEDBACK,
+        s.AI_FEEDBACK_STATUS,
+        s.AI_FEEDBACK_TYPE,
+        s.JUDGE_RESULT,
+        s.SOLVE_MODE,
+        s.MONITORING_SESSION_ID,
+        s.AI_SCORE,
+        s.TIME_EFFICIENCY_SCORE,
+        s.FINAL_SCORE,
+        s.SCORE_WEIGHTS,
+        s.STARTSOLVING,
+        s.ENDSOLVING,
+        s.SOLVING_DURATION_SECONDS,
+        s.GITHUB_COMMIT_REQUESTED,
+        s.GITHUB_COMMIT_STATUS,
+        s.SUBMITTED_AT,
+        s.IS_SHARED
         FROM ALGO_SUBMISSIONS s
-        LEFT JOIN USER u ON s.USER_ID = u.USER_ID
-        LEFT JOIN ALGO_PROBLEMS p ON s.ALGO_PROBLEM_ID = p.ALGO_PROBLEM_ID
-        WHERE s.ALGO_PROBLEM_ID = #{problemId} AND s.IS_SHARED = 1
-        ORDER BY s.FINAL_SCORE DESC, s.SUBMITTED_AT ASC
+        WHERE s.ALGO_PROBLEM_ID = #{problemId}
+        AND s.IS_SHARED = 1
+        AND s.JUDGE_RESULT = 'AC'
+        ORDER BY s.FINAL_SCORE DESC, s.SUBMITTED_AT DESC
         LIMIT #{limit} OFFSET #{offset}
     </select>
     -->
@@ -187,7 +211,7 @@
         s.ALGO_PROBLEM_ID,
         s.USER_ID,
         s.SOURCE_CODE,
-        s.LANGUAGE,
+        s.LANGUAGE_ID,              <!-- 수정: LANGUAGE → LANGUAGE_ID -->
         s.EXECUTION_TIME,
         s.MEMORY_USAGE,
         s.PASSED_TEST_COUNT,
@@ -205,8 +229,7 @@
         s.STARTSOLVING,
         s.ENDSOLVING,
         s.SOLVING_DURATION_SECONDS,
-        s.GITHUB_COMMIT_REQUESTED,
-        s.GITHUB_COMMIT_STATUS,
+        s.GITHUB_COMMIT_URL,        <!-- 수정: GITHUB_COMMIT_REQUESTED, GITHUB_COMMIT_STATUS 삭제하고 이것만 -->
         s.SUBMITTED_AT,
         s.IS_SHARED
         FROM ALGO_SUBMISSIONS s
