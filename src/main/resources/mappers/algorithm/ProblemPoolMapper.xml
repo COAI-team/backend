@@ -101,6 +101,17 @@
         LIMIT #{limit}
     </select>
 
+    <!-- 난이도만으로 문제 1개 조회 + 잠금 (SELECT FOR UPDATE) -->
+    <!-- 데일리 미션에서 사용 - 랜덤으로 토픽/테마 선택 -->
+    <select id="findAndLockOneByDifficulty" resultMap="PoolProblemResultMap">
+        SELECT <include refid="poolColumns"/>
+        FROM ALGO_PROBLEM_POOL
+        WHERE DIFFICULTY = #{difficulty}
+        ORDER BY RAND()
+        LIMIT 1
+        FOR UPDATE
+    </select>
+
     <!-- 부족한 조합 목록 조회 (스케줄러에서 사용) -->
     <!-- 모든 조합을 체크하여 targetCount보다 적은 조합 반환 -->
     <select id="findDeficientCombinations" resultType="map">

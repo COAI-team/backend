@@ -87,6 +87,15 @@ public interface ProblemPoolMapper {
     );
 
     /**
+     * 난이도만으로 문제 1개 조회 + 잠금 (SELECT FOR UPDATE)
+     * 데일리 미션에서 사용 - 랜덤으로 토픽/테마 선택
+     *
+     * @param difficulty 난이도
+     * @return 풀 문제 (없으면 null)
+     */
+    PoolProblemDto findAndLockOneByDifficulty(@Param("difficulty") String difficulty);
+
+    /**
      * 부족한 조합 목록 조회 (스케줄러에서 사용)
      * 조합당 목표 개수보다 적은 조합들 반환
      *

@@ -127,6 +127,38 @@ public class ProblemPoolService {
         return generationOrchestrator.generateProblem(request, userId, progressCallback);
     }
 
+    // ===== 데일리 미션용 문제 소비 =====
+
+    /**
+     * 데일리 미션용 - 난이도만으로 풀에서 문제 꺼내기
+     * <p>Pool에서 해당 난이도의 랜덤 문제를 가져와 DB에 저장 후 problemId 반환
+     * <p>Pool이 비어있으면 null 반환 (기존 ALGO_PROBLEM에서 fallback 필요)
+     *
+     * @param difficulty 난이도 (DB 값: BRONZE, SILVER, GOLD, PLATINUM)
+     * @param userId     사용자 ID (ALGO_CREATER에 저장될 값, nullable - 시스템 생성 시)
+     * @return 저장된 problemId, Pool이 비어있으면 null
+     */
+    @Transactional
+    public Long drawProblemForDailyMission(String difficulty, Long userId) {
+        log.info("데일리 미션용 풀에서 문제 꺼내기 - difficulty: {}", difficulty);
+
+        // 1. Pool에서 해당 난이도의 문제 1개 조회 (SELECT FOR UPDATE)
+        PoolProblemDto poolProblem = poolMapper.findAndLockOneByDifficulty(difficulty);
+
+        if (poolProblem == null) {
+            log.warn("데일리 미션용 풀이 비어있음 - difficulty: {}", difficulty);
+            return null;  // 호출측에서 기존 ALGO_PROBLEM fallback 처리
+        }
+
+        // 2. JSON 파싱 → DB 저장 → 풀에서 삭제
+        ProblemGenerationResponseDto response = consumeFromPool(poolProblem, userId);
+
+        log.info("데일리 미션용 문제 소비 완료 - poolId: {} → problemId: {}",
+                poolProblem.getAlgoPoolId(), response.getProblemId());
+
+        return response.getProblemId();
+    }
+
     // ===== 풀 채우기 (Generate for Pool) =====
 
     /**

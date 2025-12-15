@@ -31,6 +31,7 @@ public class DailyMissionService {
     private final PointService pointService;
     private final RateLimitService rateLimitService;
     private final SubscriptionMapper subscriptionMapper;
+    private final ProblemPoolService problemPoolService;  // Pool에서 문제 가져오기용
 
     /**
      * 오늘의 미션 조회 (없으면 생성)
@@ -72,9 +73,16 @@ public class DailyMissionService {
         // 오늘 같은 난이도로 이미 할당된 문제가 있는지 확인 (같은 레벨 유저에게 같은 문제 배정)
         Long problemId = missionMapper.findTodayProblemIdByDifficulty(today, difficulty);
 
-        // 없으면 새로 랜덤 선택
+        // 없으면 새로 선택 (Pool 우선 → 기존 ALGO_PROBLEM fallback)
         if (problemId == null) {
-            problemId = missionMapper.findRandomProblemIdByDifficulty(difficulty);
+            // 1. Pool에서 문제 가져오기 시도 (AI 생성 문제)
+            problemId = problemPoolService.drawProblemForDailyMission(difficulty, null);
+
+            // 2. Pool이 비어있으면 기존 ALGO_PROBLEM에서 랜덤 선택 (fallback)
+            if (problemId == null) {
+                log.info("Pool이 비어있어 기존 문제에서 선택 - difficulty: {}", difficulty);
+                problemId = missionMapper.findRandomProblemIdByDifficulty(difficulty);
+            }
         }
 
         // 미션 1: AI 문제 생성 미션
