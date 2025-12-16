@@ -6,8 +6,12 @@ import dev.langchain4j.service.SystemMessage;
 import dev.langchain4j.service.UserMessage;
 import dev.langchain4j.service.V;
 import kr.or.kosa.backend.codenose.config.PromptManager;
+import kr.or.kosa.backend.codenose.service.LangfuseService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+
+import java.time.Instant;
+import java.util.Map;
 
 /**
  * 에이전틱 워크플로우 서비스 (AgenticWorkflowService)
@@ -24,12 +28,15 @@ public class AgenticWorkflowService {
     private final Critic critic;
     private final Refiner refiner;
     private final PromptManager promptManager;
+    private final LangfuseService langfuseService;
 
-    public AgenticWorkflowService(ChatLanguageModel chatLanguageModel, PromptManager promptManager) {
+    public AgenticWorkflowService(ChatLanguageModel chatLanguageModel, PromptManager promptManager,
+            LangfuseService langfuseService) {
         this.generator = AiServices.create(Generator.class, chatLanguageModel);
         this.critic = AiServices.create(Critic.class, chatLanguageModel);
         this.refiner = AiServices.create(Refiner.class, chatLanguageModel);
         this.promptManager = promptManager;
+        this.langfuseService = langfuseService;
     }
 
     /**
@@ -48,7 +55,10 @@ public class AgenticWorkflowService {
         log.info("Agentic Workflow 시작...");
 
         // 1단계: 초안(Draft) 생성
+        Instant generatorStart = Instant.now();
+        langfuseService.startSpan("Agentic-Generator", generatorStart, Map.of("step", "generate"));
         String draft = generator.generate(userCode, systemPrompt);
+        langfuseService.endSpan(null, Instant.now(), Map.of("status", "complete", "outputLength", draft.length()));
         log.info("초안 생성 완료.");
 
         // 2단계: 비평 루프 (Critic Loop)
@@ -58,7 +68,10 @@ public class AgenticWorkflowService {
 
         for (int i = 0; i < maxIterations; i++) {
             // 비평가가 현재 JSON을 평가
+            Instant criticStart = Instant.now();
+            langfuseService.startSpan("Agentic-Critic", criticStart, Map.of("step", "critique", "iteration", i + 1));
             String critique = critic.critique(currentJson, criticSystemPrompt);
+            langfuseService.endSpan(null, Instant.now(), Map.of("status", "complete"));
 
             // 승인 시 루프 종료
             if (critique.toLowerCase().contains("approved")) {
@@ -69,7 +82,11 @@ public class AgenticWorkflowService {
             log.info("비평가 지적 사항: {}", critique);
 
             // 정제자가 지적 사항을 반영하여 수정
+            Instant refinerStart = Instant.now();
+            langfuseService.startSpan("Agentic-Refiner", refinerStart, Map.of("step", "refine", "iteration", i + 1));
             currentJson = refiner.refine(currentJson, critique, systemPrompt);
+            langfuseService.endSpan(null, Instant.now(),
+                    Map.of("status", "complete", "outputLength", currentJson.length()));
             log.info("코드 정제 완료 (반복 횟수: {})", i + 1);
         }
 

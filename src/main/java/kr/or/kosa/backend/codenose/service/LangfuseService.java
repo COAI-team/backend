@@ -62,6 +62,22 @@ public class LangfuseService {
     }
 
     /**
+     * 명명된 Trace 시작 - 워크플로우별 구분된 Trace 생성
+     */
+    public void startNamedTrace(String name, String userId, Map<String, Object> metadata) {
+        if (!enabled)
+            return;
+        String traceId = UUID.randomUUID().toString();
+        LangfuseContext.setTraceId(traceId);
+        sendEvent(new LangfuseDto.Event(
+                UUID.randomUUID().toString(),
+                "trace-create",
+                Instant.now().toString(),
+                new LangfuseDto.TraceBody(traceId, name, userId, metadata, "1.0.0", "v1")));
+        log.info(">>>> [Langfuse] Started named trace: {} ({})", name, traceId);
+    }
+
+    /**
      * [Deprecated] Trace 시작 (이전 호환성)
      */
     @Deprecated
@@ -78,9 +94,17 @@ public class LangfuseService {
 
         String traceId = LangfuseContext.getTraceId();
         if (traceId == null) {
-            // 트레이스가 없으면 임시 생성
+            // 트레이스가 없으면 새로 생성하고 Langfuse에도 전송!
             traceId = UUID.randomUUID().toString();
             LangfuseContext.setTraceId(traceId);
+
+            // 중요: trace-create 이벤트를 먼저 전송해야 Trace가 대시보드에 나타남
+            sendEvent(new LangfuseDto.Event(
+                    UUID.randomUUID().toString(),
+                    "trace-create",
+                    Instant.now().toString(),
+                    new LangfuseDto.TraceBody(traceId, name + "-Trace", null, Collections.emptyMap(), "1.0.0", "v1")));
+            log.info(">>>> [Langfuse] Auto-created Trace: {}", traceId);
         }
 
         String parentId = LangfuseContext.getCurrentParentId();
@@ -155,10 +179,10 @@ public class LangfuseService {
     }
 
     /**
-     * Generation 전송 (Context 인식)
+     * Generation 전송 (Context 인식) - 토큰 사용량 포함
      */
     public void sendGeneration(String name, Instant startTime, Instant endTime, String model,
-            Object input, Object output, int totalTokens) {
+            Object input, Object output, int promptTokens, int completionTokens, int totalTokens) {
         log.info(">>>>> [sendGeneration] Called. enabled={}", enabled);
         if (!enabled)
             return;
@@ -168,21 +192,22 @@ public class LangfuseService {
         log.info(">>>>> [sendGeneration] traceId={}, parentId={}", traceId, parentId);
 
         sendGeneration(UUID.randomUUID().toString(), traceId, parentId, name, startTime, endTime, model, input, output,
-                totalTokens);
+                promptTokens, completionTokens, totalTokens);
     }
 
     /**
-     * Legacy Send Generation (ID 명시적 전달)
+     * Legacy Send Generation (ID 명시적 전달) - 토큰 사용량 포함
      */
     public void sendGeneration(String id, String traceId, String parentObservationId, String name,
             Instant startTime, Instant endTime, String model,
             Object input, Object output,
-            int totalTokens) {
-        log.info(">>>>> [sendGeneration Legacy] id={}, traceId={}, parentId={}", id, traceId, parentObservationId);
+            int promptTokens, int completionTokens, int totalTokens) {
+        log.info(">>>>> [sendGeneration Legacy] id={}, traceId={}, parentId={}, tokens(in/out/total)={}/{}/{}",
+                id, traceId, parentObservationId, promptTokens, completionTokens, totalTokens);
         if (!enabled)
             return;
 
-        LangfuseDto.Usage usage = new LangfuseDto.Usage(0, 0, totalTokens, "TOKENS");
+        LangfuseDto.Usage usage = new LangfuseDto.Usage(promptTokens, completionTokens, totalTokens, "TOKENS");
 
         LangfuseDto.GenerationBody body = new LangfuseDto.GenerationBody(
                 id, traceId, parentObservationId, name,
@@ -234,18 +259,26 @@ public class LangfuseService {
 
     private void sendEvent(LangfuseDto.Event event) {
         try {
-            log.info(">>>> [Langfuse JSON] Payload: {}", objectMapper.writeValueAsString(event));
+            String payload = objectMapper.writeValueAsString(event);
+            log.info(">>>> [Langfuse] Sending event type: {}, id: {}", event.type(), event.id());
+            log.debug(">>>> [Langfuse JSON] Payload: {}", payload);
 
             LangfuseDto.BatchRequest batch = new LangfuseDto.BatchRequest(Collections.singletonList(event));
 
-            restClient.post()
+            // 응답 본문을 확인하기 위해 String으로 받음
+            String responseBody = restClient.post()
                     .uri("/api/public/ingestion")
                     .body(batch)
                     .retrieve()
-                    .toBodilessEntity();
+                    .body(String.class);
 
+            log.info(">>>> [Langfuse] Response: {}", responseBody);
+
+        } catch (org.springframework.web.client.RestClientResponseException e) {
+            log.error(">>>> [Langfuse] API Error - Status: {}, Body: {}",
+                    e.getStatusCode(), e.getResponseBodyAsString());
         } catch (Exception e) {
-            log.error("Langfuse 이벤트 전송 실패: {}", e.getMessage()); // Translated comment
+            log.error(">>>> [Langfuse] 이벤트 전송 실패: {} - {}", e.getClass().getSimpleName(), e.getMessage());
         }
     }
 }
