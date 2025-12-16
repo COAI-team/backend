@@ -90,8 +90,10 @@ public class AnalysisService {
      */
     @kr.or.kosa.backend.codenose.aop.LangfuseObserve(name = "analyzeStoredFile")
     public String analyzeStoredFile(AnalysisRequestDTO requestDto) {
-        // AOP가 자동으로 Trace/Span 시작 및 Input 캡처 수행
-        // LangfuseContext는 AOP Aspect와 LangfuseService에서 관리됨
+        // 워크플로우 시작: Website-RAG-Analysis Trace 생성
+        langfuseService.startNamedTrace("Website-RAG-Analysis",
+                String.valueOf(requestDto.getUserId()),
+                Map.of("mode", "RAG", "fileId", requestDto.getAnalysisId()));
 
         try {
             // 1. DB에서 저장된 GitHub 파일 내용 조회
@@ -409,6 +411,11 @@ public class AnalysisService {
      */
     @kr.or.kosa.backend.codenose.aop.LangfuseObserve(name = "analyzeRawCode")
     public String analyzeRawCode(String code, String language, Long userId) {
+        // 워크플로우 시작: MCP-Analysis Trace 생성
+        langfuseService.startNamedTrace("MCP-Analysis",
+                String.valueOf(userId),
+                Map.of("mode", "MCP", "language", language));
+
         try {
             log.info("Raw Code Analysis Requested - User: {}, Language: {}, Length: {}", userId, language,
                     code.length());

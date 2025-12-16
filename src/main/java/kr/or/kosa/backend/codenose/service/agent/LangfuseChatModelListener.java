@@ -48,9 +48,13 @@ public class LangfuseChatModelListener implements ChatModelListener {
             String model = context.response().model();
             String content = context.response().aiMessage().text();
 
-            // 토큰 사용량 추출
+            // 토큰 사용량 추출 (promptTokens, completionTokens 분리)
+            int promptTokens = 0;
+            int completionTokens = 0;
             int totalTokens = 0;
             if (context.response().tokenUsage() != null) {
+                promptTokens = context.response().tokenUsage().inputTokenCount();
+                completionTokens = context.response().tokenUsage().outputTokenCount();
                 totalTokens = context.response().tokenUsage().totalTokenCount();
             }
 
@@ -64,6 +68,8 @@ public class LangfuseChatModelListener implements ChatModelListener {
                     model,
                     input,
                     content,
+                    promptTokens,
+                    completionTokens,
                     totalTokens);
         } catch (Exception e) {
             log.error("Langfuse에 LangChain4j 응답 로깅 실패", e);
@@ -91,7 +97,7 @@ public class LangfuseChatModelListener implements ChatModelListener {
                     "unknown",
                     context.request().messages().toString(),
                     "Error: " + context.error().getMessage(),
-                    0);
+                    0, 0, 0);
         } catch (Exception e) {
             log.error("Langfuse에 LangChain4j 에러 로깅 실패", e);
         } finally {
