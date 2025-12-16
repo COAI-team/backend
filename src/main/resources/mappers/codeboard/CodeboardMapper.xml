@@ -120,6 +120,23 @@
         FROM `LIKE` L
         WHERE L.REFERENCE_ID = C.CODEBOARD_ID
         AND L.REFERENCE_TYPE = 'POST_CODEBOARD') AS likeCount,
+        (SELECT COUNT(*)
+        FROM COMMENT CM
+        WHERE CM.BOARD_ID = C.CODEBOARD_ID
+        AND CM.BOARD_TYPE = 'CODEBOARD'
+        AND CM.IS_DELETED = FALSE) AS commentCount,
+        <if test="userId != null">
+            EXISTS(
+            SELECT 1
+            FROM `LIKE` L2
+            WHERE L2.REFERENCE_ID = C.CODEBOARD_ID
+            AND L2.REFERENCE_TYPE = 'POST_CODEBOARD'
+            AND L2.USER_ID = #{userId}
+            ) AS isLiked,
+        </if>
+        <if test="userId == null">
+            FALSE AS isLiked,
+        </if>
         C.CODEBOARD_CREATED_AT AS codeboardCreatedAt
         FROM CODEBOARD C
         LEFT JOIN USERS U ON C.USER_ID = U.USER_ID

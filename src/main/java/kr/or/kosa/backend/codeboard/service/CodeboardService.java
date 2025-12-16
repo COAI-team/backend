@@ -14,9 +14,6 @@ import kr.or.kosa.backend.commons.pagination.PageResponse;
 import kr.or.kosa.backend.commons.pagination.SearchCondition;
 import kr.or.kosa.backend.commons.pagination.SortCondition;
 import kr.or.kosa.backend.commons.pagination.SortDirection;
-import kr.or.kosa.backend.like.domain.Like;
-import kr.or.kosa.backend.like.domain.ReferenceType;
-import kr.or.kosa.backend.like.mapper.LikeMapper;
 import kr.or.kosa.backend.tag.service.TagService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -34,9 +31,7 @@ public class CodeboardService {
     private final CodeboardMapper mapper;
     private final ObjectMapper objectMapper;
     private final TagService tagService;
-    private final LikeMapper likeMapper;
 
-    // 코드 게시판 목록 조회 (검색 + 정렬 + 페이지네이션)
     public PageResponse<CodeboardListResponseDto> getList(
             int page,
             int size,
@@ -56,7 +51,6 @@ public class CodeboardService {
         return new PageResponse<>(boards, pageRequest, totalCount);
     }
 
-    // 코드 게시글 작성
     @Transactional
     public Long write(CodeboardDto dto, Long userId) {
         String jsonContent;
@@ -93,26 +87,19 @@ public class CodeboardService {
         return codeboardId;
     }
 
-    // 코드 게시글 상세 조회
     @Transactional
     public CodeboardDetailResponseDto detail(Long id, Long userId) {
         mapper.increaseClick(id);
 
-        CodeboardDetailResponseDto codeboard = mapper.selectById(id);
+        CodeboardDetailResponseDto codeboard = mapper.selectById(id, userId);
         if (codeboard == null) {
             throw new CustomBusinessException(CodeboardErrorCode.NOT_FOUND);
         }
 
         log.info("조회된 좋아요 수: {}", codeboard.getLikeCount());
+        log.info("사용자 {}의 좋아요 여부: {}", userId, codeboard.getIsLiked());
 
         List<String> tags = tagService.getCodeboardTags(id);
-
-        boolean isLiked = false;
-        if (userId != null) {
-            Like existingLike = likeMapper.selectLike(userId, ReferenceType.POST_CODEBOARD, id);
-            isLiked = existingLike != null;
-            log.info("사용자 {}의 좋아요 여부: {}", userId, isLiked);
-        }
 
         return CodeboardDetailResponseDto.builder()
                 .codeboardId(codeboard.getCodeboardId())
@@ -123,16 +110,17 @@ public class CodeboardService {
                 .codeboardContent(codeboard.getCodeboardContent())
                 .codeboardClick(codeboard.getCodeboardClick())
                 .likeCount(codeboard.getLikeCount() != null ? codeboard.getLikeCount() : 0)
+                .commentCount(codeboard.getCommentCount() != null ? codeboard.getCommentCount() : 0)
+                .isLiked(codeboard.getIsLiked() != null ? codeboard.getIsLiked() : false)
                 .codeboardCreatedAt(codeboard.getCodeboardCreatedAt())
                 .tags(tags)
-                .isLiked(isLiked)
                 .build();
     }
 
-    // 코드 게시글 수정
     @Transactional
     public void edit(Long id, CodeboardDto dto, Long userId) {
-        CodeboardDetailResponseDto existing = mapper.selectById(id);
+        // 수정/삭제 시에는 userId 필요 없음 (권한 체크만 하면 됨)
+        CodeboardDetailResponseDto existing = mapper.selectById(id, null);
         if (existing == null) {
             throw new CustomBusinessException(CodeboardErrorCode.NOT_FOUND);
         }
@@ -168,10 +156,10 @@ public class CodeboardService {
         }
     }
 
-    // 코드 게시글 삭제
     @Transactional
     public void delete(Long id, Long userId) {
-        CodeboardDetailResponseDto existing = mapper.selectById(id);
+        // 삭제 시에는 userId 필요 없음 (권한 체크만 하면 됨)
+        CodeboardDetailResponseDto existing = mapper.selectById(id, null);
         if (existing == null) {
             throw new CustomBusinessException(CodeboardErrorCode.NOT_FOUND);
         }

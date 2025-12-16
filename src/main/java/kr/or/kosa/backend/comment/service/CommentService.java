@@ -195,7 +195,7 @@ public class CommentService {
     private Long getBoardAuthorId(String boardType, Long boardId) {
         return switch (boardType) {
             case "CODEBOARD" -> {
-                CodeboardDetailResponseDto codeBoard = codeBoardMapper.selectById(boardId);
+                CodeboardDetailResponseDto codeBoard = codeBoardMapper.selectById(boardId, null);
                 if (codeBoard == null) {
                     throw new CustomBusinessException(CommentErrorCode.BOARD_NOT_FOUND);
                 }

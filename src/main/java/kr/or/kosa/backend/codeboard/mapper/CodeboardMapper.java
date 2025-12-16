@@ -25,7 +25,7 @@ public interface CodeboardMapper {
     long countPosts(@Param("search") SearchCondition searchCondition);
 
     // 게시글 상세 조회
-    CodeboardDetailResponseDto selectById(Long codeboardId);
+    CodeboardDetailResponseDto selectById(@Param("codeboardId") Long codeboardId, @Param("userId") Long userId);
 
     // 게시글 작성
     int insert(Codeboard codeboard);
