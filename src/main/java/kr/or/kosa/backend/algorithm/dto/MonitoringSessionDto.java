@@ -53,6 +53,14 @@ public class MonitoringSessionDto {
     private Integer totalViolations;
     private Integer warningShownCount;
 
+    // 집중도 점수 통계 (Focus Score Stats)
+    private Double focusAvgScore;            // 평균 집중도 점수 (-100 ~ +100)
+    private Double focusFinalScore;          // 최종 집중도 점수
+    private Double focusFocusedPercentage;   // 집중 시간 비율 (%)
+    private Double focusHighFocusPercentage; // 고집중 시간 비율 (%)
+    private Long focusTotalTime;             // 총 측정 시간 (ms)
+    private Long focusFocusedTime;           // 집중 상태 시간 (ms)
+
     /**
      * 모든 위반 카운트 합계 계산
      */

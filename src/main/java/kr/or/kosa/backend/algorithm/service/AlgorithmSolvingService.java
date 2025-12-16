@@ -452,10 +452,20 @@ public class AlgorithmSolvingService {
                     .mouseLeaveCount(session.getMouseLeaveCount())
                     .noFaceCount(session.getNoFaceCount())
                     .gazeAwayCount(session.getGazeAwayCount())
+                    .sleepingCount(session.getSleepingCount())
+                    .multipleFacesCount(session.getMultipleFacesCount())
+                    .maskDetectedCount(session.getMaskDetectedCount())
                     .totalViolations(session.getTotalViolations())
                     .warningShownCount(session.getWarningShownCount())
                     .autoSubmitted(Boolean.TRUE.equals(session.getAutoSubmitted()))
                     .sessionStatus(session.getSessionStatus() != null ? session.getSessionStatus().name() : null)
+                    // 집중도 점수 통계
+                    .focusAvgScore(session.getFocusAvgScore())
+                    .focusFinalScore(session.getFocusFinalScore())
+                    .focusFocusedPercentage(session.getFocusFocusedPercentage())
+                    .focusHighFocusPercentage(session.getFocusHighFocusPercentage())
+                    .focusTotalTime(session.getFocusTotalTime())
+                    .focusFocusedTime(session.getFocusFocusedTime())
                     .build();
         } catch (Exception e) {
             log.error("Failed to fetch monitoring stats for session: {}", sessionId, e);

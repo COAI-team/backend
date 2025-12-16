@@ -129,10 +129,11 @@ public class MonitoringService {
      *
      * @param sessionId 세션 ID
      * @param remainingSeconds 남은 시간 (초)
+     * @param focusScoreStats 집중도 점수 통계 (선택)
      * @return 종료된 세션 정보
      */
     @Transactional
-    public MonitoringSessionDto endSession(String sessionId, Integer remainingSeconds) {
+    public MonitoringSessionDto endSession(String sessionId, Integer remainingSeconds, Map<String, Object> focusScoreStats) {
         MonitoringSessionDto session = monitoringMapper.findSessionById(sessionId);
 
         if (session == null) {
@@ -151,6 +152,30 @@ public class MonitoringService {
         session.setEndedAt(LocalDateTime.now());
         session.setRemainingSeconds(remainingSeconds);
         session.setAutoSubmitted(false);
+
+        // 집중도 점수 통계 설정 (있는 경우)
+        if (focusScoreStats != null) {
+            if (focusScoreStats.get("avgScore") != null) {
+                session.setFocusAvgScore(((Number) focusScoreStats.get("avgScore")).doubleValue());
+            }
+            if (focusScoreStats.get("finalScore") != null) {
+                session.setFocusFinalScore(((Number) focusScoreStats.get("finalScore")).doubleValue());
+            }
+            if (focusScoreStats.get("focusedPercentage") != null) {
+                session.setFocusFocusedPercentage(((Number) focusScoreStats.get("focusedPercentage")).doubleValue());
+            }
+            if (focusScoreStats.get("highFocusPercentage") != null) {
+                session.setFocusHighFocusPercentage(((Number) focusScoreStats.get("highFocusPercentage")).doubleValue());
+            }
+            if (focusScoreStats.get("totalTime") != null) {
+                session.setFocusTotalTime(((Number) focusScoreStats.get("totalTime")).longValue());
+            }
+            if (focusScoreStats.get("focusedTime") != null) {
+                session.setFocusFocusedTime(((Number) focusScoreStats.get("focusedTime")).longValue());
+            }
+            log.info("📊 집중도 점수 통계 저장 - avgScore: {}, finalScore: {}, focusedPercentage: {}%",
+                    session.getFocusAvgScore(), session.getFocusFinalScore(), session.getFocusFocusedPercentage());
+        }
 
         monitoringMapper.updateSession(session);
         log.info("✅ 세션 정상 종료 - sessionId: {}, totalViolations: {}",

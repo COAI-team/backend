@@ -112,9 +112,20 @@ public class SubmissionResponseDto {
         private Integer mouseLeaveCount;        // 마우스 이탈 횟수
         private Integer noFaceCount;            // 얼굴 미검출 횟수
         private Integer gazeAwayCount;          // 시선 이탈 횟수
+        private Integer sleepingCount;          // 졸음 감지 횟수
+        private Integer multipleFacesCount;     // 다중 인물 감지 횟수
+        private Integer maskDetectedCount;      // 깜빡임 없음 (liveness) 횟수
         private Integer totalViolations;        // 총 위반 횟수
         private Integer warningShownCount;      // 경고 표시 횟수
         private Boolean autoSubmitted;          // 자동 제출 여부
         private String sessionStatus;           // 세션 상태 (ACTIVE, COMPLETED, TIMEOUT)
+
+        // 집중도 점수 통계
+        private Double focusAvgScore;           // 평균 집중도 점수 (-100 ~ +100)
+        private Double focusFinalScore;         // 최종 집중도 점수
+        private Double focusFocusedPercentage;  // 집중 시간 비율 (%)
+        private Double focusHighFocusPercentage;// 고집중 시간 비율 (%)
+        private Long focusTotalTime;            // 총 측정 시간 (ms)
+        private Long focusFocusedTime;          // 집중 상태 시간 (ms)
     }
 }

@@ -26,6 +26,13 @@
         <result property="fullscreenExitCount" column="FULLSCREEN_EXIT_COUNT"/>
         <result property="totalViolations" column="TOTAL_VIOLATIONS"/>
         <result property="warningShownCount" column="WARNING_SHOWN_COUNT"/>
+        <!-- 집중도 점수 통계 -->
+        <result property="focusAvgScore" column="FOCUS_AVG_SCORE"/>
+        <result property="focusFinalScore" column="FOCUS_FINAL_SCORE"/>
+        <result property="focusFocusedPercentage" column="FOCUS_FOCUSED_PERCENTAGE"/>
+        <result property="focusHighFocusPercentage" column="FOCUS_HIGH_FOCUS_PERCENTAGE"/>
+        <result property="focusTotalTime" column="FOCUS_TOTAL_TIME"/>
+        <result property="focusFocusedTime" column="FOCUS_FOCUSED_TIME"/>
     </resultMap>
 
     <!-- 세션 시작 -->
@@ -75,23 +82,29 @@
             TAB_SWITCH_COUNT = #{tabSwitchCount},
             FULLSCREEN_EXIT_COUNT = #{fullscreenExitCount},
             TOTAL_VIOLATIONS = #{totalViolations},
-            WARNING_SHOWN_COUNT = #{warningShownCount}
+            WARNING_SHOWN_COUNT = #{warningShownCount},
+            FOCUS_AVG_SCORE = #{focusAvgScore},
+            FOCUS_FINAL_SCORE = #{focusFinalScore},
+            FOCUS_FOCUSED_PERCENTAGE = #{focusFocusedPercentage},
+            FOCUS_HIGH_FOCUS_PERCENTAGE = #{focusHighFocusPercentage},
+            FOCUS_TOTAL_TIME = #{focusTotalTime},
+            FOCUS_FOCUSED_TIME = #{focusFocusedTime}
         WHERE SESSION_ID = #{sessionId}
     </update>
 
-    <!-- 특정 위반 카운트 증가 -->
+    <!-- 특정 위반 카운트 증가 - MyBatis OGNL에서 .equals() 사용 -->
     <update id="incrementViolationCount">
         UPDATE MONITORING_SESSIONS SET
             <choose>
-                <when test="violationType == 'GAZE_AWAY'">GAZE_AWAY_COUNT = GAZE_AWAY_COUNT + 1</when>
-                <when test="violationType == 'SLEEPING'">SLEEPING_COUNT = SLEEPING_COUNT + 1</when>
-                <when test="violationType == 'NO_FACE'">NO_FACE_COUNT = NO_FACE_COUNT + 1</when>
-                <when test="violationType == 'NO_FACE_SUSTAINED'">NO_FACE_COUNT = NO_FACE_COUNT + 1</when>
-                <when test="violationType == 'MASK_DETECTED'">MASK_DETECTED_COUNT = MASK_DETECTED_COUNT + 1</when>
-                <when test="violationType == 'MULTIPLE_FACES'">MULTIPLE_FACES_COUNT = MULTIPLE_FACES_COUNT + 1</when>
-                <when test="violationType == 'MOUSE_LEAVE'">MOUSE_LEAVE_COUNT = MOUSE_LEAVE_COUNT + 1</when>
-                <when test="violationType == 'TAB_SWITCH'">TAB_SWITCH_COUNT = TAB_SWITCH_COUNT + 1</when>
-                <when test="violationType == 'FULLSCREEN_EXIT'">FULLSCREEN_EXIT_COUNT = FULLSCREEN_EXIT_COUNT + 1</when>
+                <when test="'GAZE_AWAY'.equals(violationType)">GAZE_AWAY_COUNT = GAZE_AWAY_COUNT + 1</when>
+                <when test="'SLEEPING'.equals(violationType)">SLEEPING_COUNT = SLEEPING_COUNT + 1</when>
+                <when test="'NO_FACE'.equals(violationType)">NO_FACE_COUNT = NO_FACE_COUNT + 1</when>
+                <when test="'NO_FACE_SUSTAINED'.equals(violationType)">NO_FACE_COUNT = NO_FACE_COUNT + 1</when>
+                <when test="'MASK_DETECTED'.equals(violationType)">MASK_DETECTED_COUNT = MASK_DETECTED_COUNT + 1</when>
+                <when test="'MULTIPLE_FACES'.equals(violationType)">MULTIPLE_FACES_COUNT = MULTIPLE_FACES_COUNT + 1</when>
+                <when test="'MOUSE_LEAVE'.equals(violationType)">MOUSE_LEAVE_COUNT = MOUSE_LEAVE_COUNT + 1</when>
+                <when test="'TAB_SWITCH'.equals(violationType)">TAB_SWITCH_COUNT = TAB_SWITCH_COUNT + 1</when>
+                <when test="'FULLSCREEN_EXIT'.equals(violationType)">FULLSCREEN_EXIT_COUNT = FULLSCREEN_EXIT_COUNT + 1</when>
                 <otherwise>NO_FACE_COUNT = NO_FACE_COUNT</otherwise>
             </choose>,
             TOTAL_VIOLATIONS = TOTAL_VIOLATIONS + 1
