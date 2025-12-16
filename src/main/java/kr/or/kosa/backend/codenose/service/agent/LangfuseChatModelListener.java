@@ -5,11 +5,14 @@ import dev.langchain4j.model.chat.listener.ChatModelListener;
 import dev.langchain4j.model.chat.listener.ChatModelRequestContext;
 import dev.langchain4j.model.chat.listener.ChatModelResponseContext;
 import kr.or.kosa.backend.codenose.service.LangfuseService;
+import kr.or.kosa.backend.codenose.service.trace.LangfuseContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
+import java.util.Collections;
+import java.util.UUID;
 
 @Slf4j
 @Component
@@ -21,7 +24,16 @@ public class LangfuseChatModelListener implements ChatModelListener {
     @Override
     public void onRequest(ChatModelRequestContext context) {
         log.info(">>>>> [LangfuseChatModelListener] onRequest triggered.");
-        context.attributes().put("startTime", Instant.now());
+        Instant startTime = Instant.now();
+        context.attributes().put("startTime", startTime);
+
+        // Trace Context가 비어있으면 새 Trace 생성
+        if (LangfuseContext.getTraceId() == null) {
+            String newTraceId = UUID.randomUUID().toString();
+            langfuseService.startTrace(newTraceId, "LangChain4j-Auto-Trace", null, Collections.emptyMap());
+            context.attributes().put("autoCreatedTrace", true); // 나중에 정리 플래그
+            log.info(">>>>> [LangfuseChatModelListener] Auto-created Trace: {}", newTraceId);
+        }
     }
 
     @Override
@@ -55,6 +67,12 @@ public class LangfuseChatModelListener implements ChatModelListener {
                     totalTokens);
         } catch (Exception e) {
             log.error("Langfuse에 LangChain4j 응답 로깅 실패", e);
+        } finally {
+            // 자동 생성된 Trace면 종료 처리
+            if (Boolean.TRUE.equals(context.attributes().get("autoCreatedTrace"))) {
+                LangfuseContext.clean();
+                log.info(">>>>> [LangfuseChatModelListener] Auto-created Trace cleaned up.");
+            }
         }
     }
 
@@ -76,6 +94,12 @@ public class LangfuseChatModelListener implements ChatModelListener {
                     0);
         } catch (Exception e) {
             log.error("Langfuse에 LangChain4j 에러 로깅 실패", e);
+        } finally {
+            // 자동 생성된 Trace면 종료 처리
+            if (Boolean.TRUE.equals(context.attributes().get("autoCreatedTrace"))) {
+                LangfuseContext.clean();
+                log.info(">>>>> [LangfuseChatModelListener] Auto-created Trace cleaned up (on error).");
+            }
         }
     }
 }

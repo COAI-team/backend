@@ -60,6 +60,7 @@ public class AnalysisWithoutRagService {
     /**
      * 코드 분석 수행 (간단 버전) - RAG 제외
      */
+    @kr.or.kosa.backend.codenose.aop.LangfuseObserve(name = "analyzeCode_NoRAG")
     public String analyzeCode(String userId, String userMessage, AnalysisRequestDTO requestDto) {
         try {
             String systemPrompt = promptManager.getPrompt("SIMPLE_ANALYSIS_PROMPT");
@@ -88,6 +89,7 @@ public class AnalysisWithoutRagService {
     /**
      * 저장된 GitHub 파일을 조회하여 AI 분석 수행 - RAG 제외
      */
+    @kr.or.kosa.backend.codenose.aop.LangfuseObserve(name = "analyzeStoredFile_NoRAG")
     public String analyzeStoredFile(AnalysisRequestDTO requestDto) {
         try {
             // 1. DB에서 저장된 GitHub 파일 내용 조회
