@@ -140,12 +140,15 @@ public class PistonService {
             request.put("run_timeout", timeLimit);
         }
 
-        // 메모리 제한 설정 (KB → bytes 변환, 최대 512MB 제한)
+        // 메모리 제한 설정 (KB → bytes 변환)
+        // 최소 128MB 보장 (Python 등 인터프리터 언어 실행에 필요)
         if (memoryLimit != null) {
-            long memoryLimitBytes = Math.min((long) memoryLimit * 1024, 512L * 1024 * 1024);
+            long minMemoryBytes = 128L * 1024 * 1024; // 최소 128MB
+            long memoryLimitBytes = Math.max((long) memoryLimit * 1024, minMemoryBytes);
+            memoryLimitBytes = Math.min(memoryLimitBytes, 512L * 1024 * 1024); // 최대 512MB
             request.put("run_memory_limit", memoryLimitBytes);
         }
-
+        log.info("Piston 요청: {}", request);
         try {
             // Piston API 호출
             @SuppressWarnings("unchecked")
