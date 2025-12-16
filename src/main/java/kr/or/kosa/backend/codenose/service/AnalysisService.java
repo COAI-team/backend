@@ -90,8 +90,10 @@ public class AnalysisService {
      */
     @kr.or.kosa.backend.codenose.aop.LangfuseObserve(name = "analyzeStoredFile")
     public String analyzeStoredFile(AnalysisRequestDTO requestDto) {
-        // AOP가 자동으로 Trace/Span 시작 및 Input 캡처 수행
-        // LangfuseContext는 AOP Aspect와 LangfuseService에서 관리됨
+        // 워크플로우 시작: Website-RAG-Analysis Trace 생성
+        langfuseService.startNamedTrace("Website-RAG-Analysis",
+                String.valueOf(requestDto.getUserId()),
+                Map.of("mode", "RAG", "fileId", requestDto.getAnalysisId()));
 
         try {
             // 1. DB에서 저장된 GitHub 파일 내용 조회
@@ -407,7 +409,13 @@ public class AnalysisService {
      * DB에 저장된 파일이 아니므로, 즉석에서 분석하고 결과만 반환합니다.
      * (선택적으로 기록을 남길 수도 있습니다)
      */
+    @kr.or.kosa.backend.codenose.aop.LangfuseObserve(name = "analyzeRawCode")
     public String analyzeRawCode(String code, String language, Long userId) {
+        // 워크플로우 시작: MCP-Analysis Trace 생성
+        langfuseService.startNamedTrace("MCP-Analysis",
+                String.valueOf(userId),
+                Map.of("mode", "MCP", "language", language));
+
         try {
             log.info("Raw Code Analysis Requested - User: {}, Language: {}, Length: {}", userId, language,
                     code.length());
@@ -478,7 +486,7 @@ public class AnalysisService {
      * 분석 결과만 저장 (프론트엔드에서 분석 완료 후 호출용)
      *
      * @param analysisData 프론트엔드에서 전달받은 분석 결과 데이터
-     * @param userId 현재 사용자 ID
+     * @param userId       현재 사용자 ID
      * @return 생성된 분석 ID
      */
     public String saveAnalysisOnly(java.util.Map<String, Object> analysisData, Long userId) {
