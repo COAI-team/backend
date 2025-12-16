@@ -2,7 +2,7 @@ package kr.or.kosa.backend.admin.dto;
 
 import java.time.LocalDateTime;
 
-public record BoardItem (
+public record BoardItems(
     long id,
     String title,
     String userNickName,

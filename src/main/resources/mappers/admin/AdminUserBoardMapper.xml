@@ -5,7 +5,7 @@
 
 <mapper namespace="kr.or.kosa.backend.admin.mapper.AdminUserBoardMapper">
 
-    <select id="userBoards" resultType="kr.or.kosa.backend.admin.dto.BoardItem">
+    <select id="userBoards" resultType="kr.or.kosa.backend.admin.dto.BoardItems">
         SELECT *
         FROM (
         SELECT
@@ -127,7 +127,61 @@
     </select>
 
 
+    <select id="findOneAlgoBoardByBoardId" resultType="kr.or.kosa.backend.admin.dto.response.AlgoBoardDetailResponseDto">
+        select  t.ALGOSUBMISSION_ID ,t.USER_ID , u.USER_NICKNAME ,
+        ap.ALGO_PROBLEM_TITLE, ap.ALGO_PROBLEM_DESCRIPTION,
+        ap.ALGO_PROBLEM_DIFFICULTY, ap.PROBLEM_TYPE,
+        t.SOURCE_CODE, l.LANGUAGE_NAME, t.AI_FEEDBACK,
+        t.AI_FEEDBACK_TYPE, t.SOLVE_MODE, t.SOLVING_DURATION_SECONDS,
+        t.SUBMITTED_AT
+        from ALGO_SUBMISSIONS t
+        join ALGO_PROBLEMS ap on ap.ALGO_PROBLEM_ID = t.ALGO_PROBLEM_ID
+        join LANGUAGES l on l.LANGUAGE_ID = t.LANGUAGE_ID
+        join USERS u on u.USER_ID = t.USER_ID
+        where t.ALGOSUBMISSION_ID  = #{boardId}
+    </select>
 
+
+    <!-- CODEBOARD + CODE_ANALYSIS_HISTORY 상세 조회 -->
+    <select id="findOneCodeBoardByBoardId"
+            parameterType="long"
+            resultType="kr.or.kosa.backend.admin.dto.CodeBoardAnalysisDetailDto">
+        SELECT
+        c.CODEBOARD_ID AS codeboardId,
+        c.USER_ID AS userId,
+        c.ANALYSIS_ID AS analysisId,
+        c.CODEBOARD_TITLE AS codeboardTitle,
+        c.CODEBOARD_BLOCKS AS codeboardBlocks,
+        c.CODEBOARD_DELETED_YN AS codeboardDeletedYn,
+        cah.REPOSITORY_URL AS repositoryUrl,
+        cah.FILE_PATH AS filePath,
+        cah.ANALYSIS_TYPE AS analysisType,
+        cah.TONE_LEVEL AS toneLevel,
+        cah.CUSTOM_REQUIREMENTS AS customRequirements,
+        cah.ANALYANALYSIS_RESULTSIS_RESULT AS analysisResults,   <!-- ✅ 오타 수정 -->
+        cah.AI_SCORE AS aiScore
+        FROM CODEBOARD c
+        JOIN CODE_ANALYSIS_HISTORY cah
+        ON cah.ANALYSIS_ID = c.ANALYSIS_ID
+        WHERE c.CODEBOARD_ID = 1
+<!--        WHERE c.CODEBOARD_ID = #{boardId}-->
+    </select>
+
+    <!-- 자유게시판 단건 조회 -->
+    <select id="findOnefreeBoardByBoardId"
+            parameterType="long"
+            resultType="kr.or.kosa.backend.admin.dto.response.AdminFreeBoardDetailResponseDto">
+        SELECT
+        f.FREEBOARD_ID   AS freeboardId,
+        f.USER_ID        AS userId,
+        u.USER_NICKNAME  AS userNickName,
+        f.FREEBOARD_TITLE AS freeboardTitle,
+        f.FREEBOARD_CONTENT AS freeboardContent,
+        f.FREEBOARD_DELETED_YN  ASfreeBoardDeletedYn
+        FROM FREEBOARD f
+        JOIN USERS u ON u.USER_ID  = f.USER_ID
+        WHERE f.FREEBOARD_ID = #{boardId}
+    </select>
 
 </mapper>
 

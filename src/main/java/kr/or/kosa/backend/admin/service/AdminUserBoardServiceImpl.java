@@ -1,52 +1,55 @@
 package kr.or.kosa.backend.admin.service;
 
-import kr.or.kosa.backend.admin.dto.BoardItem;
+import kr.or.kosa.backend.admin.dto.response.AlgoBoardDetailResponseDto;
+import kr.or.kosa.backend.admin.dto.BoardItems;
+import kr.or.kosa.backend.admin.dto.CodeBoardAnalysisDetailDto;
 import kr.or.kosa.backend.admin.dto.request.UserBoardSearchConditionRequestDto;
+import kr.or.kosa.backend.admin.dto.response.AdminCodeBoardDetailResponseDto;
+import kr.or.kosa.backend.admin.dto.response.AdminFreeBoardDetailResponseDto;
 import kr.or.kosa.backend.admin.dto.response.PageResponseDto;
-import kr.or.kosa.backend.admin.enums.BoardType;
-import kr.or.kosa.backend.admin.exception.AdminErrorCode;
 import kr.or.kosa.backend.admin.mapper.AdminUserBoardMapper;
-import kr.or.kosa.backend.commons.exception.custom.CustomSystemException;
+import kr.or.kosa.backend.codenose.dto.GithubFileDTO;
+import kr.or.kosa.backend.codenose.service.GithubService;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 
 @Service
 public class AdminUserBoardServiceImpl implements AdminUserBoardService {
     private final AdminUserBoardMapper adminUserBoardMapper;
+    private final GithubService githubService;
 
-    public AdminUserBoardServiceImpl(AdminUserBoardMapper adminUserBoardMapper) {
+
+    public AdminUserBoardServiceImpl(AdminUserBoardMapper adminUserBoardMapper, GithubService githubService) {
         this.adminUserBoardMapper = adminUserBoardMapper;
+        this.githubService = githubService;
     }
 
     @Override
-    public PageResponseDto<BoardItem> getUserBoards(UserBoardSearchConditionRequestDto userBoardSearchConditionRequestDtos) {
-        List<BoardItem> boardItems = new ArrayList<>();
+    public PageResponseDto<BoardItems> getUserBoards(UserBoardSearchConditionRequestDto userBoardSearchConditionRequestDtos) {
+        List<BoardItems> boardItems = new ArrayList<>();
         boardItems = adminUserBoardMapper.userBoards(userBoardSearchConditionRequestDtos);
 
         int userBoardCount = adminUserBoardMapper.countUserBoards(userBoardSearchConditionRequestDtos);
-        PageResponseDto<BoardItem> pageResponseDto = new PageResponseDto<>(boardItems,userBoardSearchConditionRequestDtos.page(), userBoardSearchConditionRequestDtos.size(), userBoardCount);
-        return pageResponseDto;
+        return new PageResponseDto<>(boardItems,userBoardSearchConditionRequestDtos.page(), userBoardSearchConditionRequestDtos.size(), userBoardCount);
     }
 
     @Override
-    public void getOneUserBoard(long boardId, String boardType) {
-        BoardType type;
-        try {
-            type = BoardType.valueOf(boardType.toLowerCase());
-        } catch (IllegalArgumentException e) {
-            throw new CustomSystemException(AdminErrorCode.ADMIN_BOARD_TYPE);
-        }
+    public AlgoBoardDetailResponseDto getAlgoBoard(long boardId) {
 
-        switch (type) {
-            case algo -> System.out.println("알고 게시판 처리");
-            case code -> System.out.println("코드 게시판 처리");
-            case free -> System.out.println("자유 게시판 처리");
-        }
-
+        return adminUserBoardMapper.findOneAlgoBoardByBoardId(boardId);
     }
 
+    public AdminCodeBoardDetailResponseDto getOneCodeBoard(long boardId) {
+        CodeBoardAnalysisDetailDto codeBoardDetail = adminUserBoardMapper.findOneCodeBoardByBoardId(boardId);
+        GithubFileDTO fileDTO = githubService.getFileContent(codeBoardDetail.userId(), codeBoardDetail.getOwner(), codeBoardDetail.getRepo(), codeBoardDetail.filePath());
 
+        return new AdminCodeBoardDetailResponseDto(codeBoardDetail, fileDTO.getFileContent());
+    }
+
+    @Override
+    public AdminFreeBoardDetailResponseDto getOneFreeBoard(long boardId) {
+        return adminUserBoardMapper.findOnefreeBoardByBoardId(boardId);
+    }
 }
