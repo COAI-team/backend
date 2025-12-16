@@ -216,8 +216,17 @@ public class AnalysisService {
             } catch (Exception e) {
                 log.error("RAG 시스템에 분석 결과 저장 실패", e);
             }
+//            return cleanedResponse; 기존의 리턴 삭제될 예정
 
-            return cleanedResponse;
+            // 8. analysisId를 응답 JSON에 추가
+            try {
+                JsonNode resultNode = objectMapper.readTree(cleanedResponse);
+                ((com.fasterxml.jackson.databind.node.ObjectNode) resultNode).put("analysisId", analysisId);
+                return objectMapper.writeValueAsString(resultNode);
+            } catch (Exception e) {
+                log.error("analysisId 추가 실패", e);
+                return cleanedResponse;
+            }
 
         } catch (Exception e) {
             log.error("파일 분석 실패: {}", e.getMessage(), e);

@@ -36,4 +36,7 @@ public interface CommentMapper {
             @Param("commentId") Long commentId,
             @Param("userId") Long userId
     );
+
+    // 전체 댓글 수
+    Long countComments(@Param("boardId") Long boardId, @Param("boardType") String boardType);
 }

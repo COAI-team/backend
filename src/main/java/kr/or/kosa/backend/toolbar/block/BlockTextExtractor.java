@@ -15,16 +15,10 @@ public class BlockTextExtractor {
 
     // 전체 블록에서 plain text 추출
     public static String extractPlainText(
-            String title,
             List<? extends BlockShape> blocks,
             ObjectMapper objectMapper
     ) {
         StringBuilder text = new StringBuilder();
-
-        // 제목 추가
-        if (title != null && !title.isBlank()) {
-            text.append(title).append("\n\n");
-        }
 
         if (blocks == null) {
             return text.toString().trim();

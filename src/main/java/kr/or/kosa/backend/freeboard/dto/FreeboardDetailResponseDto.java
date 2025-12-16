@@ -27,22 +27,4 @@ public class FreeboardDetailResponseDto {
     private List<String> tags;
     private Boolean isLiked;
 
-    // 태그와 좋아요 여부 포함한 새 인스턴스 생성
-    public FreeboardDetailResponseDto withTags(List<String> tags) {
-        return FreeboardDetailResponseDto.builder()
-                .freeboardId(this.freeboardId)
-                .userId(this.userId)
-                .userNickname(this.userNickname)
-                .freeboardTitle(this.freeboardTitle)
-                .freeboardContent(this.freeboardContent)
-                .freeboardClick(this.freeboardClick)
-                .likeCount(this.likeCount)
-                .commentCount(this.commentCount)
-                .freeboardImage(this.freeboardImage)
-                .freeboardRepresentImage(this.freeboardRepresentImage)
-                .freeboardCreatedAt(this.freeboardCreatedAt)
-                .tags(tags)
-                .isLiked(this.isLiked)
-                .build();
-    }
 }
