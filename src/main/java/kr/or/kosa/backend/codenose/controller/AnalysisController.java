@@ -76,24 +76,4 @@ public class AnalysisController {
     return ResponseEntity.ok(ApiResponse.success(result));
   }
 
-    /**
-     * 분석 결과 저장 (프론트엔드에서 분석 완료 후 호출)
-     *
-     * @param analysisData 분석 결과 데이터
-     * @return 저장된 분석 ID
-     */
-    @PostMapping("/save")
-    public ResponseEntity<ApiResponse<java.util.Map<String, String>>> saveAnalysis(
-            @RequestBody java.util.Map<String, Object> analysisData
-    ) {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        JwtUserDetails userDetails = (JwtUserDetails) authentication.getPrincipal();
-
-        String analysisId = analysisService.saveAnalysisOnly(analysisData, userDetails.id());
-
-        java.util.Map<String, String> response = new java.util.HashMap<>();
-        response.put("analysisId", analysisId);
-
-        return ResponseEntity.ok(ApiResponse.success(response));
-    }
 }

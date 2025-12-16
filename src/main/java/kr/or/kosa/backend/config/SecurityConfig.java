@@ -64,9 +64,10 @@ public class SecurityConfig {
                                                                 "/codeboard/**",
                                                                 "/comment",
                                                                 "/comment/**",
+                                                                "/like/*/*/users",  // 좋아요 누른 사용자 목록 확인
                                                                 "/like/**",
-                                                                "/analysis/**")
-                                                .permitAll()
+                                                                "/analysis/**"
+                                                ).permitAll()
                                                 // (Token Auth)
                                                 .requestMatchers("/api/mcp/token").authenticated() // User Token Issue
                                                                                                    // (JWT Auth)
