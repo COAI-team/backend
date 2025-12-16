@@ -133,8 +133,10 @@ public class FreeboardService {
         String plainText;
 
         try {
+            log.info("Blocks before conversion: {}", dto.getBlocks());
             jsonContent = dto.toJsonContent(objectMapper);
             plainText = dto.toPlainText(objectMapper);
+            log.info("PlainText after extraction: {}", plainText);
         } catch (Exception e) {
             log.error("JSON 변환 실패", e);
             throw new CustomBusinessException(FreeboardErrorCode.JSON_PARSE_ERROR);
