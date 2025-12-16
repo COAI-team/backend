@@ -146,4 +146,13 @@
         )
     </select>
 
+    <!-- 전체 댓글 수 조회 (답글 포함) -->
+    <select id="countComments" resultType="long">
+        SELECT COUNT(*)
+        FROM COMMENT
+        WHERE BOARD_ID = #{boardId}
+        AND BOARD_TYPE = #{boardType}
+        AND IS_DELETED = FALSE
+    </select>
+
 </mapper>

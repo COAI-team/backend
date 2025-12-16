@@ -139,7 +139,10 @@ public class CommentService {
                 userId
         );
 
-        return new CursorResponse<CommentResponse>(comments, cursor.getSize());
+        // 전체 댓글 수 조회
+        Long totalElements = commentMapper.countComments(boardId, boardType);
+
+        return new CursorResponse<>(comments, cursor.getSize(), totalElements);
     }
 
     @Transactional
