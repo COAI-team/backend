@@ -27,80 +27,91 @@ import org.springframework.http.HttpMethod;
 @RequiredArgsConstructor
 public class SecurityConfig {
 
-        private final JwtProvider jwtProvider;
+    private final JwtProvider jwtProvider;
 
-        @Bean
-        public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-                http
-                                .cors(Customizer.withDefaults())
-                                .csrf(AbstractHttpConfigurer::disable)
-                                .sessionManagement(session -> session
-                                                .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                                .authorizeHttpRequests(auth -> auth
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+        http
+                .cors(Customizer.withDefaults())
+                .csrf(AbstractHttpConfigurer::disable)
+                .sessionManagement(session -> session
+                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authorizeHttpRequests(auth -> auth
 
-                                                // 인증 없이 접근 허용
-                                                .requestMatchers(
-                                                                "/",
-                                                                "/auth/github/**",
-                                                                "/oauth2/**",
-                                                                "/users/register",
-                                                                "/users/login",
-                                                                "/users/github/link",
-                                                                "/users/password/**",
-                                                                "/email/**",
-                                                                "/algo/**",
-                                                                "/admin/**",
-                                                                "/codeAnalysis/**",
-                                                                "/api/analysis/**",
-                                                                "/api/mistakes/**",
-                                                                "/api/mistake-report/**",
-                                                                "/api/mcp/**",
-                                                                "/api/**",
-                                                                "/ws/**",
-                                                                "/chat/messages")
-                                                .permitAll()
-                                                .requestMatchers(HttpMethod.GET,
-                                                                "/freeboard/**",
-                                                                "/codeboard/**",
-                                                                "/comment",
-                                                                "/comment/**",
-                                                                "/like/*/*/users",  // 좋아요 누른 사용자 목록 확인
-                                                                "/like/**",
-                                                                "/analysis/**"
-                                                ).permitAll()
-                                                // (Token Auth)
-                                                .requestMatchers("/api/mcp/token").authenticated() // User Token Issue
-                                                                                                   // (JWT Auth)
-                                                .anyRequest().authenticated())
-                                .addFilterBefore(
-                                                new JwtAuthenticationFilter(jwtProvider),
-                                                UsernamePasswordAuthenticationFilter.class);
+                        // 인증 없이 접근 허용
+                        .requestMatchers(
+                                "/",
+                                "/auth/github/**",
+                                "/oauth2/**",
+                                "/users/register",
+                                "/users/login",
+                                "/users/github/link",
+                                "/users/password/**",
+                                "/email/**",
+                                "/algo/**",
+                                "/admin/**",
+                                "/codeAnalysis/**",
 
-                return http.build();
-        }
+                                // API 계열
+                                "/api/**",
 
-        @Bean
-        public PasswordEncoder passwordEncoder() {
-                return new BCryptPasswordEncoder();
-        }
+                                // WebSocket / Chat
+                                "/ws/**",
+                                "/chat/messages"
+                        ).permitAll()
 
-        @Bean
-        public AuthenticationManager authenticationManager(AuthenticationConfiguration config)
-                        throws Exception {
-                return config.getAuthenticationManager();
-        }
+                        .requestMatchers(HttpMethod.GET,
+                                "/freeboard/**",
+                                "/codeboard/**",
+                                "/comment",
+                                "/comment/**",
+                                "/like/*/*/users",  // 좋아요 누른 사용자 목록 확인
+                                "/like/**",
+                                "/analysis/**"
+                        ).permitAll()
 
-        @Bean
-        public CorsConfigurationSource corsConfigurationSource() {
-                CorsConfiguration configuration = new CorsConfiguration();
-                configuration.setAllowedOrigins(List.of("https://localhost:5173"));
-                configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
-                configuration.setAllowedHeaders(List.of("*"));
-                configuration.setAllowCredentials(true);
-                configuration.setExposedHeaders(List.of("Authorization"));
+                        // (Token Auth)
+                        .requestMatchers("/api/mcp/token").authenticated() // User Token Issue
+                        // (JWT Auth)
+                        .anyRequest().authenticated()
+                )
+                .addFilterBefore(
+                        new JwtAuthenticationFilter(jwtProvider),
+                        UsernamePasswordAuthenticationFilter.class
+                );
 
-                UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-                source.registerCorsConfiguration("/**", configuration);
-                return source;
-        }
+        return http.build();
+    }
+
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+
+    @Bean
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration config)
+            throws Exception {
+        return config.getAuthenticationManager();
+    }
+
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+        // 로컬 개발용: http/https + 모든 포트(5173, 9443 등) 허용
+        configuration.setAllowedOriginPatterns(List.of(
+                "*",
+                "http://localhost:*",
+                "https://localhost:*",
+                "http://127.0.0.1:*",
+                "https://127.0.0.1:*"
+        ));
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
+        configuration.setAllowedHeaders(List.of("*"));
+        configuration.setAllowCredentials(true);
+        configuration.setExposedHeaders(List.of("Authorization"));
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
+    }
 }
