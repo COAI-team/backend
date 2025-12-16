@@ -29,7 +29,7 @@ public class FreeboardUpdateRequest {
     @Size(max = 500, message = "대표 이미지 URL은 500자를 초과할 수 없습니다.")
     private String freeboardRepresentImage;
 
-    @Size(max = 10, message = "태그는 최대 10개까지 가능합니다.")
+    @Size(max = 5, message = "태그는 최대 5개까지 가능합니다.")
     private List<@ValidTag String> tags;
 
     public FreeboardDto toDto() {

@@ -9,6 +9,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Getter
@@ -20,16 +21,20 @@ public class CodeboardDto {
     private Long userId;
     private String analysisId;
     private String codeboardTitle;
-    private Object blocks;
+    private List<CodeboardBlockResponse> blocks;
+    private Long codeboardClick;
+    private LocalDateTime codeboardCreatedAt;
     private List<String> tags;
 
+    // blocks를 JSON 문자열로 변환
     public String toJsonContent(ObjectMapper objectMapper) throws Exception {
         List<BlockShape> blockList = BlockJsonConverter.toBlockList(blocks, objectMapper);
         return objectMapper.writeValueAsString(blockList);
     }
 
+    // 순수 텍스트 추출 (검색용)
     public String toPlainText(ObjectMapper objectMapper) throws Exception {
         List<BlockShape> blockList = BlockJsonConverter.toBlockList(blocks, objectMapper);
-        return BlockTextExtractor.extractPlainText(codeboardTitle, blockList, objectMapper);
+        return BlockTextExtractor.extractPlainText(blockList, objectMapper);
     }
 }

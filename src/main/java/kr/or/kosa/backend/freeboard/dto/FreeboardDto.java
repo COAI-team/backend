@@ -1,7 +1,10 @@
 package kr.or.kosa.backend.freeboard.dto;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import kr.or.kosa.backend.toolbar.block.BlockJsonConverter;
+import kr.or.kosa.backend.toolbar.block.BlockSecurityGuard;
+import kr.or.kosa.backend.toolbar.block.BlockShape;
+import kr.or.kosa.backend.toolbar.block.BlockTextExtractor;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -26,60 +29,20 @@ public class FreeboardDto {
     private LocalDateTime freeboardCreatedAt;
     private List<String> tags;
 
-    // blocks를 JSON 문자열로 변환
+    // blocks를 JSON 문자열로 변환 (보안 검증 포함)
     public String toJsonContent(ObjectMapper objectMapper) throws Exception {
-        return objectMapper.writeValueAsString(this.blocks);
+        // 블록 변환
+        List<BlockShape> blockList = BlockJsonConverter.toBlockList(blocks, objectMapper);
+
+        // 보안 검증
+        BlockSecurityGuard.guard(blockList, objectMapper);
+
+        return objectMapper.writeValueAsString(blockList);
     }
 
-    // 순수 텍스트 추출 (검색/RAG용)
-    public String toPlainText(ObjectMapper objectMapper) {
-        StringBuilder text = new StringBuilder();
-
-        // 제목 추가
-        if (freeboardTitle != null) {
-            text.append(freeboardTitle).append("\n\n");
-        }
-
-        // 각 블록에서 텍스트 추출
-        if (blocks != null) {
-            for (FreeboardBlockResponse block : blocks) {
-                if ("tiptap".equals(block.getType())) {
-                    String tiptapText = extractFromTiptap(block.getContent(), objectMapper);
-                    text.append(tiptapText).append("\n");
-                } else if ("code".equals(block.getType())) {
-                    text.append(block.getContent()).append("\n");
-                }
-            }
-        }
-
-        return text.toString().trim();
-    }
-
-    // Tiptap JSON에서 텍스트 추출
-    private String extractFromTiptap(Object content, ObjectMapper objectMapper) {
-        try {
-            JsonNode node = objectMapper.valueToTree(content);
-            return extractTextFromNode(node);
-        } catch (Exception e) {
-            log.warn("Tiptap 텍스트 추출 실패", e);  // 로깅 추가
-            return "";
-        }
-    }
-
-    // JSON 노드에서 재귀적으로 텍스트 추출
-    private String extractTextFromNode(JsonNode node) {
-        StringBuilder text = new StringBuilder();
-
-        if (node.has("text")) {
-            text.append(node.get("text").asText()).append(" ");
-        }
-
-        if (node.has("content") && node.get("content").isArray()) {
-            for (JsonNode child : node.get("content")) {
-                text.append(extractTextFromNode(child));
-            }
-        }
-
-        return text.toString();
+    // 순수 텍스트 추출 (검색용)
+    public String toPlainText(ObjectMapper objectMapper) throws Exception {
+        List<BlockShape> blockList = BlockJsonConverter.toBlockList(blocks, objectMapper);
+        return BlockTextExtractor.extractPlainText(blockList, objectMapper);
     }
 }

@@ -18,10 +18,6 @@ import kr.or.kosa.backend.like.domain.Like;
 import kr.or.kosa.backend.like.domain.ReferenceType;
 import kr.or.kosa.backend.like.mapper.LikeMapper;
 import kr.or.kosa.backend.tag.service.TagService;
-import kr.or.kosa.backend.toolbar.block.BlockJsonConverter;
-import kr.or.kosa.backend.toolbar.block.BlockSecurityGuard;
-import kr.or.kosa.backend.toolbar.block.BlockShape;
-import kr.or.kosa.backend.toolbar.block.BlockTextExtractor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -63,31 +59,14 @@ public class CodeboardService {
     // 코드 게시글 작성
     @Transactional
     public Long write(CodeboardDto dto, Long userId) {
-        // 블록 변환
-        List<BlockShape> blocks;
-        try {
-            blocks = BlockJsonConverter.toBlockList(dto.getBlocks(), objectMapper);
-        } catch (Exception e) {
-            log.error("블록 변환 실패", e);
-            throw new CustomBusinessException(CodeboardErrorCode.JSON_PARSE_ERROR);
-        }
-
-        // 보안 검증
-        try {
-            BlockSecurityGuard.guard(blocks, objectMapper);
-        } catch (IllegalArgumentException e) {
-            log.warn("보안 검증 실패: {}", e.getMessage());
-            throw new CustomBusinessException(CodeboardErrorCode.INVALID_BLOCK_CONTENT);
-        }
-
-        // JSON 직렬화 및 플레인 텍스트 추출
         String jsonContent;
         String plainText;
+
         try {
-            jsonContent = objectMapper.writeValueAsString(blocks);
-            plainText = BlockTextExtractor.extractPlainText(dto.getCodeboardTitle(), blocks, objectMapper);
+            jsonContent = dto.toJsonContent(objectMapper);
+            plainText = dto.toPlainText(objectMapper);
         } catch (Exception e) {
-            log.error("JSON 직렬화 실패", e);
+            log.error("JSON 변환 실패", e);
             throw new CustomBusinessException(CodeboardErrorCode.JSON_PARSE_ERROR);
         }
 
@@ -161,31 +140,14 @@ public class CodeboardService {
             throw new CustomBusinessException(CodeboardErrorCode.NO_EDIT_PERMISSION);
         }
 
-        // 블록 변환
-        List<BlockShape> blocks;
-        try {
-            blocks = BlockJsonConverter.toBlockList(dto.getBlocks(), objectMapper);
-        } catch (Exception e) {
-            log.error("블록 변환 실패: codeboardId={}", id, e);
-            throw new CustomBusinessException(CodeboardErrorCode.JSON_PARSE_ERROR);
-        }
-
-        // 보안 검증
-        try {
-            BlockSecurityGuard.guard(blocks, objectMapper);
-        } catch (IllegalArgumentException e) {
-            log.warn("보안 검증 실패: codeboardId={}, {}", id, e.getMessage());
-            throw new CustomBusinessException(CodeboardErrorCode.INVALID_BLOCK_CONTENT);
-        }
-
-        // JSON 직렬화 및 플레인 텍스트 추출
         String jsonContent;
         String plainText;
+
         try {
-            jsonContent = objectMapper.writeValueAsString(blocks);
-            plainText = BlockTextExtractor.extractPlainText(dto.getCodeboardTitle(), blocks, objectMapper);
+            jsonContent = dto.toJsonContent(objectMapper);
+            plainText = dto.toPlainText(objectMapper);
         } catch (Exception e) {
-            log.error("JSON 직렬화 실패: codeboardId={}", id, e);
+            log.error("JSON 변환 실패: codeboardId={}", id, e);
             throw new CustomBusinessException(CodeboardErrorCode.JSON_PARSE_ERROR);
         }
 
