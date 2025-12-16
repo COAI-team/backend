@@ -31,54 +31,58 @@ public class SecurityConfig {
 
         @Bean
         public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-                http
-                                .cors(Customizer.withDefaults())
-                                .csrf(AbstractHttpConfigurer::disable)
-                                .sessionManagement(session -> session
-                                                .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                                .authorizeHttpRequests(auth -> auth
+            http
+                    .cors(Customizer.withDefaults())
+                    .csrf(AbstractHttpConfigurer::disable)
+                    .sessionManagement(session -> session
+                            .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                    .authorizeHttpRequests(auth -> auth
 
-                                                // 인증 없이 접근 허용
-                                                .requestMatchers(
-                                                                "/",
-                                                                "/auth/github/**",
-                                                                "/oauth2/**",
-                                                                "/users/register",
-                                                                "/users/login",
-                                                                "/users/github/link",
-                                                                "/users/password/**",
-                                                                "/email/**",
-                                                                "/algo/**",
-                                                                "/admin/**",
-                                                                "/codeAnalysis/**",
-                                                                "/api/analysis/**",
-                                                                "/api/mistakes/**",
-                                                                "/api/mistake-report/**",
-                                                                "/api/mcp/**",
-                                                                "/api/**",
-                                                                "/ws/**",
-                                                                "/chat/messages")
-                                                .permitAll()
-                                                .requestMatchers(HttpMethod.GET,
-                                                                "/freeboard/**",
-                                                                "/codeboard/**",
-                                                                "/comment",
-                                                                "/comment/**",
-                                                                "/like/**",
-                                                                "/analysis/**")
-                                                .permitAll()
-                                                // (Token Auth)
-                                                .requestMatchers("/api/mcp/token").authenticated() // User Token Issue
-                                                                                                   // (JWT Auth)
-                                                .anyRequest().authenticated())
-                                .addFilterBefore(
-                                                new JwtAuthenticationFilter(jwtProvider),
-                                                UsernamePasswordAuthenticationFilter.class);
+                            // 인증 없이 접근 허용
+                            .requestMatchers(
+                                    "/",
+                                    "/auth/github/**",
+                                    "/oauth2/**",
+                                    "/users/register",
+                                    "/users/login",
+                                    "/users/github/link",
+                                    "/users/password/**",
+                                    "/email/**",
+                                    "/algo/**",
+                                    "/admin/**",
+                                    "/codeAnalysis/**",
 
-                return http.build();
+                                    // ✅ 아래 /api/** 하나로 전부 커버되므로 중복 제거
+                                    "/api/**",
+
+                                    "/ws/**",
+                                    "/chat/messages"
+                            ).permitAll()
+
+                            .requestMatchers(HttpMethod.GET,
+                                    "/freeboard/**",
+                                    "/codeboard/**",
+                                    "/comment",
+                                    "/comment/**",
+                                    "/like/**",
+                                    "/analysis/**"
+                            ).permitAll()
+
+                            // (Token Auth)
+                            .requestMatchers("/api/mcp/token").authenticated() // User Token Issue
+                            // (JWT Auth)
+                            .anyRequest().authenticated()
+                    )
+                    .addFilterBefore(
+                            new JwtAuthenticationFilter(jwtProvider),
+                            UsernamePasswordAuthenticationFilter.class
+                    );
+
+            return http.build();
         }
 
-        @Bean
+
+    @Bean
         public PasswordEncoder passwordEncoder() {
                 return new BCryptPasswordEncoder();
         }
@@ -92,7 +96,14 @@ public class SecurityConfig {
         @Bean
         public CorsConfigurationSource corsConfigurationSource() {
                 CorsConfiguration configuration = new CorsConfiguration();
-                configuration.setAllowedOrigins(List.of("https://localhost:5173"));
+                // 로컬 개발용: http/https + 모든 포트(5173, 9443 등) 허용
+                configuration.setAllowedOriginPatterns(List.of(
+                                "*",
+                                "http://localhost:*",
+                                "https://localhost:*",
+                                "http://127.0.0.1:*",
+                                "https://127.0.0.1:*"
+                ));
                 configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
                 configuration.setAllowedHeaders(List.of("*"));
                 configuration.setAllowCredentials(true);
