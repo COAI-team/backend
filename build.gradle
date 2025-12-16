@@ -55,6 +55,9 @@ dependencies {
     /* MyBatis */
     implementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter:3.0.4'
     implementation 'io.github.cdimascio:dotenv-java:2.2.3'
+
+    /* Spring Batch */
+    implementation 'org.springframework.boot:spring-boot-starter-batch'
     implementation 'org.springframework.boot:spring-boot-starter-webflux'
     implementation 'io.projectreactor.netty:reactor-netty'
 

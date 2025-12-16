@@ -47,11 +47,12 @@
     </select>
 
     <select id="languageRanking" resultType="kr.or.kosa.backend.admin.dto.LanguageRankingDto">
-        select LANGUAGE, count(LANGUAGE) as sub_count from ALGO_SUBMISSIONS t
-        group by `LANGUAGE`
+        select l.LANGUAGE_NAME, COUNT(t.LANGUAGE_ID) as sub_count  from ALGO_SUBMISSIONS t
+        join LANGUAGES l on l.LANGUAGE_ID = t.LANGUAGE_ID
+        group by l.LANGUAGE_NAME
         with rollup
         order by sub_count DESC
-        limit 6
+        limit 6;
     </select>
 
     <select id="algoSolverRanking" resultType="kr.or.kosa.backend.admin.dto.AlgoSolverRankingDto">
