@@ -96,7 +96,7 @@ public class AlgorithmSolvingController {
     public ResponseEntity<ApiResponse<SubmissionResponseDto>> submitCode(
             @RequestBody @Valid SubmissionRequestDto request,
             @AuthenticationPrincipal JwtAuthentication authentication) {
-
+        System.out.println("=====================================");
         Long userId = extractUserId(authentication);
 
         log.info("코드 제출 요청 - problemId: {}, userId: {}, language: {}",
