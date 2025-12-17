@@ -389,11 +389,16 @@ CREATE TABLE `DAILY_MISSIONS` (
 ) ENGINE = InnoDB AUTO_INCREMENT = 1 DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '데일리 미션';
 
 -- 사용자 레벨 테이블 (알고리즘 레벨)
+-- 변경사항 (2025-12-17): XP 기반 레벨 시스템 도입
+-- - TOTAL_XP 컬럼 추가: 경험치 기반 레벨 산정
+-- - TOTAL_SOLVED는 유지 (통계용)
+-- - 첫 정답 여부는 ALGO_SUBMISSIONS 테이블에서 조회
 CREATE TABLE `USER_ALGO_LEVELS` (
     `LEVEL_ID` BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '레벨 고유 식별자',
     `USER_ID` BIGINT NOT NULL UNIQUE COMMENT '사용자 ID',
     `ALGO_LEVEL` ENUM('EMERALD', 'SAPPHIRE', 'RUBY', 'DIAMOND') DEFAULT 'EMERALD' COMMENT '알고리즘 레벨',
-    `TOTAL_SOLVED` INT DEFAULT 0 COMMENT '총 푼 문제 수',
+    `TOTAL_XP` INT DEFAULT 0 COMMENT '총 경험치 (XP 기반 레벨 산정)',
+    `TOTAL_SOLVED` INT DEFAULT 0 COMMENT '총 푼 문제 수 (통계용, 중복 제외)',
     `CURRENT_STREAK` INT DEFAULT 0 COMMENT '현재 연속 풀이 일수',
     `MAX_STREAK` INT DEFAULT 0 COMMENT '최대 연속 풀이 일수',
     `LAST_SOLVED_AT` TIMESTAMP NULL COMMENT '마지막 풀이 일시',
