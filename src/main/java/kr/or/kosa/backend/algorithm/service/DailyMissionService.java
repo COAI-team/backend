@@ -4,6 +4,8 @@ import kr.or.kosa.backend.algorithm.dto.DailyMissionDto;
 import kr.or.kosa.backend.algorithm.dto.UserAlgoLevelDto;
 import kr.or.kosa.backend.algorithm.dto.enums.AlgoLevel;
 import kr.or.kosa.backend.algorithm.dto.enums.MissionType;
+import kr.or.kosa.backend.algorithm.dto.enums.ProblemDifficulty;
+import kr.or.kosa.backend.algorithm.mapper.AlgorithmSubmissionMapper;
 import kr.or.kosa.backend.algorithm.mapper.DailyMissionMapper;
 import kr.or.kosa.backend.pay.entity.Subscription;
 import kr.or.kosa.backend.pay.repository.SubscriptionMapper;
@@ -17,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 데일리 미션 서비스
@@ -27,6 +30,7 @@ import java.util.List;
 public class DailyMissionService {
 
     private final DailyMissionMapper missionMapper;
+    private final AlgorithmSubmissionMapper submissionMapper;  // 잔디 캘린더용
     private final UserMapper userMapper;
     private final PointService pointService;
     private final RateLimitService rateLimitService;
@@ -112,9 +116,13 @@ public class DailyMissionService {
      * 미션이 없으면 자동 생성 후 완료 처리
      * - 0시 이후 가입한 신규 유저
      * - 데일리미션 페이지를 거치지 않고 직접 문제 생성하는 경우
+     *
+     * @param userId 사용자 ID
+     * @param missionType 미션 타입
+     * @param solvedProblemId 실제로 푼 문제 ID (PROBLEM_SOLVE일 때 필수, PROBLEM_GENERATE일 때 null)
      */
     @Transactional
-    public MissionCompleteResult completeMission(Long userId, MissionType missionType) {
+    public MissionCompleteResult completeMission(Long userId, MissionType missionType, Long solvedProblemId) {
         LocalDate today = LocalDate.now();
 
         // 미션 조회
@@ -137,20 +145,25 @@ public class DailyMissionService {
             return MissionCompleteResult.alreadyCompleted();
         }
 
+        // ★ PROBLEM_SOLVE 미션: 데일리 미션에 할당된 문제와 실제 푼 문제가 일치하는지 검증
+        if (missionType == MissionType.PROBLEM_SOLVE) {
+            Long missionProblemId = mission.getProblemId();
+            if (missionProblemId == null || !missionProblemId.equals(solvedProblemId)) {
+                log.debug("데일리 미션 문제 불일치 - userId: {}, 미션문제: {}, 푼문제: {}",
+                        userId, missionProblemId, solvedProblemId);
+                return MissionCompleteResult.wrongProblem();
+            }
+        }
+
         // 미션 완료 처리
         missionMapper.completeMission(mission.getMissionId());
 
-        // 포인트 지급
+        // 보너스 포인트 지급 (XP는 AlgorithmJudgingService에서 일괄 처리)
         int rewardPoints = mission.getRewardPoints();
         String description = String.format("데일리 미션 완료: %s", missionType.getDescription());
         pointService.addRewardPoint(userId, rewardPoints, description);
 
-        // 사용자 레벨 통계 업데이트 (문제 풀기 미션만)
-        if (missionType == MissionType.PROBLEM_SOLVE) {
-            updateUserStats(userId);
-        }
-
-        log.info("사용자 {} 미션 완료: {} (+{}P)", userId, missionType, rewardPoints);
+        log.info("사용자 {} 미션 완료: {} (+{}P 보너스)", userId, missionType, rewardPoints);
         return MissionCompleteResult.success(rewardPoints);
     }
 
@@ -164,11 +177,15 @@ public class DailyMissionService {
             level = new UserAlgoLevelDto();
             level.setUserId(userId);
             level.setAlgoLevel(AlgoLevel.EMERALD);
+            level.setTotalXp(0);
             level.setTotalSolved(0);
             level.setCurrentStreak(0);
             level.setMaxStreak(0);
             missionMapper.insertUserLevel(level);
-            log.info("사용자 {} 알고리즘 레벨 생성: EMERALD", userId);
+            log.info("사용자 {} 알고리즘 레벨 생성: EMERALD (XP: 0)", userId);
+        } else {
+            // DB에서 로드 후 XP 기반으로 레벨 동기화
+            level.syncLevelFromXp();
         }
         return level;
     }
@@ -198,13 +215,19 @@ public class DailyMissionService {
     }
 
     /**
-     * 사용자 통계 업데이트 (문제 풀이 완료 시)
+     * 사용자 통계 업데이트 (문제 풀이 완료 시) - XP 기반
+     *
+     * @param userId 사용자 ID
+     * @param problemId 문제 ID
+     * @param difficulty 문제 난이도
+     * @return 획득한 XP (레벨업 시 음수 반환으로 표시하지 않고, XpRewardResult 반환)
      */
     @Transactional
-    public void updateUserStats(Long userId) {
+    public XpRewardResult updateUserStatsWithXp(Long userId, Long problemId, ProblemDifficulty difficulty) {
         UserAlgoLevelDto level = getOrCreateUserLevel(userId);
         LocalDateTime lastSolved = level.getLastSolvedAt();
         LocalDate today = LocalDate.now();
+        AlgoLevel previousLevel = level.getAlgoLevel();
 
         // 연속 풀이 계산
         int currentStreak = level.getCurrentStreak();
@@ -220,11 +243,20 @@ public class DailyMissionService {
         // 최대 스트릭 업데이트
         int maxStreak = Math.max(level.getMaxStreak(), currentStreak);
 
-        // 레벨 업 체크
-        int totalSolved = level.getTotalSolved() + 1;
-        AlgoLevel newLevel = calculateLevel(totalSolved);
+        // 첫 정답 여부 확인 (ALGO_SUBMISSIONS 테이블 활용)
+        boolean isFirstSolve = missionMapper.isFirstSolve(userId, problemId);
 
-        level.setTotalSolved(totalSolved);
+        // XP 계산 (난이도 + 첫 정답 보너스 + 스트릭 보너스)
+        int earnedXp = difficulty.calculateXpWithBonus(currentStreak, isFirstSolve);
+
+        // XP 추가 및 레벨 동기화
+        int newTotalXp = level.getTotalXp() + earnedXp;
+        AlgoLevel newLevel = AlgoLevel.fromXp(newTotalXp);
+        boolean leveledUp = previousLevel != newLevel;
+
+        // 통계 업데이트
+        level.setTotalXp(newTotalXp);
+        level.setTotalSolved(level.getTotalSolved() + 1);
         level.setCurrentStreak(currentStreak);
         level.setMaxStreak(maxStreak);
         level.setAlgoLevel(newLevel);
@@ -232,24 +264,44 @@ public class DailyMissionService {
 
         missionMapper.updateUserLevel(level);
 
-        if (newLevel != level.getAlgoLevel()) {
-            log.info("사용자 {} 레벨 업: {} -> {}", userId, level.getAlgoLevel(), newLevel);
+        if (leveledUp) {
+            log.info("사용자 {} 레벨 업! {} -> {} (XP: {})", userId, previousLevel, newLevel, newTotalXp);
         }
+
+        log.info("사용자 {} XP 획득: +{} (첫정답: {}, 스트릭: {}일, 총XP: {})",
+                userId, earnedXp, isFirstSolve, currentStreak, newTotalXp);
+
+        return new XpRewardResult(earnedXp, isFirstSolve, currentStreak, leveledUp, previousLevel, newLevel, newTotalXp);
     }
 
     /**
-     * 총 풀이 수에 따른 레벨 계산
+     * 기존 updateUserStats 호환용 (문제 ID/난이도 없이 호출 시)
+     * @deprecated updateUserStatsWithXp 사용 권장
      */
-    private AlgoLevel calculateLevel(int totalSolved) {
-        if (totalSolved >= 100) {
-            return AlgoLevel.DIAMOND;
-        } else if (totalSolved >= 50) {
-            return AlgoLevel.RUBY;
-        } else if (totalSolved >= 20) {
-            return AlgoLevel.SAPPHIRE;
-        } else {
-            return AlgoLevel.EMERALD;
+    @Deprecated
+    @Transactional
+    public void updateUserStats(Long userId) {
+        UserAlgoLevelDto level = getOrCreateUserLevel(userId);
+        LocalDateTime lastSolved = level.getLastSolvedAt();
+        LocalDate today = LocalDate.now();
+
+        // 연속 풀이 계산
+        int currentStreak = level.getCurrentStreak();
+        if (lastSolved == null || lastSolved.toLocalDate().isBefore(today.minusDays(1))) {
+            currentStreak = 1;
+        } else if (lastSolved.toLocalDate().equals(today.minusDays(1))) {
+            currentStreak++;
         }
+
+        int maxStreak = Math.max(level.getMaxStreak(), currentStreak);
+        int totalSolved = level.getTotalSolved() + 1;
+
+        level.setTotalSolved(totalSolved);
+        level.setCurrentStreak(currentStreak);
+        level.setMaxStreak(maxStreak);
+        level.setLastSolvedAt(LocalDateTime.now());
+
+        missionMapper.updateUserLevel(level);
     }
 
     /**
@@ -313,18 +365,27 @@ public class DailyMissionService {
     public record MissionCompleteResult(
             boolean success,
             String message,
-            int rewardPoints
+            int rewardPoints,
+            XpRewardResult xpResult
     ) {
         public static MissionCompleteResult success(int rewardPoints) {
-            return new MissionCompleteResult(true, "미션 완료!", rewardPoints);
+            return new MissionCompleteResult(true, "미션 완료!", rewardPoints, null);
+        }
+
+        public static MissionCompleteResult success(int rewardPoints, XpRewardResult xpResult) {
+            return new MissionCompleteResult(true, "미션 완료!", rewardPoints, xpResult);
         }
 
         public static MissionCompleteResult notFound() {
-            return new MissionCompleteResult(false, "미션을 찾을 수 없습니다.", 0);
+            return new MissionCompleteResult(false, "미션을 찾을 수 없습니다.", 0, null);
         }
 
         public static MissionCompleteResult alreadyCompleted() {
-            return new MissionCompleteResult(false, "이미 완료된 미션입니다.", 0);
+            return new MissionCompleteResult(false, "이미 완료된 미션입니다.", 0, null);
+        }
+
+        public static MissionCompleteResult wrongProblem() {
+            return new MissionCompleteResult(false, "데일리 미션 문제가 아닙니다.", 0, null);
         }
     }
 
@@ -338,4 +399,58 @@ public class DailyMissionService {
             int remaining,
             boolean isSubscriber
     ) {}
+
+    /**
+     * 사용자의 일별 정답 수 조회 (GitHub 잔디 캘린더용)
+     * @param userId 사용자 ID
+     * @param months 조회할 개월 수 (기본 12개월)
+     * @return 날짜별 정답 수 리스트
+     */
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> getDailySolveCounts(Long userId, int months) {
+        LocalDate endDate = LocalDate.now();
+        LocalDate startDate = endDate.minusMonths(months);
+
+        log.info("📊 잔디 캘린더 데이터 조회 - userId: {}, 기간: {} ~ {}", userId, startDate, endDate);
+
+        return submissionMapper.selectDailySolveCountsByUserId(userId, startDate, endDate);
+    }
+
+    /**
+     * XP 보상 결과
+     */
+    public record XpRewardResult(
+            int earnedXp,
+            boolean isFirstSolve,
+            int currentStreak,
+            boolean leveledUp,
+            AlgoLevel previousLevel,
+            AlgoLevel newLevel,
+            int totalXp
+    ) {
+        /**
+         * 보너스 상세 정보 문자열 생성
+         */
+        public String getBonusDescription() {
+            StringBuilder sb = new StringBuilder();
+            if (isFirstSolve) {
+                sb.append("첫 정답 보너스 +50%");
+            }
+            if (currentStreak >= 3) {
+                if (!sb.isEmpty()) sb.append(", ");
+                int bonusPercent;
+                if (currentStreak >= 30) {
+                    bonusPercent = 50;
+                } else if (currentStreak >= 14) {
+                    bonusPercent = 30;
+                } else if (currentStreak >= 7) {
+                    bonusPercent = 20;
+                } else {
+                    bonusPercent = 10;
+                }
+                sb.append(String.format("스트릭 보너스 +%d%%", bonusPercent));
+            }
+            return sb.isEmpty() ? "기본 XP" : sb.toString();
+        }
+    }
 }
