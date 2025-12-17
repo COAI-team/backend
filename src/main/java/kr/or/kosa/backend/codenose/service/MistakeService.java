@@ -3,6 +3,8 @@ package kr.or.kosa.backend.codenose.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.langchain4j.model.chat.ChatLanguageModel;
+import kr.or.kosa.backend.codenose.aop.LangfuseObserve;
+import kr.or.kosa.backend.codenose.dto.CodeResultDTO;
 import kr.or.kosa.backend.codenose.dto.UserMistakeStatDTO;
 import kr.or.kosa.backend.codenose.mapper.AnalysisMapper;
 import lombok.extern.slf4j.Slf4j;
@@ -90,7 +92,7 @@ public class MistakeService {
     /**
      * AI를 통한 상세 리포트 및 O/X 퀴즈 생성
      */
-    @kr.or.kosa.backend.codenose.aop.LangfuseObserve(name = "MistakeReportGeneration")
+    @LangfuseObserve(name = "MistakeReportGeneration")
     public String generateMistakeReport(Long userId) {
         try {
             // 1. Threshold 넘긴 실수 상위 3개 조회
@@ -198,9 +200,9 @@ public class MistakeService {
      * 특정 실수(Mistake Type)가 발생한 코드 내역 상세 조회
      * mistakeType이 null이면, 현재 Alert 조건을 만족하는(임계치 초과) 모든 실수에 대한 상세 내역을 반환합니다.
      */
-    @kr.or.kosa.backend.codenose.aop.LangfuseObserve(name = "getMistakeReports")
+    @LangfuseObserve(name = "getMistakeReports")
     public List<Map<String, Object>> getMistakeDetails(Long userId, String mistakeType) {
-        List<kr.or.kosa.backend.codenose.dto.CodeResultDTO> history = analysisMapper.findCodeResultByUserId(userId);
+        List<CodeResultDTO> history = analysisMapper.findCodeResultByUserId(userId);
         List<Map<String, Object>> details = new ArrayList<>();
 
         List<String> targetMistakes = new ArrayList<>();

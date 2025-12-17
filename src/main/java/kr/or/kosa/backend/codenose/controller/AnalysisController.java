@@ -1,6 +1,7 @@
 package kr.or.kosa.backend.codenose.controller;
 
 import kr.or.kosa.backend.codenose.dto.AnalysisRequestDTO;
+import kr.or.kosa.backend.codenose.dto.CodeResultDTO;
 import kr.or.kosa.backend.codenose.service.AnalysisService;
 import kr.or.kosa.backend.commons.response.ApiResponse;
 import kr.or.kosa.backend.security.jwt.JwtUserDetails;
@@ -8,10 +9,14 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 /**
  * 분석 컨트롤러 (AnalysisController)
@@ -55,11 +60,10 @@ public class AnalysisController {
    * @param userId 조회할 사용자의 ID
    * @return 사용자의 과거 코드 분석 이력 리스트
    */
-  @org.springframework.web.bind.annotation.GetMapping("/history/{userId}")
-  public ResponseEntity<ApiResponse<java.util.List<kr.or.kosa.backend.codenose.dto.CodeResultDTO>>> getUserAnalysisHistory(
-      @org.springframework.web.bind.annotation.PathVariable Long userId) {
-    java.util.List<kr.or.kosa.backend.codenose.dto.CodeResultDTO> history = analysisService
-        .getUserAnalysisHistory(userId);
+  @GetMapping("/history/{userId}")
+  public ResponseEntity<ApiResponse<List<CodeResultDTO>>> getUserAnalysisHistory(
+      @PathVariable Long userId) {
+    List<CodeResultDTO> history = analysisService.getUserAnalysisHistory(userId);
     return ResponseEntity.ok(ApiResponse.success(history));
   }
 
@@ -69,10 +73,10 @@ public class AnalysisController {
    * @param analysisId 분석 결과의 고유 ID
    * @return 상세 분석 결과 데이터 (Code Smells, 제안 등 포함)
    */
-  @org.springframework.web.bind.annotation.GetMapping("/result/{analysisId}")
-  public ResponseEntity<ApiResponse<kr.or.kosa.backend.codenose.dto.CodeResultDTO>> getAnalysisResult(
-      @org.springframework.web.bind.annotation.PathVariable String analysisId) {
-    kr.or.kosa.backend.codenose.dto.CodeResultDTO result = analysisService.getAnalysisResult(analysisId);
+  @GetMapping("/result/{analysisId}")
+  public ResponseEntity<ApiResponse<CodeResultDTO>> getAnalysisResult(
+      @PathVariable String analysisId) {
+    CodeResultDTO result = analysisService.getAnalysisResult(analysisId);
     return ResponseEntity.ok(ApiResponse.success(result));
   }
 
