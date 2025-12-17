@@ -18,6 +18,8 @@ public class EmailVerificationServiceImpl implements EmailVerificationService {
 
     private static final String VERIFY_CODE_PREFIX = "email:verify:";
     private static final String VERIFIED_PREFIX = "email:verified:";
+    private static final String VERIFIED_VALUE = "true";
+    private static final int CODE_LENGTH = 6;
 
     // 인증번호 존재시간 : 5분
     private static final long EXPIRATION_SECONDS = 5 * 60;
@@ -26,7 +28,7 @@ public class EmailVerificationServiceImpl implements EmailVerificationService {
     @Override
     public long sendVerificationEmail(String email) {
 
-        String code = UUID.randomUUID().toString().substring(0, 6);
+        String code = UUID.randomUUID().toString().substring(0, CODE_LENGTH);
         String codeKey = VERIFY_CODE_PREFIX + email;
 
         redisTemplate.opsForValue().set(
@@ -59,7 +61,7 @@ public class EmailVerificationServiceImpl implements EmailVerificationService {
         if (savedCode == null) return false;
         if (!savedCode.equalsIgnoreCase(requestCode)) return false;
 
-        redisTemplate.opsForValue().set(VERIFIED_PREFIX + email, "true", 1, TimeUnit.HOURS);
+        redisTemplate.opsForValue().set(VERIFIED_PREFIX + email, VERIFIED_VALUE, 1, TimeUnit.HOURS);
         redisTemplate.delete(codeKey);
 
         return true;
@@ -71,7 +73,7 @@ public class EmailVerificationServiceImpl implements EmailVerificationService {
         String key = VERIFIED_PREFIX + email;
         String verified = redisTemplate.opsForValue().get(key);
 
-        return "true".equals(verified); // 올바른 로직
+        return VERIFIED_VALUE.equals(verified); // 올바른 로직
     }
 
     /** 이메일 전송 - void → boolean */

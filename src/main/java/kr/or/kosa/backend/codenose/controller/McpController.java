@@ -1,7 +1,9 @@
 package kr.or.kosa.backend.codenose.controller;
 
 import kr.or.kosa.backend.codenose.service.AnalysisService;
+import kr.or.kosa.backend.commons.exception.custom.CustomBusinessException;
 import kr.or.kosa.backend.users.domain.Users;
+import kr.or.kosa.backend.users.exception.UserErrorCode;
 import kr.or.kosa.backend.users.mapper.UserMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,6 +22,11 @@ public class McpController {
 
     private final AnalysisService analysisService;
     private final UserMapper userMapper;
+
+    private static final String KEY_ERROR = "error";
+    private static final String MSG_MISSING_MCP_TOKEN = "Missing MCP Token";
+    private static final String MSG_CODE_REQUIRED = "Code content is required";
+    private static final String MSG_INVALID_MCP_TOKEN = "Invalid MCP Token";
 
     // 1. MCP 토큰 발급/조회 (Authenticated User Only)
     // SecurityConfig에서 /api/mcp/token 은 authenticated() 로 설정해야 함 (현재는 permitAll이므로
@@ -69,7 +76,12 @@ public class McpController {
 
             if (user.getMcpToken() == null || user.getMcpToken().isEmpty()) {
                 String newToken = UUID.randomUUID().toString();
-                userMapper.updateMcpToken(user.getUserId(), newToken);
+                int updated = userMapper.updateMcpToken(user.getUserId(), newToken);
+
+                if (updated != 1) {
+                    throw new CustomBusinessException(UserErrorCode.USER_UPDATE_FAILED);
+                }
+
                 user.setMcpToken(newToken);
             }
 
@@ -87,20 +99,24 @@ public class McpController {
 
         // 1. 토큰 검증 (DB 조회)
         if (token == null || token.isEmpty()) {
-            return ResponseEntity.status(403).body(Map.of("error", "Missing MCP Token"));
+            return ResponseEntity
+                    .status(403)
+                    .body(Map.of(KEY_ERROR, MSG_MISSING_MCP_TOKEN));
         }
 
         Users user = userMapper.findByMcpToken(token);
         if (user == null) {
             log.warn("MCP Access Denied: Invalid Token. Received: {}", token);
-            return ResponseEntity.status(403).body(Map.of("error", "Invalid MCP Token"));
+            return ResponseEntity.status(403)
+                    .body(Map.of(KEY_ERROR, MSG_INVALID_MCP_TOKEN));
         }
 
         String code = request.get("code");
         String language = request.getOrDefault("language", "java");
 
         if (code == null || code.trim().isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Code content is required"));
+            return ResponseEntity.badRequest()
+                    .body(Map.of(KEY_ERROR, MSG_CODE_REQUIRED));
         }
 
         try {
@@ -111,7 +127,8 @@ public class McpController {
                     "result", result));
         } catch (Exception e) {
             log.error("MCP Processing Error", e);
-            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+            return ResponseEntity.internalServerError()
+                    .body(Map.of(KEY_ERROR, e.getMessage()));
         }
     }
 }

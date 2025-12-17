@@ -17,4 +17,5 @@ public class GithubLoginResult {
 
     private String accessToken;
     private String refreshToken;
+    private GitHubUserResponse gitHubUser;
 }
