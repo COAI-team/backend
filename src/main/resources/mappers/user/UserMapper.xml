@@ -24,9 +24,16 @@
         <result property="userIssubscribed" column="USER_ISSUBSCRIBED"/>
         <result property="githubId" column="GITHUB_ID"/>
         <result property="githubToken" column="GITHUB_TOKEN"/>
+        <result property="mcpToken" column="MCP_TOKEN"/>
     </resultMap>
 
     <!-- ========= SELECT ========= -->
+
+    <select id="findByMcpToken" resultMap="UserMap">
+        SELECT *
+        FROM USERS
+        WHERE MCP_TOKEN = #{mcpToken}
+    </select>
 
     <select id="findByEmail" resultMap="UserMap">
         SELECT *
@@ -126,6 +133,13 @@
         UPDATE USERS
         SET USER_NAME = #{userName},
             USER_NICKNAME = #{userNickname},
+            USER_UPDATEDAT = NOW()
+        WHERE USER_ID = #{userId}
+    </update>
+
+    <update id="updateMcpToken">
+        UPDATE USERS
+        SET MCP_TOKEN = #{mcpToken},
             USER_UPDATEDAT = NOW()
         WHERE USER_ID = #{userId}
     </update>

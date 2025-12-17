@@ -1,5 +1,6 @@
 package kr.or.kosa.backend.freeboard.dto;
 
+import kr.or.kosa.backend.toolbar.block.BlockShape;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -11,7 +12,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class FreeboardBlockResponse {
+public class FreeboardBlockResponse implements BlockShape {
 
     private String id;
     private String type;     // "tiptap" or "code"

@@ -10,6 +10,7 @@ import kr.or.kosa.backend.codenose.mapper.AnalysisMapper;
 import kr.or.kosa.backend.codenose.service.PromptGenerator;
 import kr.or.kosa.backend.codenose.config.PromptManager;
 import kr.or.kosa.backend.codenose.service.agent.AgenticWorkflowService;
+import kr.or.kosa.backend.codenose.service.LangfuseService;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,6 +27,7 @@ import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Slf4j
@@ -37,6 +39,7 @@ public class AnalysisWithoutRagService {
     private final ObjectMapper objectMapper;
     private final ChatClient chatClient;
     private final AgenticWorkflowService agenticWorkflowService;
+    private final LangfuseService langfuseService;
 
     private final PromptManager promptManager;
     private final PromptGenerator promptGenerator;
@@ -47,12 +50,14 @@ public class AnalysisWithoutRagService {
             AnalysisMapper analysisMapper,
             ObjectMapper objectMapper,
             AgenticWorkflowService agenticWorkflowService,
+            LangfuseService langfuseService,
             PromptManager promptManager,
             PromptGenerator promptGenerator) {
         this.chatClient = chatClientBuilder.build();
         this.analysisMapper = analysisMapper;
         this.objectMapper = objectMapper;
         this.agenticWorkflowService = agenticWorkflowService;
+        this.langfuseService = langfuseService;
         this.promptManager = promptManager;
         this.promptGenerator = promptGenerator;
     }
@@ -60,7 +65,13 @@ public class AnalysisWithoutRagService {
     /**
      * 코드 분석 수행 (간단 버전) - RAG 제외
      */
+    @kr.or.kosa.backend.codenose.aop.LangfuseObserve(name = "analyzeCode_NoRAG")
     public String analyzeCode(String userId, String userMessage, AnalysisRequestDTO requestDto) {
+        // 워크플로우 시작: Website-NoRAG-Analysis Trace 생성
+        langfuseService.startNamedTrace("Website-NoRAG-Analysis",
+                userId,
+                Map.of("mode", "NoRAG", "method", "analyzeCode"));
+
         try {
             String systemPrompt = promptManager.getPrompt("SIMPLE_ANALYSIS_PROMPT");
             List<Message> messages = new ArrayList<>();
@@ -88,7 +99,13 @@ public class AnalysisWithoutRagService {
     /**
      * 저장된 GitHub 파일을 조회하여 AI 분석 수행 - RAG 제외
      */
+    @kr.or.kosa.backend.codenose.aop.LangfuseObserve(name = "analyzeStoredFile_NoRAG")
     public String analyzeStoredFile(AnalysisRequestDTO requestDto) {
+        // 워크플로우 시작: Website-NoRAG-Analysis Trace 생성
+        langfuseService.startNamedTrace("Website-NoRAG-Analysis",
+                String.valueOf(requestDto.getUserId()),
+                Map.of("mode", "NoRAG", "method", "analyzeStoredFile", "fileId", requestDto.getAnalysisId()));
+
         try {
             // 1. DB에서 저장된 GitHub 파일 내용 조회
             GithubFileDTO storedFile = analysisMapper.findFileById(requestDto.getAnalysisId());

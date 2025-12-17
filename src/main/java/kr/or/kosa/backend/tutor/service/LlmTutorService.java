@@ -1,5 +1,8 @@
 package kr.or.kosa.backend.tutor.service;
 
+import kr.or.kosa.backend.algorithm.dto.AlgoProblemDto;
+import kr.or.kosa.backend.algorithm.dto.AlgoTestcaseDto;
+import kr.or.kosa.backend.algorithm.service.AlgorithmProblemService;
 import kr.or.kosa.backend.algorithm.service.LLMChatService;
 import kr.or.kosa.backend.tutor.dto.TutorClientMessage;
 import kr.or.kosa.backend.tutor.dto.TutorServerMessage;
@@ -44,6 +47,7 @@ public class LlmTutorService implements TutorService {
     private static final int MAX_CONCURRENT_PER_USER = 3;
 
     private final LLMChatService llmChatService;
+    private final AlgorithmProblemService algorithmProblemService;
     private final SubscriptionTierResolver subscriptionTierResolver;
 
     private final Map<String, Long> lastAutoCallMillis = new ConcurrentHashMap<>();
@@ -164,7 +168,8 @@ public class LlmTutorService implements TutorService {
         }
 
         try {
-            String userPrompt = buildUserPrompt(clientMessage, trigger, promptCode, normalizedCode);
+            String problemContext = buildProblemContext(clientMessage.getProblemId());
+            String userPrompt = buildUserPrompt(clientMessage, trigger, promptCode, normalizedCode, problemContext);
             String answer = callLlmWithTimeout(userPrompt);
 
             if ("USER".equals(trigger)) {
@@ -319,6 +324,72 @@ public class LlmTutorService implements TutorService {
         return changed;
     }
 
+    private String buildProblemContext(Long problemId) {
+        if (problemId == null) {
+            return "문제 ID가 없어 설명을 불러올 수 없습니다.";
+        }
+        try {
+            AlgoProblemDto problem = algorithmProblemService.getProblemDetail(problemId);
+            if (problem == null) {
+                return "문제 정보를 불러올 수 없습니다.";
+            }
+
+            StringBuilder sb = new StringBuilder();
+            sb.append("- 제목: ").append(nullToPlaceholder(problem.getAlgoProblemTitle())).append("\n");
+
+            String description = sanitize(problem.getAlgoProblemDescription());
+            if (!description.isBlank()) {
+                sb.append("- 설명: ").append(truncate(description, 600)).append("\n");
+            }
+
+            if (problem.getProblemType() != null) {
+                sb.append("- 유형: ").append(problem.getProblemType().name()).append("\n");
+            }
+            if (problem.getAlgoProblemDifficulty() != null) {
+                sb.append("- 난이도: ").append(problem.getAlgoProblemDifficulty().name()).append("\n");
+            }
+
+            if (problem.getTestcases() != null && !problem.getTestcases().isEmpty()) {
+                sb.append("- 예시 테스트케이스:\n");
+                problem.getTestcases().stream()
+                        .filter(tc -> Boolean.TRUE.equals(tc.getIsSample()))
+                        .limit(2)
+                        .forEach(tc -> appendSample(sb, tc));
+
+                if (!sb.toString().contains("입력:") && problem.getTestcases().size() > 0) {
+                    problem.getTestcases().stream()
+                            .limit(2)
+                            .forEach(tc -> appendSample(sb, tc));
+                }
+            }
+
+            return sb.toString().isBlank() ? "문제 정보가 부족합니다." : sb.toString();
+        } catch (Exception e) {
+            log.warn("문제 컨텍스트 조회 실패 - problemId={}", problemId, e);
+            return "문제 정보를 불러오는 데 실패했습니다. 코드와 질문만 참고하세요.";
+        }
+    }
+
+    private void appendSample(StringBuilder sb, AlgoTestcaseDto tc) {
+        sb.append("  * 입력: ").append(truncate(sanitize(tc.getInputData()), 120)).append("\n");
+        sb.append("    출력: ").append(truncate(sanitize(tc.getExpectedOutput()), 120)).append("\n");
+    }
+
+    private String sanitize(String text) {
+        if (text == null) return "";
+        return text.replace("\r", "").trim();
+    }
+
+    private String truncate(String text, int max) {
+        if (text == null) return "";
+        if (text.length() <= max) return text;
+        return text.substring(0, max) + "...";
+    }
+
+    private String nullToPlaceholder(String value) {
+        return value == null || value.isBlank() ? "(제목 없음)" : value;
+    }
+
     private String prepareCodeForPrompt(String code) {
         if (code == null) {
             return "";
@@ -341,7 +412,7 @@ public class LlmTutorService implements TutorService {
         return Integer.toHexString(Objects.hash(userId, client.getProblemId(), normalizedCode, signature, "AUTO_HINT"));
     }
 
-    private String buildUserPrompt(TutorClientMessage client, String trigger, String promptCode, String normalizedCode) {
+    private String buildUserPrompt(TutorClientMessage client, String trigger, String promptCode, String normalizedCode, String problemContext) {
         String base = """
             [문제 번호]
             %d
@@ -354,11 +425,15 @@ public class LlmTutorService implements TutorService {
             %s
             ```
 
+            [문제 정보 요약]
+            %s
+
             """.formatted(
                 client.getProblemId(),
                 client.getLanguage(),
                 client.getLanguage(),
-                promptCode == null ? "" : promptCode
+                promptCode == null ? "" : promptCode,
+                problemContext == null ? "" : problemContext
         );
 
         String judgeMeta = "";

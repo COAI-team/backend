@@ -3,6 +3,7 @@ package kr.or.kosa.backend.codenose.mapper;
 import kr.or.kosa.backend.codenose.dto.CodeResultDTO;
 import kr.or.kosa.backend.codenose.dto.GithubFileDTO;
 import kr.or.kosa.backend.codenose.dto.UserCodePatternDTO;
+import kr.or.kosa.backend.codenose.dto.UserMistakeStatDTO;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -145,4 +146,11 @@ public interface AnalysisMapper {
                         @Param("userId") Long userId,
                         @Param("startDate") java.sql.Timestamp startDate,
                         @Param("endDate") java.sql.Timestamp endDate);
+
+        // 사용자 실수 통계 (Mistake Stats)
+        void saveOrUpdateMistakeStat(UserMistakeStatDTO stat);
+
+        UserMistakeStatDTO findMistakeStat(@Param("userId") Long userId, @Param("mistakeType") String mistakeType);
+
+        List<UserMistakeStatDTO> findMistakeStatsByUserId(@Param("userId") Long userId);
 }

@@ -70,6 +70,11 @@ public class PromptGenerator {
     return String.format(template, codeContent);
   }
 
+  public String createMistakeReportPrompt(String mistakesContext) {
+    String template = promptManager.getPrompt("MISTAKE_REPORT_PROMPT");
+    return String.format(template, mistakesContext);
+  }
+
   // 하위 호환성을 위한 오버로딩 (Context가 없는 경우)
   public String createSystemPrompt(List<String> analysisTypes, int toneLevel, String customRequirements) {
     return createSystemPrompt(analysisTypes, toneLevel, customRequirements, null);

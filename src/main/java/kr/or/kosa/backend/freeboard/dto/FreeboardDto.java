@@ -2,6 +2,8 @@ package kr.or.kosa.backend.freeboard.dto;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import kr.or.kosa.backend.toolbar.block.BlockSecurityGuard;
+import kr.or.kosa.backend.toolbar.block.BlockShape;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -9,6 +11,7 @@ import lombok.NoArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 @Slf4j
@@ -26,21 +29,23 @@ public class FreeboardDto {
     private LocalDateTime freeboardCreatedAt;
     private List<String> tags;
 
-    // blocks를 JSON 문자열로 변환
+    // blocks를 JSON 문자열로 변환 (보안 검증 포함)
     public String toJsonContent(ObjectMapper objectMapper) throws Exception {
-        return objectMapper.writeValueAsString(this.blocks);
+        if (blocks == null || blocks.isEmpty()) {
+            return "[]";
+        }
+
+        // 보안 검증
+        List<BlockShape> blockList = new ArrayList<>(blocks);
+        BlockSecurityGuard.guard(blockList, objectMapper);
+
+        return objectMapper.writeValueAsString(blocks);
     }
 
-    // 순수 텍스트 추출 (검색/RAG용)
+    // 순수 텍스트 추출 (검색용)
     public String toPlainText(ObjectMapper objectMapper) {
         StringBuilder text = new StringBuilder();
 
-        // 제목 추가
-        if (freeboardTitle != null) {
-            text.append(freeboardTitle).append("\n\n");
-        }
-
-        // 각 블록에서 텍스트 추출
         if (blocks != null) {
             for (FreeboardBlockResponse block : blocks) {
                 if ("tiptap".equals(block.getType())) {
@@ -58,10 +63,21 @@ public class FreeboardDto {
     // Tiptap JSON에서 텍스트 추출
     private String extractFromTiptap(Object content, ObjectMapper objectMapper) {
         try {
+            // content가 이미 String(HTML)인 경우
+            if (content instanceof String) {
+                String htmlContent = (String) content;
+                // HTML 태그 제거
+                return htmlContent
+                        .replaceAll("<[^>]+>", " ")  // 모든 HTML 태그 제거
+                        .replaceAll("\\s+", " ")      // 연속된 공백을 하나로
+                        .trim();
+            }
+
+            // content가 JSON 객체인 경우
             JsonNode node = objectMapper.valueToTree(content);
             return extractTextFromNode(node);
         } catch (Exception e) {
-            log.warn("Tiptap 텍스트 추출 실패", e);  // 로깅 추가
+            log.warn("Tiptap 텍스트 추출 실패", e);
             return "";
         }
     }

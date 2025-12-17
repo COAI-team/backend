@@ -1,16 +1,18 @@
 package kr.or.kosa.backend.admin.controller;
 
 
-import kr.or.kosa.backend.admin.dto.BoardItem;
+import kr.or.kosa.backend.admin.dto.BoardItems;
 import kr.or.kosa.backend.admin.dto.request.UserBoardSearchConditionRequestDto;
+import kr.or.kosa.backend.admin.dto.response.AdminCodeBoardDetailResponseDto;
+import kr.or.kosa.backend.admin.dto.response.AdminFreeBoardDetailResponseDto;
+import kr.or.kosa.backend.admin.dto.response.AlgoBoardDetailResponseDto;
 import kr.or.kosa.backend.admin.dto.response.PageResponseDto;
+import kr.or.kosa.backend.admin.exception.AdminErrorCode;
 import kr.or.kosa.backend.admin.service.AdminUserBoardService;
+import kr.or.kosa.backend.commons.exception.custom.CustomBusinessException;
 import kr.or.kosa.backend.commons.response.ApiResponse;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.ModelAttribute;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/admin")
@@ -22,10 +24,35 @@ public class AdminUserBoardController {
     }
 
     @GetMapping("/userboards")
-    public ResponseEntity<ApiResponse<PageResponseDto<BoardItem>>> adminUserBoards(
+    public ResponseEntity<ApiResponse<PageResponseDto<BoardItems>>> adminUserBoards(
         @ModelAttribute UserBoardSearchConditionRequestDto userBoardSearchConditionRequestDto
         ) {
-        PageResponseDto<BoardItem> result = adminUserBoardService.getUserBoards(userBoardSearchConditionRequestDto);
+        PageResponseDto<BoardItems> result = adminUserBoardService.getUserBoards(userBoardSearchConditionRequestDto);
+        return ResponseEntity.ok(ApiResponse.success(result));
+    }
+
+
+    @GetMapping("/boarddetail/algo/{boardId}")
+    public ResponseEntity<ApiResponse<AlgoBoardDetailResponseDto>> algoBoardDitail(
+        @PathVariable("boardId") long boardId
+    ){
+        AlgoBoardDetailResponseDto result = adminUserBoardService.getAlgoBoard(boardId);
+        return ResponseEntity.ok(ApiResponse.success(result));
+    }
+
+    @GetMapping("/boarddetail/code/{boardId}")
+    public ResponseEntity<ApiResponse<AdminCodeBoardDetailResponseDto>> codeBoardDitail(
+        @PathVariable("boardId") long boardId
+    ){
+        AdminCodeBoardDetailResponseDto result = adminUserBoardService.getOneCodeBoard(boardId);
+        return ResponseEntity.ok(ApiResponse.success(result));
+    }
+
+    @GetMapping("/boarddetail/free/{boardId}")
+    public ResponseEntity<ApiResponse<AdminFreeBoardDetailResponseDto>> freeBoardDitail(
+        @PathVariable("boardId") long boardId
+    ){
+        AdminFreeBoardDetailResponseDto result = adminUserBoardService.getOneFreeBoard(boardId);
         return ResponseEntity.ok(ApiResponse.success(result));
     }
 }

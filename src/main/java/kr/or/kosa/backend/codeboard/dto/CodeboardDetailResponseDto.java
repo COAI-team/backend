@@ -19,9 +19,10 @@ public class CodeboardDetailResponseDto {
     private String analysisId;
     private String codeboardTitle;
     private String codeboardContent;
-    private Long codeboardClick;
+    private Integer codeboardClick;
     private Integer likeCount;
+    private Integer commentCount;
+    private Boolean isLiked;
     private LocalDateTime codeboardCreatedAt;
     private List<String> tags;
-    private Boolean isLiked;
 }

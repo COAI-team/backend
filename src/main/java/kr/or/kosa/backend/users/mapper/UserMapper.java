@@ -68,4 +68,8 @@ public interface UserMapper {
         Map<String, Object> getGithubUserInfo(@Param("userId") Long userId);
 
         String findSocialProviderByUserId(@Param("userId") Long userId);
+
+        int updateMcpToken(@Param("userId") Long userId, @Param("mcpToken") String mcpToken);
+
+        Users findByMcpToken(@Param("mcpToken") String mcpToken);
 }

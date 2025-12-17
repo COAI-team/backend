@@ -31,13 +31,11 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-
         http
                 .cors(Customizer.withDefaults())
                 .csrf(AbstractHttpConfigurer::disable)
-                .sessionManagement(session ->
-                        session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-                )
+                .sessionManagement(session -> session
+                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
 
                         // 인증 없이 접근 허용
@@ -45,36 +43,38 @@ public class SecurityConfig {
                                 "/",
                                 "/auth/github/**",
                                 "/oauth2/**",
-                                "/users/**",
+                                "/users/register",
+                                "/users/login",
+                                "/users/github/link",
+                                "/users/password/**",
                                 "/email/**",
-                                "/algo/missions/**",
                                 "/algo/**",
-                                "/github/**",
                                 "/admin/**",
                                 "/codeAnalysis/**",
-                                "/codeAnalysis/new/**",
-                                "/api/**",            // 임시추가
-                                "/analysis/**",       // 임시추가
-                                "/chat/messages",
-                                "/ws/**"
+
+                                // API 계열
+                                "/api/**",
+
+                                // WebSocket / Chat
+                                "/ws/**",
+                                "/chat/messages"
                         ).permitAll()
+
                         .requestMatchers(HttpMethod.GET,
                                 "/freeboard/**",
                                 "/codeboard/**",
                                 "/comment",
                                 "/comment/**",
-                                "/like/*/*/users",               // 좋아요 누른 사용자 목록 조회
+                                "/like/*/*/users",  // 좋아요 누른 사용자 목록 확인
                                 "/like/**",
-                                "/notification/**",
                                 "/analysis/**"
-                                ).permitAll()
-                        .requestMatchers(HttpMethod.POST,
-                                "/api/analysis/save",    // 명시적으로 POST 허용
-                                "/like/*/*"
                         ).permitAll()
+
+                        // (Token Auth)
+                        .requestMatchers("/api/mcp/token").authenticated() // User Token Issue
+                        // (JWT Auth)
                         .anyRequest().authenticated()
                 )
-                // JWT 인증 필터 (한 번만 등록)
                 .addFilterBefore(
                         new JwtAuthenticationFilter(jwtProvider),
                         UsernamePasswordAuthenticationFilter.class
@@ -97,7 +97,14 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of("https://localhost:5173", "http://localhost:5173"));
+        // 로컬 개발용: http/https + 모든 포트(5173, 9443 등) 허용
+        configuration.setAllowedOriginPatterns(List.of(
+                "*",
+                "http://localhost:*",
+                "https://localhost:*",
+                "http://127.0.0.1:*",
+                "https://127.0.0.1:*"
+        ));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);

@@ -1,10 +1,13 @@
 package kr.or.kosa.backend.codenose.service.pipeline;
 
+import dev.langchain4j.model.chat.ChatLanguageModel;
+import kr.or.kosa.backend.codenose.service.LangfuseService;
 import com.samskivert.mustache.Mustache;
 import com.samskivert.mustache.Template;
-import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
+import java.util.Collections;
 import java.util.Map;
 
 /**
@@ -17,12 +20,15 @@ import java.util.Map;
 @Service
 public class FinalSynthesizerModule {
 
-    private final ChatClient chatClient;
+    private final ChatLanguageModel chatLanguageModel;
     private final Mustache.Compiler mustacheCompiler;
+    private final LangfuseService langfuseService;
 
-    public FinalSynthesizerModule(ChatClient.Builder builder, Mustache.Compiler mustacheCompiler) {
-        this.chatClient = builder.build();
+    public FinalSynthesizerModule(ChatLanguageModel chatLanguageModel, Mustache.Compiler mustacheCompiler,
+            LangfuseService langfuseService) {
+        this.chatLanguageModel = chatLanguageModel;
         this.mustacheCompiler = mustacheCompiler;
+        this.langfuseService = langfuseService;
     }
 
     /**
@@ -32,26 +38,36 @@ public class FinalSynthesizerModule {
      * @return 업데이트된 컨텍스트 (최종 결과 설정됨)
      */
     public PipelineContext synthesize(PipelineContext context) {
-        String promptTemplate = """
-                You are a code synthesizer.
-                Apply the following Style Rules to the Optimized Logic.
+        Instant start = Instant.now();
+        // Langfuse 스팬 시작
+        langfuseService.startSpan("FinalSynthesizer", start, Collections.emptyMap());
 
-                Style Rules:
-                {{styleRules}}
+        try {
+            String promptTemplate = """
+                    You are a code synthesizer.
+                    Apply the following Style Rules to the Optimized Logic.
 
-                Optimized Logic:
-                {{optimizedLogic}}
+                    Style Rules:
+                    {{styleRules}}
 
-                Output the final Java code.
-                """;
+                    Optimized Logic:
+                    {{optimizedLogic}}
 
-        Template tmpl = mustacheCompiler.compile(promptTemplate);
-        String prompt = tmpl.execute(Map.of(
-                "styleRules", context.getStyleRules(),
-                "optimizedLogic", context.getOptimizedLogic()));
+                    Output the final Java code.
+                    """;
 
-        String finalCode = chatClient.prompt(prompt).call().content();
-        context.setFinalResult(finalCode);
-        return context;
+            Template tmpl = mustacheCompiler.compile(promptTemplate);
+            String prompt = tmpl.execute(Map.of(
+                    "styleRules", context.getStyleRules(),
+                    "optimizedLogic", context.getOptimizedLogic()));
+
+            String finalCode = chatLanguageModel.generate(prompt);
+
+            context.setFinalResult(finalCode);
+            return context;
+        } finally {
+            // Langfuse 스팬 종료
+            langfuseService.endSpan(null, Instant.now(), Collections.emptyMap());
+        }
     }
 }
