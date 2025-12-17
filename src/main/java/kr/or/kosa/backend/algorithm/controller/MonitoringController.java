@@ -129,10 +129,19 @@ public class MonitoringController {
      * Request Body:
      * {
      *   "sessionId": "uuid-...",
-     *   "remainingSeconds": 300  // 남은 시간 (초)
+     *   "remainingSeconds": 300,  // 남은 시간 (초)
+     *   "focusScoreStats": {      // 집중도 점수 통계 (선택)
+     *     "avgScore": 45.5,
+     *     "finalScore": 60.0,
+     *     "focusedPercentage": 75.5,
+     *     "highFocusPercentage": 30.2,
+     *     "totalTime": 1800000,
+     *     "focusedTime": 1350000
+     *   }
      * }
      */
     @PostMapping("/end")
+    @SuppressWarnings("unchecked")
     public ResponseEntity<ApiResponse<MonitoringSessionDto>> endSession(
             @RequestBody Map<String, Object> request) {
 
@@ -141,9 +150,13 @@ public class MonitoringController {
                 ? ((Number) request.get("remainingSeconds")).intValue()
                 : null;
 
-        log.info("✅ [Session End] sessionId: {}, remainingSeconds: {}", sessionId, remainingSeconds);
+        // 집중도 점수 통계 추출
+        Map<String, Object> focusScoreStats = (Map<String, Object>) request.get("focusScoreStats");
 
-        MonitoringSessionDto result = monitoringService.endSession(sessionId, remainingSeconds);
+        log.info("✅ [Session End] sessionId: {}, remainingSeconds: {}, hasFocusStats: {}",
+                sessionId, remainingSeconds, focusScoreStats != null);
+
+        MonitoringSessionDto result = monitoringService.endSession(sessionId, remainingSeconds, focusScoreStats);
         return ResponseEntity.ok(ApiResponse.success(result));
     }
 
