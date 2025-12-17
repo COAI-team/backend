@@ -81,6 +81,38 @@ public class McpController {
         }
     }
 
+    // 2. MCP 토큰 재발급 (강제로 새 토큰 생성)
+    @PutMapping("/token/regenerate")
+    public ResponseEntity<?> regenerateToken(Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return ResponseEntity.status(401).build();
+        }
+
+        try {
+            String principal = authentication.getName();
+            Users user = userMapper.findByEmail(principal);
+
+            if (user == null && principal.matches("\\d+")) {
+                user = userMapper.findById(Long.parseLong(principal));
+            }
+
+            if (user == null) {
+                return ResponseEntity.status(404).body("User not found");
+            }
+
+            // 강제로 새 토큰 생성
+            String newToken = UUID.randomUUID().toString();
+            userMapper.updateMcpToken(user.getUserId(), newToken);
+
+            log.info("MCP Token Regenerated for User {}", user.getUserId());
+            return ResponseEntity.ok(Map.of("mcpToken", newToken));
+
+        } catch (Exception e) {
+            log.error("Token Regeneration Failed", e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
     @PostMapping("/analyze")
     public ResponseEntity<?> analyzeCode(@RequestHeader(value = "X-MCP-Token", required = false) String token,
             @RequestBody Map<String, String> request) {
