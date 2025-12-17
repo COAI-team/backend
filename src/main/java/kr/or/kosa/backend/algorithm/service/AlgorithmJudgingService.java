@@ -7,6 +7,7 @@ import kr.or.kosa.backend.algorithm.dto.request.SubmissionRequestDto;
 import kr.or.kosa.backend.algorithm.dto.response.TestRunResponseDto;
 import kr.or.kosa.backend.algorithm.dto.enums.AiFeedbackStatus;
 import kr.or.kosa.backend.algorithm.dto.enums.JudgeResult;
+import kr.or.kosa.backend.algorithm.dto.enums.MissionType;
 import kr.or.kosa.backend.algorithm.mapper.AlgorithmProblemMapper;
 import kr.or.kosa.backend.algorithm.mapper.AlgorithmSubmissionMapper;
 import lombok.RequiredArgsConstructor;
@@ -41,6 +42,7 @@ public class AlgorithmJudgingService {
     private final AlgorithmEvaluationService evaluationService;
     private final LanguageService languageService;  // 언어 정보 조회 (DB 기반)
     private final DailyQuizBonusService dailyQuizBonusService;
+    private final DailyMissionService dailyMissionService;  // 데일리 미션 완료 처리용
 
     /**
      * 통합 채점 및 평가 프로세스 (비동기)
@@ -80,7 +82,7 @@ public class AlgorithmJudgingService {
             log.info("Judge0 채점 완료 - submissionId: {}, result: {}",
                     submissionId, judgeResult.getOverallResult());
 
-            // 5. Daily Quiz 보너스 처리
+            // 5. Daily Quiz 보너스 처리 (선착순 3명 추가 포인트)
             if (updatedSubmission != null && updatedSubmission.getJudgeResult() == JudgeResult.AC) {
                 dailyQuizBonusService.handleDailyQuizSolved(
                         updatedSubmission.getUserId(),
@@ -89,7 +91,30 @@ public class AlgorithmJudgingService {
                 );
             }
 
-            // 6. AI 평가 및 점수 계산 비동기 시작 (분리된 서비스)
+            // 6. 데일리 미션 완료 처리 (문제 ID 검증 포함)
+            if (updatedSubmission != null && updatedSubmission.getJudgeResult() == JudgeResult.AC) {
+                try {
+                    DailyMissionService.MissionCompleteResult missionResult =
+                            dailyMissionService.completeMission(
+                                    updatedSubmission.getUserId(),
+                                    MissionType.PROBLEM_SOLVE,
+                                    updatedSubmission.getAlgoProblemId()
+                            );
+                    if (missionResult.success()) {
+                        log.info("데일리 미션 자동 완료 - userId: {}, problemId: {}, reward: {}P",
+                                updatedSubmission.getUserId(),
+                                updatedSubmission.getAlgoProblemId(),
+                                missionResult.rewardPoints());
+                    }
+                } catch (Exception e) {
+                    log.warn("데일리 미션 완료 처리 실패 (무시) - userId: {}, problemId: {}, error: {}",
+                            updatedSubmission.getUserId(),
+                            updatedSubmission.getAlgoProblemId(),
+                            e.getMessage());
+                }
+            }
+
+            // 7. AI 평가 및 점수 계산 비동기 시작 (분리된 서비스)
             log.info("🤖 AI 평가 서비스 호출 시작 - submissionId: {}, 현재 스레드: {}",
                     submissionId, Thread.currentThread().getName());
             try {

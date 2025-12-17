@@ -112,9 +112,13 @@ public class DailyMissionService {
      * 미션이 없으면 자동 생성 후 완료 처리
      * - 0시 이후 가입한 신규 유저
      * - 데일리미션 페이지를 거치지 않고 직접 문제 생성하는 경우
+     *
+     * @param userId 사용자 ID
+     * @param missionType 미션 타입
+     * @param solvedProblemId 실제로 푼 문제 ID (PROBLEM_SOLVE일 때 필수, PROBLEM_GENERATE일 때 null)
      */
     @Transactional
-    public MissionCompleteResult completeMission(Long userId, MissionType missionType) {
+    public MissionCompleteResult completeMission(Long userId, MissionType missionType, Long solvedProblemId) {
         LocalDate today = LocalDate.now();
 
         // 미션 조회
@@ -135,6 +139,16 @@ public class DailyMissionService {
         // 이미 완료됨
         if (mission.isCompleted()) {
             return MissionCompleteResult.alreadyCompleted();
+        }
+
+        // ★ PROBLEM_SOLVE 미션: 데일리 미션에 할당된 문제와 실제 푼 문제가 일치하는지 검증
+        if (missionType == MissionType.PROBLEM_SOLVE) {
+            Long missionProblemId = mission.getProblemId();
+            if (missionProblemId == null || !missionProblemId.equals(solvedProblemId)) {
+                log.debug("데일리 미션 문제 불일치 - userId: {}, 미션문제: {}, 푼문제: {}",
+                        userId, missionProblemId, solvedProblemId);
+                return MissionCompleteResult.wrongProblem();
+            }
         }
 
         // 미션 완료 처리
@@ -325,6 +339,10 @@ public class DailyMissionService {
 
         public static MissionCompleteResult alreadyCompleted() {
             return new MissionCompleteResult(false, "이미 완료된 미션입니다.", 0);
+        }
+
+        public static MissionCompleteResult wrongProblem() {
+            return new MissionCompleteResult(false, "데일리 미션 문제가 아닙니다.", 0);
         }
     }
 
