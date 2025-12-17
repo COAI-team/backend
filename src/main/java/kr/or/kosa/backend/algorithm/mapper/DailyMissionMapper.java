@@ -94,4 +94,22 @@ public interface DailyMissionMapper {
      * 일일 사용량 조회
      */
     Integer getTotalDailyUsage(@Param("userId") Long userId, @Param("date") LocalDate date);
+
+    // ===== XP 관련 =====
+
+    /**
+     * XP 추가 및 레벨 자동 업데이트
+     */
+    void addXp(@Param("userId") Long userId, @Param("xp") int xp);
+
+    /**
+     * 사용자가 해당 문제를 처음 푸는지 확인 (ALGO_SUBMISSIONS 테이블 활용)
+     * @return true면 첫 정답, false면 이미 정답 기록이 있음
+     */
+    boolean isFirstSolve(@Param("userId") Long userId, @Param("problemId") Long problemId);
+
+    /**
+     * 사용자의 특정 문제 정답 횟수 조회
+     */
+    int getAcceptedCountForProblem(@Param("userId") Long userId, @Param("problemId") Long problemId);
 }

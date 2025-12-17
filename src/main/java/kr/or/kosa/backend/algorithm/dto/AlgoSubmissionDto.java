@@ -62,6 +62,10 @@ public class AlgoSubmissionDto {
     private BigDecimal finalScore;
     private String scoreWeights;
 
+    // XP 관련 (2025-12-17 추가)
+    private Integer earnedXp;           // 이번 제출로 획득한 XP (AC일 때만)
+    private Boolean isFirstSolve;       // 첫 정답 여부 (보너스 적용)
+
     // 시간 추적
     private LocalDateTime startSolving;
     private LocalDateTime endSolving;

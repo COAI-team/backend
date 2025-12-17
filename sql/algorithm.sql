@@ -389,11 +389,16 @@ CREATE TABLE `DAILY_MISSIONS` (
 ) ENGINE = InnoDB AUTO_INCREMENT = 1 DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '데일리 미션';
 
 -- 사용자 레벨 테이블 (알고리즘 레벨)
+-- 변경사항 (2025-12-17): XP 기반 레벨 시스템 도입
+-- - TOTAL_XP 컬럼 추가: 경험치 기반 레벨 산정
+-- - TOTAL_SOLVED는 유지 (통계용)
+-- - 첫 정답 여부는 ALGO_SUBMISSIONS 테이블에서 조회
 CREATE TABLE `USER_ALGO_LEVELS` (
     `LEVEL_ID` BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '레벨 고유 식별자',
     `USER_ID` BIGINT NOT NULL UNIQUE COMMENT '사용자 ID',
     `ALGO_LEVEL` ENUM('EMERALD', 'SAPPHIRE', 'RUBY', 'DIAMOND') DEFAULT 'EMERALD' COMMENT '알고리즘 레벨',
-    `TOTAL_SOLVED` INT DEFAULT 0 COMMENT '총 푼 문제 수',
+    `TOTAL_XP` INT DEFAULT 0 COMMENT '총 경험치 (XP 기반 레벨 산정)',
+    `TOTAL_SOLVED` INT DEFAULT 0 COMMENT '총 푼 문제 수 (통계용, 중복 제외)',
     `CURRENT_STREAK` INT DEFAULT 0 COMMENT '현재 연속 풀이 일수',
     `MAX_STREAK` INT DEFAULT 0 COMMENT '최대 연속 풀이 일수',
     `LAST_SOLVED_AT` TIMESTAMP NULL COMMENT '마지막 풀이 일시',
@@ -431,31 +436,3 @@ CREATE TABLE `ALGO_PROBLEM_POOL` (
     INDEX `idx_pool_difficulty` (`DIFFICULTY`)
 ) ENGINE = InnoDB AUTO_INCREMENT = 1 DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = 'AI 사전 생성 문제 풀';
 
--- =============================================
--- 성능 최적화 설정
--- =============================================
-SET GLOBAL innodb_buffer_pool_size = 1073741824;
-SET GLOBAL slow_query_log = 'ON';
-SET GLOBAL long_query_time = 2;
-SET @@auto_increment_increment = 1;
-SET @@auto_increment_offset = 1;
-SET FOREIGN_KEY_CHECKS = 1;
-COMMIT;
-SHOW TABLES;
--- =============================================
--- 6. 사용자 실수 통계 테이블 (상습적 실수 추적용)
--- =============================================
-CREATE TABLE `USER_MISTAKE_STATS` (
-    `STAT_ID` BIGINT AUTO_INCREMENT PRIMARY KEY,
-    `USER_ID` BIGINT NOT NULL,
-    `MISTAKE_TYPE` VARCHAR(255) NOT NULL COMMENT '실수 유형 (예: Magic Number)',
-    `OCCURRENCE_COUNT` INT DEFAULT 0 COMMENT '누적 발생 횟수',
-    `SOLVED_COUNT` INT DEFAULT 0 COMMENT '퀴즈 통과 횟수 (30회 차감 효과)',
-    `LAST_DETECTED_AT` DATETIME DEFAULT CURRENT_TIMESTAMP,
-    `LAST_REPORT_GENERATED_AT` DATETIME NULL COMMENT '마지막으로 리포트가 생성된 시각',
-    FOREIGN KEY (`USER_ID`) REFERENCES `USERS`(`USER_ID`) ON DELETE CASCADE,
-    UNIQUE KEY `uk_user_mistake` (`USER_ID`, `MISTAKE_TYPE`)
-) COMMENT = '사용자 실수 누적 통계';
-
--- AUTO_INCREMENT 값 설정
-ALTER TABLE `USER_MISTAKE_STATS` AUTO_INCREMENT = 1;
