@@ -436,31 +436,3 @@ CREATE TABLE `ALGO_PROBLEM_POOL` (
     INDEX `idx_pool_difficulty` (`DIFFICULTY`)
 ) ENGINE = InnoDB AUTO_INCREMENT = 1 DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = 'AI 사전 생성 문제 풀';
 
--- =============================================
--- 성능 최적화 설정
--- =============================================
-SET GLOBAL innodb_buffer_pool_size = 1073741824;
-SET GLOBAL slow_query_log = 'ON';
-SET GLOBAL long_query_time = 2;
-SET @@auto_increment_increment = 1;
-SET @@auto_increment_offset = 1;
-SET FOREIGN_KEY_CHECKS = 1;
-COMMIT;
-SHOW TABLES;
--- =============================================
--- 6. 사용자 실수 통계 테이블 (상습적 실수 추적용)
--- =============================================
-CREATE TABLE `USER_MISTAKE_STATS` (
-    `STAT_ID` BIGINT AUTO_INCREMENT PRIMARY KEY,
-    `USER_ID` BIGINT NOT NULL,
-    `MISTAKE_TYPE` VARCHAR(255) NOT NULL COMMENT '실수 유형 (예: Magic Number)',
-    `OCCURRENCE_COUNT` INT DEFAULT 0 COMMENT '누적 발생 횟수',
-    `SOLVED_COUNT` INT DEFAULT 0 COMMENT '퀴즈 통과 횟수 (30회 차감 효과)',
-    `LAST_DETECTED_AT` DATETIME DEFAULT CURRENT_TIMESTAMP,
-    `LAST_REPORT_GENERATED_AT` DATETIME NULL COMMENT '마지막으로 리포트가 생성된 시각',
-    FOREIGN KEY (`USER_ID`) REFERENCES `USERS`(`USER_ID`) ON DELETE CASCADE,
-    UNIQUE KEY `uk_user_mistake` (`USER_ID`, `MISTAKE_TYPE`)
-) COMMENT = '사용자 실수 누적 통계';
-
--- AUTO_INCREMENT 값 설정
-ALTER TABLE `USER_MISTAKE_STATS` AUTO_INCREMENT = 1;

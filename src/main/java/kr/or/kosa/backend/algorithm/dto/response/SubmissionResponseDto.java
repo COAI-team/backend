@@ -72,6 +72,10 @@ public class SubmissionResponseDto {
     // GitHub 커밋 URL (NULL: 미커밋, 값: 커밋완료)
     private String githubCommitUrl;
 
+    // XP 관련 (2025-12-17 추가)
+    private Integer earnedXp;       // 이번 제출로 획득한 XP (AC일 때만)
+    private Boolean isFirstSolve;   // 첫 정답 여부 (1.5배 보너스 적용)
+
     // 제출 시각
     private LocalDateTime submittedAt;
 

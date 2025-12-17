@@ -162,6 +162,27 @@ public class DailyMissionController {
     }
 
     /**
+     * 일별 문제 풀이 수 조회 (GitHub 잔디 캘린더용)
+     * GET /api/algo/missions/contributions
+     *
+     * @param months 조회할 개월 수 (기본 12개월)
+     * @return 날짜별 정답 수 리스트 [{solveDate: "2025-12-01", solveCount: 3}, ...]
+     */
+    @GetMapping("/contributions")
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getContributions(
+            @AuthenticationPrincipal JwtAuthentication authentication,
+            @RequestParam(required = false) Long testUserId,
+            @RequestParam(defaultValue = "12") int months) {
+
+        Long userId = getUserId(authentication, testUserId);
+
+        List<Map<String, Object>> contributions = dailyMissionService.getDailySolveCounts(userId, months);
+        log.info("📊 잔디 캘린더 조회 - userId: {}, 데이터 수: {}", userId, contributions.size());
+
+        return ResponseEntity.ok(ApiResponse.success(contributions));
+    }
+
+    /**
      * 인증 객체에서 userId 추출 (테스트용 userId 우선)
      */
     private Long getUserId(JwtAuthentication authentication, Long testUserId) {

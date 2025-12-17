@@ -8,6 +8,7 @@ import kr.or.kosa.backend.algorithm.dto.response.TestRunResponseDto;
 import kr.or.kosa.backend.algorithm.dto.enums.AiFeedbackStatus;
 import kr.or.kosa.backend.algorithm.dto.enums.JudgeResult;
 import kr.or.kosa.backend.algorithm.dto.enums.MissionType;
+import kr.or.kosa.backend.algorithm.dto.enums.ProblemDifficulty;
 import kr.or.kosa.backend.algorithm.mapper.AlgorithmProblemMapper;
 import kr.or.kosa.backend.algorithm.mapper.AlgorithmSubmissionMapper;
 import lombok.RequiredArgsConstructor;
@@ -82,35 +83,44 @@ public class AlgorithmJudgingService {
             log.info("Judge0 채점 완료 - submissionId: {}, result: {}",
                     submissionId, judgeResult.getOverallResult());
 
-            // 5. Daily Quiz 보너스 처리 (선착순 3명 추가 포인트)
+            // 5. AC 제출 시 보상 처리
             if (updatedSubmission != null && updatedSubmission.getJudgeResult() == JudgeResult.AC) {
-                dailyQuizBonusService.handleDailyQuizSolved(
-                        updatedSubmission.getUserId(),
-                        updatedSubmission.getAlgoProblemId(),
-                        LocalDate.now()
-                );
-            }
+                Long userId = updatedSubmission.getUserId();
+                Long problemId = updatedSubmission.getAlgoProblemId();
 
-            // 6. 데일리 미션 완료 처리 (문제 ID 검증 포함)
-            if (updatedSubmission != null && updatedSubmission.getJudgeResult() == JudgeResult.AC) {
+                // 5-1. Daily Quiz 보너스 처리 (선착순 3명 추가 포인트)
+                dailyQuizBonusService.handleDailyQuizSolved(userId, problemId, LocalDate.now());
+
+                // 5-2. XP 지급 (모든 AC 제출에 대해)
+                try {
+                    ProblemDifficulty difficulty = problem.getAlgoProblemDifficulty();
+                    if (difficulty != null) {
+                        DailyMissionService.XpRewardResult xpResult =
+                                dailyMissionService.updateUserStatsWithXp(userId, problemId, difficulty);
+                        log.info("✨ XP 지급 완료 - userId: {}, problemId: {}, +{}XP ({})",
+                                userId, problemId, xpResult.earnedXp(), xpResult.getBonusDescription());
+
+                        if (xpResult.leveledUp()) {
+                            log.info("🎉 레벨 업! userId: {}, {} → {}",
+                                    userId, xpResult.previousLevel(), xpResult.newLevel());
+                        }
+                    }
+                } catch (Exception e) {
+                    log.warn("XP 지급 실패 (무시) - userId: {}, problemId: {}, error: {}",
+                            userId, problemId, e.getMessage());
+                }
+
+                // 5-3. 데일리 미션 완료 처리 (문제 ID 일치 시 추가 보너스 포인트)
                 try {
                     DailyMissionService.MissionCompleteResult missionResult =
-                            dailyMissionService.completeMission(
-                                    updatedSubmission.getUserId(),
-                                    MissionType.PROBLEM_SOLVE,
-                                    updatedSubmission.getAlgoProblemId()
-                            );
+                            dailyMissionService.completeMission(userId, MissionType.PROBLEM_SOLVE, problemId);
                     if (missionResult.success()) {
-                        log.info("데일리 미션 자동 완료 - userId: {}, problemId: {}, reward: {}P",
-                                updatedSubmission.getUserId(),
-                                updatedSubmission.getAlgoProblemId(),
-                                missionResult.rewardPoints());
+                        log.info("📋 데일리 미션 보너스 포인트 지급 - userId: {}, problemId: {}, +{}P",
+                                userId, problemId, missionResult.rewardPoints());
                     }
                 } catch (Exception e) {
                     log.warn("데일리 미션 완료 처리 실패 (무시) - userId: {}, problemId: {}, error: {}",
-                            updatedSubmission.getUserId(),
-                            updatedSubmission.getAlgoProblemId(),
-                            e.getMessage());
+                            userId, problemId, e.getMessage());
                 }
             }
 

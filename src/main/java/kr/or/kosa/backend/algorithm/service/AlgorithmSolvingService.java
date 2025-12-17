@@ -4,10 +4,12 @@ import kr.or.kosa.backend.algorithm.dto.AlgoProblemDto;
 import kr.or.kosa.backend.algorithm.dto.AlgoSubmissionDto;
 import kr.or.kosa.backend.algorithm.dto.AlgoTestcaseDto;
 import kr.or.kosa.backend.algorithm.dto.LanguageDto;
+import kr.or.kosa.backend.algorithm.dto.UserAlgoLevelDto;
 import kr.or.kosa.backend.algorithm.dto.enums.AiFeedbackStatus;
 import kr.or.kosa.backend.algorithm.dto.enums.AiFeedbackType;
 import kr.or.kosa.backend.algorithm.dto.enums.JudgeResult;
 import kr.or.kosa.backend.algorithm.dto.enums.LanguageType;
+import kr.or.kosa.backend.algorithm.dto.enums.ProblemDifficulty;
 import kr.or.kosa.backend.algorithm.dto.enums.ProblemType;
 import kr.or.kosa.backend.algorithm.dto.enums.SolveMode;
 import kr.or.kosa.backend.algorithm.dto.request.SubmissionRequestDto;
@@ -17,6 +19,7 @@ import kr.or.kosa.backend.algorithm.dto.response.SubmissionResponseDto;
 import kr.or.kosa.backend.algorithm.dto.response.TestRunResponseDto;
 import kr.or.kosa.backend.algorithm.mapper.AlgorithmProblemMapper;
 import kr.or.kosa.backend.algorithm.mapper.AlgorithmSubmissionMapper;
+import kr.or.kosa.backend.algorithm.mapper.DailyMissionMapper;
 import kr.or.kosa.backend.algorithm.mapper.MonitoringMapper;
 import kr.or.kosa.backend.algorithm.dto.MonitoringSessionDto;
 import kr.or.kosa.backend.commons.pagination.PageRequest;
@@ -54,6 +57,7 @@ public class AlgorithmSolvingService {
     private final AlgorithmProblemMapper problemMapper;
     private final AlgorithmSubmissionMapper submissionMapper;
     private final MonitoringMapper monitoringMapper;  // 모니터링 세션 데이터 조회용
+    private final DailyMissionMapper missionMapper;   // XP 동적 계산용 (첫정답 여부, 사용자 레벨)
     private final CodeExecutorService codeExecutorService;  // Judge0 또는 Piston 선택
     private final AlgorithmJudgingService judgingService;
     private final LanguageService languageService;  // 언어 정보 조회 (DB 기반)
@@ -395,6 +399,33 @@ public class AlgorithmSolvingService {
             languageName = (language != null) ? language.getLanguageName() : "Unknown";
         }
 
+        // XP 동적 계산 (AC 제출인 경우에만)
+        Integer earnedXp = null;
+        Boolean isFirstSolve = null;
+        if (submission.getJudgeResult() == JudgeResult.AC && problem != null) {
+            try {
+                Long userId = submission.getUserId();
+                Long problemId = submission.getAlgoProblemId();
+                ProblemDifficulty difficulty = problem.getAlgoProblemDifficulty();
+
+                if (difficulty != null && userId != null && problemId != null) {
+                    // 첫 정답 여부 확인 (현재 AC 제출이 유일한 AC인지)
+                    isFirstSolve = missionMapper.isFirstSolve(userId, problemId);
+
+                    // 사용자 레벨 정보로 스트릭 조회
+                    UserAlgoLevelDto userLevel = missionMapper.findUserLevel(userId);
+                    int currentStreak = (userLevel != null && userLevel.getCurrentStreak() != 0)
+                            ? userLevel.getCurrentStreak() : 0;
+
+                    // XP 계산 (난이도 기반 + 첫정답 보너스 + 스트릭 보너스)
+                    earnedXp = difficulty.calculateXpWithBonus(currentStreak, isFirstSolve);
+                }
+            } catch (Exception e) {
+                log.warn("XP 동적 계산 실패 (무시) - submissionId: {}, error: {}",
+                        submission.getAlgosubmissionId(), e.getMessage());
+            }
+        }
+
         return SubmissionResponseDto.builder()
                 .submissionId(submission.getAlgosubmissionId())
                 .problemId(submission.getAlgoProblemId())
@@ -431,6 +462,9 @@ public class AlgorithmSolvingService {
                 .solvingDurationMinutes(submission.getSolvingDurationMinutes())
                 .isShared(submission.getIsShared())
                 .githubCommitUrl(submission.getGithubCommitUrl())
+                // XP 관련 (동적 계산)
+                .earnedXp(earnedXp)
+                .isFirstSolve(isFirstSolve)
                 .submittedAt(submission.getSubmittedAt())
                 .build();
     }
