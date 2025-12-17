@@ -66,8 +66,7 @@ public class SecurityConfig {
                                 "/comment",
                                 "/comment/**",
                                 "/like/*/*/users",  // 좋아요 누른 사용자 목록 확인
-                                "/like/**",
-                                "/analysis/**"
+                                "/like/**"
                         ).permitAll()
 
                         // (Token Auth)
