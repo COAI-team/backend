@@ -4,7 +4,6 @@ import kr.or.kosa.backend.algorithm.dto.AlgoProblemDto;
 import kr.or.kosa.backend.algorithm.dto.AlgoTestcaseDto;
 import kr.or.kosa.backend.algorithm.dto.ProblemValidationLogDto;
 import kr.or.kosa.backend.algorithm.dto.ValidationResultDto;
-import kr.or.kosa.backend.algorithm.dto.request.ProblemListRequestDto;
 import kr.or.kosa.backend.algorithm.dto.response.ProblemGenerationResponseDto;
 import kr.or.kosa.backend.algorithm.dto.response.ProblemStatisticsResponseDto;
 import kr.or.kosa.backend.algorithm.mapper.AlgorithmProblemMapper;
@@ -79,60 +78,6 @@ public class AlgorithmProblemService {
             throw new RuntimeException("문제 목록 조회 중 오류가 발생했습니다.", e);
         }
     }
-
-
-//     문제 목록 조회 (V2 - 통계 포함 제거할 예정
-//     @param request 문제 목록 조회 요청 DTO
-//     @return 문제 목록 및 페이징 정보
-//
-//    public Map<String, Object> getProblemListWithStats(ProblemListRequestDto request) {
-//        log.debug("문제 목록 조회 (V2) - request: {}", request);
-//
-//        try {
-//            // 문제 목록 조회
-//            List<AlgoProblemDto> problems = getProblemsWithFilter(
-//                    request.getOffset(),
-//                    request.getLimit(),
-//                    request.getDifficulty(),
-//                    request.getSource(),
-//                    request.getKeyword(),
-//                    request.getTopic(),
-//                    request.getProblemType()
-//            );
-//
-//            // 전체 개수 조회
-//            int totalCount = getTotalProblemsCountWithFilter(
-//                    request.getDifficulty(),
-//                    request.getSource(),
-//                    request.getKeyword(),
-//                    request.getTopic(),
-//                    request.getProblemType(),
-//                    null,
-//                    null
-//            );
-//
-//            // 페이징 정보 계산
-//            int totalPages = (int) Math.ceil((double) totalCount / request.getLimit());
-//
-//            // 응답 데이터 구성
-//            Map<String, Object> responseData = new HashMap<>();
-//            responseData.put("problems", problems);
-//            responseData.put("totalCount", totalCount);
-//            responseData.put("currentPage", request.getPage());
-//            responseData.put("pageSize", request.getLimit());
-//            responseData.put("totalPages", totalPages);
-//            responseData.put("hasNext", request.getPage() < totalPages);
-//            responseData.put("hasPrevious", request.getPage() > 1);
-//
-//            log.debug("문제 목록 조회 완료 - totalCount: {}, problems: {}", totalCount, problems.size());
-//
-//            return responseData;
-//
-//        } catch (Exception e) {
-//            log.error("문제 목록 조회 실패 (V2)", e);
-//            throw new RuntimeException("문제 목록 조회 중 오류가 발생했습니다.", e);
-//        }
-//    }
 
     /**
      * 사용자 풀이 상태 포함 문제 목록 조회

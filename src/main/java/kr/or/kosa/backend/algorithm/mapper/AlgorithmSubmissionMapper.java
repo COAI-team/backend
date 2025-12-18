@@ -146,4 +146,8 @@ public interface AlgorithmSubmissionMapper {
             @Param("endDate") LocalDate endDate
     );
 
+    /**
+     * 사용자가 특정 문제를 AC 처리한 적이 있는지 확인
+     */
+    boolean hasUserSolvedProblem(@Param("userId") Long userId, @Param("problemId") Long problemId);
 }

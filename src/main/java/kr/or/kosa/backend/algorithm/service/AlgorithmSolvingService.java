@@ -13,10 +13,12 @@ import kr.or.kosa.backend.algorithm.dto.request.TestRunRequestDto;
 import kr.or.kosa.backend.algorithm.dto.response.ProblemSolveResponseDto;
 import kr.or.kosa.backend.algorithm.dto.response.SubmissionResponseDto;
 import kr.or.kosa.backend.algorithm.dto.response.TestRunResponseDto;
+import kr.or.kosa.backend.algorithm.exception.AlgoErrorCode;
 import kr.or.kosa.backend.algorithm.mapper.AlgorithmProblemMapper;
 import kr.or.kosa.backend.algorithm.mapper.AlgorithmSubmissionMapper;
 import kr.or.kosa.backend.algorithm.mapper.DailyMissionMapper;
 import kr.or.kosa.backend.algorithm.mapper.MonitoringMapper;
+import kr.or.kosa.backend.commons.exception.custom.CustomBusinessException;
 import kr.or.kosa.backend.commons.pagination.PageRequest;
 import kr.or.kosa.backend.commons.pagination.PageResponse;
 import lombok.RequiredArgsConstructor;
@@ -252,11 +254,26 @@ public class AlgorithmSolvingService {
     
     /**
      * 문제별 공유된 제출 목록 조회 (다른 사람의 풀이) + 풀이 유저 정보 포함
+     * 본인이 해당 문제를 AC(Accept) 처리한 적이 있어야만 조회 가능
      */
     @Transactional(readOnly = true)
     public PageResponse<AlgoSubmissionShareDto> getSharedSubmissions(Long problemId, Long currentUserId, int page, int size) {
-        log.info("공유된 제출 목록 조회 - problemId: {}, page: {}, size: {}", problemId, page, size);
+        log.info("공유된 제출 목록 조회 - problemId: {}, userId: {}, page: {}, size: {}",
+                problemId, currentUserId, page, size);
 
+        // 1. 로그인 체크
+        if (currentUserId == null) {
+            throw new CustomBusinessException(AlgoErrorCode.UNAUTHORIZED);
+        }
+
+        // 2. 사용자가 이 문제를 정답 처리한 적이 있는지 확인
+        boolean hasSolved = submissionMapper.hasUserSolvedProblem(currentUserId, problemId);
+
+        if (!hasSolved) {
+            throw new CustomBusinessException(AlgoErrorCode.FORBIDDEN);
+        }
+
+        // 3. 권한 확인 완료 - 공유 풀이 조회
         PageRequest pageRequest = new PageRequest(page, size);
         int totalCount = submissionMapper.countPublicSubmissionsByProblemId(problemId);
 

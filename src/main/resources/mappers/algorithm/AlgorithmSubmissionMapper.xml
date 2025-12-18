@@ -312,6 +312,17 @@
         LIMIT #{size} OFFSET #{offset}
     </select>
 
+    <!-- 사용자가 문제를 풀었는지 확인 (AC 여부) -->
+    <select id="hasUserSolvedProblem" resultType="boolean">
+        SELECT EXISTS(
+        SELECT 1
+        FROM ALGO_SUBMISSIONS
+        WHERE USER_ID = #{userId}
+        AND ALGO_PROBLEM_ID = #{problemId}
+        AND JUDGE_RESULT = 'AC'
+        )
+    </select>
+
     <!-- 문제별 공개된 제출 총 개수 -->
     <select id="countPublicSubmissionsByProblemId" resultType="int">
         SELECT COUNT(*)
