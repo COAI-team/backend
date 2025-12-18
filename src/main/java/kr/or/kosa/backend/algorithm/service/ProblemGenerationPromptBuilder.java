@@ -1,5 +1,6 @@
 package kr.or.kosa.backend.algorithm.service;
 
+import kr.or.kosa.backend.algorithm.dto.DifficultySpec;
 import kr.or.kosa.backend.algorithm.dto.request.ProblemGenerationRequestDto;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,6 +17,10 @@ import java.util.Map;
  * Phase 2 개선 사항:
  * - StoryKeywordPool 연동으로 테마별 다양한 스토리 소재 제공
  * - 같은 테마라도 랜덤 키워드 조합으로 매번 다른 문제 생성
+ *
+ * Phase 1 개선 사항:
+ * - AlgorithmProfileRegistry 연동으로 알고리즘별/난이도별 스펙 제공
+ * - 프로필 기반 가이드라인으로 더 정확한 문제 생성
  */
 @Slf4j
 @Component
@@ -26,6 +31,11 @@ public class ProblemGenerationPromptBuilder {
      * 스토리 키워드 풀 - 테마별 다양한 스토리 소재 제공
      */
     private final StoryKeywordPool storyKeywordPool;
+
+    /**
+     * 알고리즘 프로필 레지스트리 - 알고리즘별 난이도별 스펙 제공 (Phase 1)
+     */
+    private final AlgorithmProfileRegistry profileRegistry;
 
     /**
      * 사용 가능한 스토리 테마 목록 (겨울/연말 시즌)
@@ -147,7 +157,10 @@ public class ProblemGenerationPromptBuilder {
             }
         }
 
-        // 2. 생성 요청 본문
+        // 2. 프로필 기반 가이드라인 추가 (Phase 1)
+        sb.append(buildProfileGuidelines(request.getTopic(), request.getDifficulty().name()));
+
+        // 3. 생성 요청 본문
         sb.append("## 새로운 문제 생성 요청\n\n");
 
         if (references != null && !references.isEmpty()) {
@@ -175,7 +188,7 @@ public class ProblemGenerationPromptBuilder {
             sb.append(buildStoryKeywordSection(themeKey));
         }
 
-        // 3. JSON 응답 형식 (Code-First 방식: 입력만 생성, 출력은 코드 실행으로 생성)
+        // 4. JSON 응답 형식 (Code-First 방식: 입력만 생성, 출력은 코드 실행으로 생성)
         sb.append("""
 
                 **응답 형식 (JSON):**
@@ -255,6 +268,46 @@ public class ProblemGenerationPromptBuilder {
                 알고리즘 문제를 생성하세요.
                 응답은 JSON 형식으로 작성하세요.
                 """;
+    }
+
+    /**
+     * 프로필 기반 가이드라인 생성 (Phase 1)
+     *
+     * 알고리즘 프로필에서 해당 주제/난이도의 스펙을 가져와
+     * LLM에 전달할 구체적인 가이드라인을 생성합니다.
+     *
+     * @param topic      알고리즘 주제 (예: "동적 프로그래밍", "DFS/BFS")
+     * @param difficulty 난이도 (BRONZE, SILVER, GOLD, PLATINUM)
+     * @return 프롬프트에 추가할 가이드라인 섹션 문자열
+     */
+    private String buildProfileGuidelines(String topic, String difficulty) {
+        if (!profileRegistry.hasProfile(topic)) {
+            log.debug("프로필 없음: {} → 가이드라인 섹션 생략", topic);
+            return "";
+        }
+
+        DifficultySpec spec = profileRegistry.getDifficultySpec(topic, difficulty);
+        String displayName = profileRegistry.getDisplayName(topic);
+        String promptAdditions = profileRegistry.getPromptAdditions(topic);
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("\n## 알고리즘 특성 기반 가이드라인\n\n");
+        sb.append(String.format("**%s - %s 난이도 기준:**\n", displayName, difficulty));
+        sb.append(String.format("- 입력 크기: %s\n", spec.getInputSize()));
+        sb.append(String.format("- 시간 제한: %d ms\n", spec.getTimeLimit()));
+        sb.append(String.format("- 메모리 제한: %d MB\n", spec.getMemoryLimit()));
+        sb.append(String.format("- 기대 시간복잡도: %s\n", spec.getTimeComplexity()));
+        sb.append(String.format("- 문제 특성: %s\n\n", spec.getDescription()));
+
+        // 알고리즘별 추가 가이드라인
+        if (promptAdditions != null && !promptAdditions.isBlank()) {
+            sb.append("**알고리즘별 추가 지침:**\n");
+            sb.append(promptAdditions);
+            sb.append("\n");
+        }
+
+        log.debug("프로필 가이드라인 생성: {} - {}", displayName, difficulty);
+        return sb.toString();
     }
 
     /**
