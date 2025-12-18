@@ -1,6 +1,7 @@
 package kr.or.kosa.backend.algorithm.mapper;
 
 import kr.or.kosa.backend.algorithm.dto.AlgoSubmissionDto;
+import kr.or.kosa.backend.algorithm.dto.AlgoSubmissionShareDto;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -66,6 +67,16 @@ public interface AlgorithmSubmissionMapper {
             @Param("problemId") Long problemId,
             @Param("offset") int offset,
             @Param("limit") int limit
+    );
+
+    /**
+     * 문제별 제출 목록 조회 (공개된 것만) + 유저정보 포함
+     */
+    List<AlgoSubmissionShareDto> selectSharedSubmissionsWithUser(
+            @Param("problemId") Long problemId,
+            @Param("currentUserId") Long currentUserId,
+            @Param("size") int size,
+            @Param("offset") int offset
     );
 
     /**
