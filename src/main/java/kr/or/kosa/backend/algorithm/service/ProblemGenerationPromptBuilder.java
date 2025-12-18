@@ -17,15 +17,19 @@ import java.util.Map;
 public class ProblemGenerationPromptBuilder {
 
     /**
-     * 사용 가능한 스토리 테마 목록
-     * 프론트엔드에서 선택 가능한 테마들
+     * 사용 가능한 스토리 테마 목록 (겨울/연말 시즌)
+     * 프론트엔드 ProblemGenerator.jsx의 STORY_THEMES와 동기화 필수
+     *
+     * 동기화 대상:
+     * - coai-frontend/src/pages/algorithm/ProblemGenerator.jsx
+     * - coai-backend/src/main/java/.../controller/ProblemPoolController.java (ACTIVE_THEMES)
      */
     public static final Map<String, String> STORY_THEMES = Map.of(
-            "SPACE", "우주 탐사대 - 우주선, 행성, 위성 탐사 미션. 예: 탐사선이 N개의 행성을 방문하려 한다...",
-            "GAME", "게임 개발자 - RPG 게임 밸런싱, 아이템 조합, 스킬 시스템. 예: 마법사의 스킬 조합에서 최대 데미지를...",
-            "FINANCE", "금융 분석가 - 주식 거래, 투자 포트폴리오 최적화. 예: N일간의 주가 데이터에서 최대 이익을...",
-            "COOKING", "요리 대회 - 레시피 최적화, 재료 조합, 요리 점수 계산. 예: K가지 재료로 만들 수 있는 요리의...",
-            "FESTIVAL", "음악 페스티벌 - 공연 스케줄링, 무대 배치, 관객 동선. 예: N개의 밴드가 M개의 무대에서..."
+            "SANTA_DELIVERY", "산타의 선물 배달 - 크리스마스 이브에 산타와 루돌프가 선물을 배달하는 이야기. 굴뚝, 썰매, 선물 상자, 밤하늘을 배경으로 한 스토리.",
+            "SNOWBALL_FIGHT", "눈싸움 대작전 - 겨울 마을에서 펼쳐지는 눈싸움 대회. 눈덩이, 눈더미, 팀 진영, 눈밭을 배경으로 한 스토리.",
+            "CHRISTMAS_TREE", "크리스마스 트리 장식 - 크리스마스 트리를 꾸미는 이야기. 전구, 오너먼트, 별, 리본, 가지를 소재로 한 스토리.",
+            "NEW_YEAR_FIREWORKS", "새해 불꽃놀이 - 새해 카운트다운과 함께 펼쳐지는 불꽃놀이. 불꽃, 밤하늘, 색상, 타이밍을 소재로 한 스토리.",
+            "SKI_RESORT", "스키장 - 눈 덮인 산의 스키 리조트 이야기. 슬로프, 리프트, 스키어, 눈밭을 배경으로 한 스토리."
     );
 
     /**
