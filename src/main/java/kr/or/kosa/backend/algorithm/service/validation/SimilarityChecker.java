@@ -1,6 +1,7 @@
 package kr.or.kosa.backend.algorithm.service.validation;
 
 import kr.or.kosa.backend.algorithm.dto.AlgoProblemDto;
+import kr.or.kosa.backend.algorithm.dto.SimilarityThresholds;
 import kr.or.kosa.backend.algorithm.dto.ValidationResultDto;
 import kr.or.kosa.backend.algorithm.mapper.AlgorithmProblemMapper;
 import kr.or.kosa.backend.algorithm.service.ProblemVectorStoreService;
@@ -10,6 +11,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * Phase 4-4: 유사도 검사 서비스
@@ -34,15 +36,38 @@ public class SimilarityChecker {
     @Value("${algorithm.validation.use-vector-similarity:true}")
     private boolean useVectorSimilarity;
 
+    // ===== Phase 3: 다단계 유사도 임계값 =====
+    @Value("${algorithm.similarity.collected-threshold:0.85}")
+    private double collectedThreshold;
+
+    @Value("${algorithm.similarity.generated-threshold:0.75}")
+    private double generatedThreshold;
+
+    @Value("${algorithm.similarity.same-theme-threshold:0.65}")
+    private double sameThemeThreshold;
+
     /**
-     * 유사도 검사
-     * Vector DB 기반 의미적 유사도 검사 우선, 실패 시 Jaccard 유사도 사용
-     *
-     * @param newProblem 새로 생성된 문제
-     * @return 검증 결과
+     * 유사도 검사 (테마 없이 - 기존 호환성 유지)
      */
     public ValidationResultDto checkSimilarity(AlgoProblemDto newProblem) {
-        log.info("유사도 검사 시작 - 문제: {}", newProblem != null ? newProblem.getAlgoProblemTitle() : "null");
+        return checkSimilarity(newProblem, null);
+    }
+
+    /**
+     * 유사도 검사 (Phase 3: 테마 기반 다단계 검사)
+     *
+     * Vector DB 기반 소스별 유사도 검사 수행:
+     * - 수집 데이터 (BOJ 등): 높은 임계값 (0.85)
+     * - 생성 데이터: 중간 임계값 (0.75)
+     * - 동일 테마: 낮은 임계값 (0.65)
+     *
+     * @param newProblem 새로 생성된 문제
+     * @param theme      스토리 테마 (nullable)
+     * @return 검증 결과
+     */
+    public ValidationResultDto checkSimilarity(AlgoProblemDto newProblem, String theme) {
+        log.info("유사도 검사 시작 - 문제: {}, 테마: {}",
+                newProblem != null ? newProblem.getAlgoProblemTitle() : "null", theme);
 
         ValidationResultDto result = ValidationResultDto.builder()
                 .passed(true)
@@ -68,13 +93,14 @@ public class SimilarityChecker {
         }
 
         try {
-            // Vector DB 기반 유사도 검사 시도
+            // Phase 3: 다단계 유사도 검사 시도
             if (useVectorSimilarity) {
-                ValidationResultDto vectorResult = checkVectorSimilarity(newTitle, newDescription, result);
+                ValidationResultDto vectorResult = checkMultiLevelVectorSimilarity(
+                        newTitle, newDescription, theme, result);
                 if (vectorResult != null) {
                     return vectorResult;
                 }
-                log.info("Vector DB 유사도 검사 실패, Jaccard 유사도로 폴백");
+                log.info("다단계 Vector DB 유사도 검사 실패, Jaccard 유사도로 폴백");
             }
 
             // Jaccard 유사도 검사 (폴백)
@@ -90,38 +116,79 @@ public class SimilarityChecker {
     }
 
     /**
-     * Vector DB 기반 유사도 검사
+     * Phase 3: 다단계 Vector DB 기반 유사도 검사
+     * 소스별로 다른 임계값 적용
      */
-    private ValidationResultDto checkVectorSimilarity(String title, String description, ValidationResultDto result) {
+    private ValidationResultDto checkMultiLevelVectorSimilarity(
+            String title, String description, String theme, ValidationResultDto result) {
         try {
-            ProblemVectorStoreService.SimilarityCheckResult vectorResult =
-                    vectorStoreService.checkSimilarity(title, description, maxSimilarity);
+            SimilarityThresholds thresholds = SimilarityThresholds.of(
+                    collectedThreshold, generatedThreshold, sameThemeThreshold);
 
-            result.addMetadata("checkMethod", "VectorDB");
-            result.addMetadata("maxFoundSimilarity", Math.round(vectorResult.getMaxSimilarity() * 100) / 100.0);
-            result.addMetadata("maxAllowedSimilarity", maxSimilarity);
+            Map<String, ProblemVectorStoreService.SimilarityCheckResult> checkResults =
+                    vectorStoreService.checkSimilarityBySource(title, description, theme, thresholds);
 
-            if (vectorResult.getMostSimilarTitle() != null) {
-                result.addMetadata("mostSimilarTitle", vectorResult.getMostSimilarTitle());
-                result.addMetadata("mostSimilarId", vectorResult.getMostSimilarId());
+            result.addMetadata("checkMethod", "VectorDB_MultiLevel");
+
+            // 수집 데이터 검사 결과
+            ProblemVectorStoreService.SimilarityCheckResult collectedResult = checkResults.get("COLLECTED");
+            if (collectedResult != null) {
+                result.addMetadata("collected_maxSimilarity",
+                        Math.round(collectedResult.getMaxSimilarity() * 100) / 100.0);
+                result.addMetadata("collected_threshold", collectedThreshold);
+                result.addMetadata("collected_passed", collectedResult.isPassed());
             }
 
-            if (!vectorResult.isPassed()) {
-                result.addError(String.format(
-                        "기존 문제와 유사도가 너무 높습니다 (유사도: %.1f%%, 기준: %.1f%%). " +
-                        "가장 유사한 문제: %s",
-                        vectorResult.getMaxSimilarity() * 100, maxSimilarity * 100,
-                        vectorResult.getMostSimilarTitle()));
+            // 생성 데이터 검사 결과
+            ProblemVectorStoreService.SimilarityCheckResult generatedResult = checkResults.get("GENERATED");
+            if (generatedResult != null) {
+                result.addMetadata("generated_maxSimilarity",
+                        Math.round(generatedResult.getMaxSimilarity() * 100) / 100.0);
+                result.addMetadata("generated_threshold", generatedThreshold);
+                result.addMetadata("generated_passed", generatedResult.isPassed());
+            }
+
+            // 동일 테마 검사 결과 (있는 경우)
+            ProblemVectorStoreService.SimilarityCheckResult sameThemeResult = checkResults.get("SAME_THEME");
+            if (sameThemeResult != null) {
+                result.addMetadata("sameTheme_maxSimilarity",
+                        Math.round(sameThemeResult.getMaxSimilarity() * 100) / 100.0);
+                result.addMetadata("sameTheme_threshold", sameThemeThreshold);
+                result.addMetadata("sameTheme_passed", sameThemeResult.isPassed());
+            }
+
+            // 종합 판정: 모든 검사 통과 여부
+            boolean allPassed = checkResults.values().stream()
+                    .allMatch(ProblemVectorStoreService.SimilarityCheckResult::isPassed);
+
+            if (!allPassed) {
+                // 실패한 검사 찾아서 에러 메시지 생성
+                for (Map.Entry<String, ProblemVectorStoreService.SimilarityCheckResult> entry : checkResults.entrySet()) {
+                    ProblemVectorStoreService.SimilarityCheckResult checkResult = entry.getValue();
+                    if (!checkResult.isPassed()) {
+                        String sourceType = switch (entry.getKey()) {
+                            case "COLLECTED" -> "수집 데이터(BOJ 등)";
+                            case "GENERATED" -> "AI 생성 데이터";
+                            case "SAME_THEME" -> "동일 테마 데이터";
+                            default -> entry.getKey();
+                        };
+                        result.addError(String.format(
+                                "%s와 유사도가 높습니다 (유사도: %.1f%%, 기준: %.1f%%). 가장 유사한 문제: %s",
+                                sourceType,
+                                checkResult.getMaxSimilarity() * 100,
+                                checkResult.getThreshold() * 100,
+                                checkResult.getMostSimilarTitle()));
+                    }
+                }
             } else {
-                log.info("Vector DB 유사도 검사 통과 - 최대 유사도: {}%",
-                        String.format("%.1f", vectorResult.getMaxSimilarity() * 100));
+                log.info("다단계 Vector DB 유사도 검사 통과");
             }
 
-            log.info("유사도 검사 완료 (VectorDB) - 결과: {}", result.getSummary());
+            log.info("유사도 검사 완료 (VectorDB_MultiLevel) - 결과: {}", result.getSummary());
             return result;
 
         } catch (Exception e) {
-            log.warn("Vector DB 유사도 검사 실패: {}", e.getMessage());
+            log.warn("다단계 Vector DB 유사도 검사 실패: {}", e.getMessage());
             return null;  // 폴백 신호
         }
     }
