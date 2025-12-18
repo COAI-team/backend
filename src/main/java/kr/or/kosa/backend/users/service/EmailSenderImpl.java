@@ -12,11 +12,20 @@ import org.springframework.stereotype.Service;
 public class EmailSenderImpl implements EmailSender {
 
     private final JavaMailSender mailSender;
+    /**
+     * Reusable base message to avoid rebuilding defaults on every send.
+     */
+    private final SimpleMailMessage baseMessage = new SimpleMailMessage();
 
     @Override
     public boolean sendEmail(String to, String subject, String text) {
+        if (to == null || to.isBlank() || subject == null || text == null) {
+            log.warn("Skip email send due to invalid parameters: to={}, subject null? {}, text null? {}",
+                    to, subject == null, text == null);
+            return false;
+        }
         try {
-            SimpleMailMessage message = new SimpleMailMessage();
+            SimpleMailMessage message = new SimpleMailMessage(baseMessage);
             message.setTo(to);
             message.setSubject(subject);
             message.setText(text);

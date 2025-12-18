@@ -20,6 +20,11 @@ import org.springframework.web.bind.annotation.*;
 @Validated  // ✅ Validation 활성화
 public class ChatMessageController {
 
+    private static final ResponseEntity<ChatResponseDto> UNAUTHORIZED_RESPONSE =
+            ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+    private static final ResponseEntity<ChatResponseDto> BAD_REQUEST_RESPONSE =
+            ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
+
     private final ChatMessageService chatMessageService;
 
     @PostMapping("/messages")
@@ -37,22 +42,32 @@ public class ChatMessageController {
         // 인증 체크
         if (authentication == null || !authentication.isAuthenticated()) {
             log.warn("Unauthorized access to /chat/messages");
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+            return UNAUTHORIZED_RESPONSE;
         }
 
-        try {
-            Long userId = Long.valueOf(authentication.getName());
-            log.info("Get messages - userId: {}, sessionId: {}", userId, sessionId);
-
-            ChatResponseDto result = chatMessageService.getMessages(sessionId, limit, userId);
-            return ResponseEntity.ok(result);
-        } catch (NumberFormatException e) {
-            log.error("Invalid userId from authentication: {}", authentication.getName(), e);
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
-        } catch (Exception e) {
-            log.error("Error fetching messages for userId: {}, sessionId: {}",
-                    authentication.getName(), sessionId, e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        String principal = authentication.getName();
+        if (!isNumeric(principal)) {
+            log.error("Invalid userId from authentication: {}", principal);
+            return BAD_REQUEST_RESPONSE;
         }
+
+        Long userId = Long.parseLong(principal);
+        log.info("Get messages - userId: {}, sessionId: {}", userId, sessionId);
+
+        ChatResponseDto result = chatMessageService.getMessages(sessionId, limit, userId);
+        return ResponseEntity.ok(result);
+    }
+
+    private boolean isNumeric(String value) {
+        if (value == null || value.isEmpty()) {
+            return false;
+        }
+        for (int i = 0; i < value.length(); i++) {
+            char ch = value.charAt(i);
+            if (ch < '0' || ch > '9') {
+                return false;
+            }
+        }
+        return true;
     }
 }

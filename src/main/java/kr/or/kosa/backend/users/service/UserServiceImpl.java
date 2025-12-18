@@ -113,7 +113,10 @@ public class UserServiceImpl implements UserService {
             imageUrl = "https://codenemsy.s3.ap-northeast-2.amazonaws.com/profile-images/default.png";
         }
 
-        userMapper.updateUserImage(userId, imageUrl);
+        int updated = userMapper.updateUserImage(userId, imageUrl);
+        if (updated != 1) {
+            throw new CustomBusinessException(UserErrorCode.USER_UPDATE_FAILED);
+        }
         return userId;
     }
 
@@ -132,14 +135,7 @@ public class UserServiceImpl implements UserService {
             throw new CustomBusinessException(UserErrorCode.INVALID_PASSWORD);
         }
 
-        String accessToken = jwtProvider.createAccessToken(users.getUserId(), users.getUserEmail());
-        String refreshToken = jwtProvider.createRefreshToken(users.getUserId(), users.getUserEmail());
-
-        redisTemplate.opsForValue().set(
-                REFRESH_KEY_PREFIX + users.getUserId(),
-                refreshToken,
-                REFRESH_TOKEN_EXPIRE_DAYS,
-                TimeUnit.DAYS);
+        Map<String, String> tokens = issueTokens(users);
 
         SubscriptionTier tier = subscriptionTierResolver.resolveTier(String.valueOf(users.getUserId()));
 
@@ -158,8 +154,8 @@ public class UserServiceImpl implements UserService {
                 .build();
 
         return UserLoginResponseDto.builder()
-                .accessToken(accessToken)
-                .refreshToken(refreshToken)
+                .accessToken(tokens.get(KEY_ACCESS_TOKEN))
+                .refreshToken(tokens.get(KEY_REFRESH_TOKEN))
                 .user(userDto)
                 .build();
     }
@@ -170,7 +166,7 @@ public class UserServiceImpl implements UserService {
     @Override
     public String refresh(String bearerToken) {
 
-        String refreshToken = bearerToken.replace("Bearer ", "");
+        String refreshToken = stripBearer(bearerToken);
 
         if (!jwtProvider.validateToken(refreshToken)) {
             throw new CustomBusinessException(UserErrorCode.INVALID_TOKEN);
@@ -194,7 +190,7 @@ public class UserServiceImpl implements UserService {
     public boolean logout(String bearerToken) {
 
         try {
-            String token = bearerToken.replace("Bearer ", "");
+            String token = stripBearer(bearerToken);
 
             if (!jwtProvider.validateToken(token))
                 return false;
@@ -235,7 +231,7 @@ public class UserServiceImpl implements UserService {
         }
 
         String token = passwordResetTokenService.createResetToken(users.getUserId());
-        String resetUrl = "http://localhost:5173/reset-password?token=" + token;
+        String resetUrl = "https://localhost:5173/reset-password?token=" + token;
 
         boolean sent = emailVerificationService.send(
                 email,
@@ -283,65 +279,74 @@ public class UserServiceImpl implements UserService {
     @Override
     public UserResponseDto updateUserInfo(Long userId, UserUpdateRequestDto dto, MultipartFile image) {
 
-        Users users = userMapper.findById(userId);
-        if (users == null) {
+        Users user = userMapper.findById(userId);
+        if (user == null) {
             throw new CustomBusinessException(UserErrorCode.USER_NOT_FOUND);
         }
 
-        // ⚡ 빈 문자열 처리 (name, nickname)
-        String name = (dto.getUserName() != null && dto.getUserName().trim().isEmpty())
-                ? null
-                : dto.getUserName();
+        // Process updates with validation
+        String newName = processField(dto.getUserName(), user.getUserName());
+        String newNickname = processField(dto.getUserNickname(), user.getUserNickname());
 
-        String nickname = (dto.getUserNickname() != null && dto.getUserNickname().trim().isEmpty())
-                ? null
-                : dto.getUserNickname();
+        validateNickname(userId, newNickname);
 
-        // ⚡ 닉네임 중복 체크
-        if (nickname != null) {
-            Users existing = userMapper.findByNickname(nickname);
-            if (existing != null && !existing.getUserId().equals(userId)) {
-                throw new CustomBusinessException(UserErrorCode.NICKNAME_DUPLICATE);
-            }
+        String newImage = processImage(image, user.getUserImage());
+
+        updateUserFields(user, dto, newName, newNickname, newImage);
+        int updated = userMapper.updateUser(user);
+        if (updated != 1) {
+            throw new CustomBusinessException(UserErrorCode.USER_UPDATE_FAILED);
         }
 
-        // ⚡ 새로운 이름/닉네임 적용
-        String newName = (name != null) ? name : users.getUserName();
-        String newNickname = (nickname != null) ? nickname : users.getUserNickname();
+        return buildUserResponse(user);
+    }
 
-        // ⚡ 이미지 파일 처리
-        String newImage = users.getUserImage(); // 기본: 기존 이미지 유지
+    private String processField(String newValue, String currentValue) {
+        if (newValue == null) {
+            return currentValue;
+        }
+        return newValue.trim().isEmpty() ? null : newValue.trim();
+    }
 
-        if (image != null && !image.isEmpty()) {
-            try {
-                newImage = s3Uploader.upload(image, "profile");
-            } catch (IOException e) {
-                throw new CustomBusinessException(UserErrorCode.FILE_UPLOAD_FAILED);
-            }
+    private void validateNickname(Long userId, String nickname) {
+        if (nickname == null) {
+            return;
         }
 
-        // ⚡ DB 업데이트
-        // userMapper.updateUserInfo(userId, newName, newNickname); // 기존 코드 주석 처리 또는 제거
+        Users existing = userMapper.findByNickname(nickname);
+        if (existing != null && !existing.getUserId().equals(userId)) {
+            throw new CustomBusinessException(UserErrorCode.NICKNAME_DUPLICATE);
+        }
+    }
 
-        // GitHub 정보 및 암호화 처리
+    private String processImage(MultipartFile image, String currentImage) {
+        if (image == null || image.isEmpty()) {
+            return currentImage;
+        }
+
+        try {
+            return s3Uploader.upload(image, "profile");
+        } catch (IOException e) {
+            throw new CustomBusinessException(UserErrorCode.FILE_UPLOAD_FAILED);
+        }
+    }
+
+    private void updateUserFields(Users user, UserUpdateRequestDto dto,
+                                  String newName, String newNickname, String newImage) {
+        user.setUserName(newName);
+        user.setUserNickname(newNickname);
+        user.setUserImage(newImage);
+
+        // GitHub 정보 처리
         if (dto.getGithubId() != null) {
-            users.setGithubId(dto.getGithubId());
+            user.setGithubId(dto.getGithubId());
         }
         if (dto.getGithubToken() != null && !dto.getGithubToken().isBlank()) {
-            String encryptedToken = encryptionUtil.encrypt(dto.getGithubToken());
-            users.setGithubToken(encryptedToken);
+            user.setGithubToken(encryptionUtil.encrypt(dto.getGithubToken()));
         }
+    }
 
-        // Users 객체 업데이트 (mapper.updateUser 사용 권장 - 모든 필드 업데이트 가능하도록 수정됨)
-        users.setUserName(newName);
-        users.setUserNickname(newNickname);
-        users.setUserImage(newImage);
-
-        userMapper.updateUser(users); // 기존 updateUserInfo 대신 updateUser 사용
-
-        // ⚡ 변경된 정보 다시 조회
-        Users updated = userMapper.findById(userId);
-
+    private UserResponseDto buildUserResponse(Users updated) {
         SubscriptionTier tier = subscriptionTierResolver.resolveTier(String.valueOf(updated.getUserId()));
 
         return UserResponseDto.builder()
@@ -378,22 +383,7 @@ public class UserServiceImpl implements UserService {
         if (users == null) {
             throw new CustomBusinessException(UserErrorCode.USER_NOT_FOUND);
         }
-
-        SubscriptionTier tier = subscriptionTierResolver.resolveTier(String.valueOf(users.getUserId()));
-
-        return UserResponseDto.builder()
-                .userId(users.getUserId())
-                .userEmail(users.getUserEmail())
-                .userName(users.getUserName())
-                .userNickname(users.getUserNickname())
-                .userImage(users.getUserImage())
-                .userGrade(users.getUserGrade())
-                .userRole(users.getUserRole())
-                .userEnabled(users.getUserEnabled())
-                .githubId(users.getGithubId())
-                .hasGithubToken(users.getGithubToken() != null && !users.getGithubToken().isBlank())
-                .subscriptionTier(tier.name())
-                .build();
+        return buildUserResponse(users);
     }
 
     // ============================================================
@@ -444,56 +434,56 @@ public class UserServiceImpl implements UserService {
     public GithubLoginResult githubLogin(GitHubUserResponse gitHubUser, boolean linkMode) {
 
         String providerId = String.valueOf(gitHubUser.getId());
-        String email = gitHubUser.getEmail();
+        String email = normalizeEmail(gitHubUser.getEmail(), providerId);
 
-        // 1) link 모드일 경우 계정 생성 X, 토큰 발급 X
+        // Early return for link mode
         if (linkMode) {
-            return GithubLoginResult.builder()
-                    .user(null)
-                    .needLink(false)
-                    .accessToken(null)
-                    .refreshToken(null)
-                    .build();
+            return buildLinkModeResult();
         }
 
-        // 2) 이미 GitHub provider 연동된 계정 → 바로 로그인
+        // Check for existing GitHub-linked account
         Users linkedUser = userMapper.findBySocialProvider(PROVIDER_GITHUB, providerId);
         if (linkedUser != null) {
-
-            Map<String, String> tokens = issueTokens(linkedUser);
-
-            return GithubLoginResult.builder()
-                    .user(linkedUser)
-                    .needLink(false)
-                    .accessToken(tokens.get(KEY_ACCESS_TOKEN))
-                    .refreshToken(tokens.get(KEY_REFRESH_TOKEN))
-                    .build();
+            return buildLoginResult(linkedUser, false, null);
         }
 
-        // 3) 이메일로 기존 일반 계정이 존재 → 연동 필요
+        // Check for existing email account
         Users existingUser = userMapper.findByEmail(email);
         if (existingUser != null) {
-
-            // 기존 계정 자동 로그인 처리 (토큰 발급)
-            Map<String, String> tokens = issueTokens(existingUser);
-
-            return GithubLoginResult.builder()
-                    .user(existingUser)
-                    .needLink(true)
-                    .accessToken(tokens.get(KEY_ACCESS_TOKEN))
-                    .refreshToken(tokens.get(KEY_REFRESH_TOKEN))
-                    .build();
+            return buildLoginResult(existingUser, true, gitHubUser);
         }
 
-        // 4) 신규 GitHub 계정 생성
+        // Create new GitHub account
         Users newUser = createNewGithubUser(gitHubUser);
-        Map<String, String> tokens = issueTokens(newUser);
+        return buildLoginResult(newUser, false, null);
+    }
+
+    // Extracted helper methods
+    private String normalizeEmail(String email, String providerId) {
+        if (email == null || email.isBlank()) {
+            return "github-" + providerId + "@noemail.com";
+        }
+        return email;
+    }
+
+    private GithubLoginResult buildLinkModeResult() {
+        return GithubLoginResult.builder()
+                .user(null)
+                .needLink(false)
+                .accessToken(null)
+                .refreshToken(null)
+                .build();
+    }
+
+    private GithubLoginResult buildLoginResult(Users user, boolean needLink, GitHubUserResponse gitHubUser) {
+        Map<String, String> tokens = issueTokens(user);
 
         return GithubLoginResult.builder()
-                .user(newUser)
-                .needLink(false)
+                .user(user)
+                .needLink(needLink)
                 .accessToken(tokens.get(KEY_ACCESS_TOKEN))
                 .refreshToken(tokens.get(KEY_REFRESH_TOKEN))
+                .gitHubUser(gitHubUser)
                 .build();
     }
 
@@ -519,10 +509,7 @@ public class UserServiceImpl implements UserService {
     // ---------------------------------------------------------
     @Override
     public boolean isGithubLinked(Long userId) {
-
-        // 소셜 로그인 추가 여부 확인 (userMapper 필요)
         Integer count = userMapper.countSocialAccount(userId, PROVIDER_GITHUB);
-
         return count != null && count > 0;
     }
 
@@ -543,27 +530,42 @@ public class UserServiceImpl implements UserService {
         String providerId = String.valueOf(githubId);
         String email = gitHubUser.getEmail();
 
+        // 1) 이메일 정규화
+        String normalizedEmail = email != null
+                ? email
+                : "github-" + providerId + "@noemail.com";
+
+        // 2) 이미 같은 이메일 계정 있는지 확인
+        Users existingByEmail = userMapper.findByEmail(normalizedEmail);
+        if (existingByEmail != null) {
+            return existingByEmail;
+        }
+
         String randomPassword = UUID.randomUUID().toString();
 
         Users newUser = new Users();
-
-        newUser.setUserEmail(email != null ? email : "github-" + providerId + "@noemail.com");
+        newUser.setUserEmail(normalizedEmail);
         newUser.setUserName(gitHubUser.getName());
         newUser.setUserNickname(gitHubUser.getLogin());
         newUser.setUserImage(gitHubUser.getAvatarUrl());
-
         newUser.setUserPw(passwordEncoder.encode(randomPassword));
         newUser.setUserRole("ROLE_USER");
         newUser.setUserEnabled(true);
 
-        userMapper.insertUser(newUser);
+        int inserted = userMapper.insertUser(newUser);
+        if (inserted != 1) {
+            throw new CustomBusinessException(UserErrorCode.USER_CREATE_FAIL);
+        }
 
-        // SOCIAL_LOGIN 테이블 insert
-        userMapper.insertSocialAccount(
+        int socialInserted = userMapper.insertSocialAccount(
                 newUser.getUserId(),
                 PROVIDER_GITHUB,
                 providerId,
-                email);
+                email
+        );
+        if (socialInserted != 1) {
+            throw new CustomBusinessException(UserErrorCode.USER_UPDATE_FAILED);
+        }
 
         return newUser;
     }
@@ -593,12 +595,24 @@ public class UserServiceImpl implements UserService {
         }
 
         // 4) 신규 연동 저장
-        userMapper.insertSocialAccount(
+        int socialInserted = userMapper.insertSocialAccount(
                 currentUserId,
                 PROVIDER_GITHUB,
                 providerId,
-                email);
+                email
+        );
+
+        if (socialInserted != 1) {
+            throw new CustomBusinessException(UserErrorCode.USER_UPDATE_FAILED);
+        }
 
         return true;
+    }
+
+    private String stripBearer(String bearerToken) {
+        if (bearerToken != null && bearerToken.startsWith("Bearer ")) {
+            return bearerToken.substring(7);
+        }
+        return bearerToken;
     }
 }
