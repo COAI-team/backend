@@ -76,25 +76,27 @@ public class InsightsController {
     }
 
     /**
-     * 워드 클라우드 생성
+     * 워드 클라우드 데이터 생성 (JSON)
      * 
-     * 사용자의 코드 스타일/자주 쓰이는 패턴을 워드 클라우드 이미지(Base64)로 생성하여 반환합니다.
+     * 사용자의 코드 분석 패턴을 ECharts wordCloud에서 사용할 수 있는
+     * JSON 형식으로 반환합니다.
      * 
      * @param userDetails 현재 로그인한 사용자 정보 (ID 추출용)
      * @param year        조회할 연도
      * @param month       조회할 월
-     * @return Base64 인코딩된 PNG 이미지 데이터
+     * @return [{name: "패턴명", value: 빈도수}, ...] 형태의 JSON 데이터
      */
     @GetMapping("/wordcloud")
-    public ResponseEntity<String> getWordCloud(
+    public ResponseEntity<List<java.util.Map<String, Object>>> getWordCloud(
             @AuthenticationPrincipal JwtUserDetails userDetails,
             @RequestParam int year,
             @RequestParam int month) {
-        String base64Image = wordCloudService.generateWordCloud(userDetails.id(), year, month);
-        if (base64Image == null) {
+        List<java.util.Map<String, Object>> wordCloudData = wordCloudService.generateWordCloudData(userDetails.id(),
+                year, month);
+        if (wordCloudData.isEmpty()) {
             return ResponseEntity.noContent().build();
         }
-        return ResponseEntity.ok(base64Image);
+        return ResponseEntity.ok(wordCloudData);
     }
 
     /**

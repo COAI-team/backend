@@ -3,6 +3,7 @@ package kr.or.kosa.backend.codenose.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.langchain4j.model.chat.ChatLanguageModel;
+import kr.or.kosa.backend.codenose.aop.LangfuseObserve;
 import kr.or.kosa.backend.codenose.dto.RagDto;
 import kr.or.kosa.backend.codenose.dto.AnalysisRequestDTO;
 import kr.or.kosa.backend.codenose.dto.CodeResultDTO;
@@ -88,7 +89,7 @@ public class AnalysisService {
      * @param requestDto 분석 요청 DTO
      * @return AI 분석 결과 (JSON 문자열)
      */
-    @kr.or.kosa.backend.codenose.aop.LangfuseObserve(name = "analyzeStoredFile")
+    @LangfuseObserve(name = "analyzeStoredFile")
     public String analyzeStoredFile(AnalysisRequestDTO requestDto) {
         // 워크플로우 시작: Website-RAG-Analysis Trace 생성
         langfuseService.startNamedTrace("Website-RAG-Analysis",
@@ -216,7 +217,7 @@ public class AnalysisService {
             } catch (Exception e) {
                 log.error("RAG 시스템에 분석 결과 저장 실패", e);
             }
-//            return cleanedResponse; 기존의 리턴 삭제될 예정
+            // return cleanedResponse; 기존의 리턴 삭제될 예정
 
             // 8. analysisId를 응답 JSON에 추가
             try {
@@ -418,7 +419,7 @@ public class AnalysisService {
      * DB에 저장된 파일이 아니므로, 즉석에서 분석하고 결과만 반환합니다.
      * (선택적으로 기록을 남길 수도 있습니다)
      */
-    @kr.or.kosa.backend.codenose.aop.LangfuseObserve(name = "analyzeRawCode")
+    @LangfuseObserve(name = "analyzeRawCode")
     public String analyzeRawCode(String code, String language, Long userId) {
         // 워크플로우 시작: MCP-Analysis Trace 생성
         langfuseService.startNamedTrace("MCP-Analysis",
