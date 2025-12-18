@@ -176,14 +176,16 @@ public class ProblemPoolService {
 
     /**
      * 풀에 문제 추가 (스케줄러에서 호출)
+     * <p>Phase 6: AUTO_APPROVED 문제만 풀에 저장
      * <p>1. 문제 생성 (저장 없음)
-     * <p>2. JSON 직렬화 → 풀에 저장
-     * <p>3. Vector DB에 저장 (유사도 검사용)
+     * <p>2. 품질 등급 확인 (AUTO_APPROVED만 통과)
+     * <p>3. JSON 직렬화 → 풀에 저장
+     * <p>4. Vector DB에 저장 (유사도 검사용)
      *
      * @param difficulty 난이도
      * @param topic      알고리즘 주제 (displayName)
      * @param theme      스토리 테마
-     * @return 생성된 풀 문제 ID
+     * @return 생성된 풀 문제 ID (AUTO_REJECTED면 null 반환)
      */
     @Transactional
     public Long generateForPool(String difficulty, String topic, String theme) {
@@ -202,10 +204,11 @@ public class ProblemPoolService {
             ProblemGenerationResponseDto generated = generationOrchestrator.generateWithoutSaving(request);
 
             // 디버그: 저장 전 데이터 확인
-            log.info("🔍 [Pool 저장 전] generationTime: {}, validationResults: {}, optimalCode: {}",
+            log.info("🔍 [Pool 저장 전] generationTime: {}, validationResults: {}, optimalCode: {}, reviewStatus: {}",
                     generated.getGenerationTime(),
                     generated.getValidationResults() != null ? generated.getValidationResults().size() + "개" : "null",
-                    generated.getOptimalCode() != null ? generated.getOptimalCode().length() + "자" : "null");
+                    generated.getOptimalCode() != null ? generated.getOptimalCode().length() + "자" : "null",
+                    generated.getReviewStatus());
 
             if (generated.getValidationResults() != null && !generated.getValidationResults().isEmpty()) {
                 generated.getValidationResults().forEach(vr ->
@@ -213,10 +216,19 @@ public class ProblemPoolService {
                             vr.getValidatorName(), vr.isPassed(), vr.getMetadata()));
             }
 
-            // 2. JSON 직렬화
+            // 2. Phase 6: 품질 등급 확인 - AUTO_APPROVED만 풀에 저장
+            if (!generated.isApproved()) {
+                log.warn("❌ [Pool 저장 거부] 품질 등급 미달 - reviewStatus: {}, message: {}",
+                        generated.getReviewStatus(), generated.getMessage());
+                return null;  // 스케줄러에서 재시도 또는 다음 조합으로 이동
+            }
+
+            log.info("✅ [Pool 저장 승인] 품질 등급 통과 - reviewStatus: {}", generated.getReviewStatus());
+
+            // 3. JSON 직렬화
             String contentJson = objectMapper.writeValueAsString(generated);
 
-            // 3. 풀에 저장
+            // 4. 풀에 저장
             int generationTimeMs = (int) (System.currentTimeMillis() - startTime);
             PoolProblemDto poolProblem = PoolProblemDto.builder()
                     .difficulty(difficulty)
@@ -229,7 +241,7 @@ public class ProblemPoolService {
 
             poolMapper.insert(poolProblem);
 
-            // 4. Vector DB에 저장 (유사도 검사용 - 풀 문제도 포함)
+            // 5. Vector DB에 저장 (유사도 검사용 - 풀 문제도 포함)
             storeToVectorDb(generated, poolProblem.getAlgoPoolId());
 
             log.info("풀 채우기 완료 - poolId: {}, 소요시간: {}ms", poolProblem.getAlgoPoolId(), generationTimeMs);
