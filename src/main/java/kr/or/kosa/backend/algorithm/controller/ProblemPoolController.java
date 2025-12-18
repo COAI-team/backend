@@ -134,12 +134,17 @@ public class ProblemPoolController {
                     // fetchTime < 3초이고 generationTime이 있으면 풀에서 가져온 것으로 판단
                     boolean fromPool = fetchTime < 3.0 && response.getGenerationTime() != null;
 
-                    // 완료 이벤트 전송
+                    // 완료 이벤트 전송 (DB 필드 직접 매핑)
                     Map<String, Object> completeEvent = new HashMap<>();
                     completeEvent.put("type", "COMPLETE");
                     completeEvent.put("problemId", response.getProblemId());
                     completeEvent.put("title", response.getProblem().getAlgoProblemTitle());
                     completeEvent.put("description", response.getProblem().getAlgoProblemDescription());
+                    completeEvent.put("inputFormat", response.getProblem().getInputFormat());  // DB의 INPUT_FORMAT 컬럼
+                    completeEvent.put("outputFormat", response.getProblem().getOutputFormat());  // DB의 OUTPUT_FORMAT 컬럼
+                    completeEvent.put("constraints", response.getProblem().getConstraints());  // DB의 CONSTRAINTS 컬럼
+                    completeEvent.put("algoProblemTags", response.getProblem().getAlgoProblemTags());  // DB의 ALGO_PROBLEM_TAGS 컬럼
+                    completeEvent.put("testcases", response.getTestCases());  // 테스트케이스 목록 (isSample 포함)
                     completeEvent.put("difficulty", response.getProblem().getAlgoProblemDifficulty().name());
                     completeEvent.put("testCaseCount", response.getTestCases() != null ? response.getTestCases().size() : 0);
                     completeEvent.put("generationTime", response.getGenerationTime());  // LLM이 생성하는데 걸린 시간 (풀에 저장된 값)
@@ -192,10 +197,16 @@ public class ProblemPoolController {
             ProblemGenerationResponseDto response = poolService.drawProblem(
                     difficulty, topic, theme, userId, null);
 
+            // DB 필드 직접 매핑
             Map<String, Object> responseData = new HashMap<>();
             responseData.put("problemId", response.getProblemId());
             responseData.put("title", response.getProblem().getAlgoProblemTitle());
             responseData.put("description", response.getProblem().getAlgoProblemDescription());
+            responseData.put("inputFormat", response.getProblem().getInputFormat());  // DB의 INPUT_FORMAT 컬럼
+            responseData.put("outputFormat", response.getProblem().getOutputFormat());  // DB의 OUTPUT_FORMAT 컬럼
+            responseData.put("constraints", response.getProblem().getConstraints());  // DB의 CONSTRAINTS 컬럼
+            responseData.put("algoProblemTags", response.getProblem().getAlgoProblemTags());  // DB의 ALGO_PROBLEM_TAGS 컬럼
+            responseData.put("testcases", response.getTestCases());  // 테스트케이스 목록 (isSample 포함)
             responseData.put("difficulty", response.getProblem().getAlgoProblemDifficulty().name());
             responseData.put("testCaseCount", response.getTestCases() != null ? response.getTestCases().size() : 0);
             responseData.put("generationTime", response.getGenerationTime());

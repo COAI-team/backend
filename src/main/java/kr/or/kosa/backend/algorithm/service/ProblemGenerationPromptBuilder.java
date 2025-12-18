@@ -179,8 +179,13 @@ public class ProblemGenerationPromptBuilder {
         }
 
         if (request.getAdditionalRequirements() != null && !request.getAdditionalRequirements().isBlank()) {
-            String themeKey = request.getAdditionalRequirements().toUpperCase();
-            String themeDescription = STORY_THEMES.getOrDefault(themeKey, request.getAdditionalRequirements());
+            String additionalReqs = request.getAdditionalRequirements();
+            // "스토리 테마: " 프리픽스 제거하여 순수 테마 키 추출
+            String themeKey = additionalReqs.toUpperCase();
+            if (themeKey.startsWith("스토리 테마: ")) {
+                themeKey = themeKey.substring("스토리 테마: ".length());
+            }
+            String themeDescription = STORY_THEMES.getOrDefault(themeKey, additionalReqs);
             sb.append(String.format("- 스토리 테마: %s\n", themeDescription));
             sb.append("  **테마에 맞는 스토리텔링을 문제 설명에 반드시 적용하세요.**\n");
 
