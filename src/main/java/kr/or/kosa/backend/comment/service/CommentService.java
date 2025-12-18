@@ -1,5 +1,7 @@
 package kr.or.kosa.backend.comment.service;
 
+import kr.or.kosa.backend.algorithm.dto.AlgoSubmissionDto;
+import kr.or.kosa.backend.algorithm.mapper.AlgorithmSubmissionMapper;
 import kr.or.kosa.backend.codeboard.dto.CodeboardDetailResponseDto;
 import kr.or.kosa.backend.codeboard.mapper.CodeboardMapper;
 import kr.or.kosa.backend.comment.domain.Comment;
@@ -35,6 +37,7 @@ public class CommentService {
     private final CommentMapper commentMapper;
     private final CodeboardMapper codeBoardMapper;
     private final FreeboardMapper freeboardMapper;
+    private final AlgorithmSubmissionMapper submissionMapper;
     private final UserMapper userMapper;
     private final NotificationService notificationService;
     private final LikeService likeService;
@@ -73,7 +76,7 @@ public class CommentService {
                 ReferenceType referenceType = switch (request.boardType()) {
                     case "CODEBOARD" -> ReferenceType.POST_CODEBOARD;
                     case "FREEBOARD" -> ReferenceType.POST_FREEBOARD;
-                    case "ALGORITHM" -> ReferenceType.POST_ALGORITHM;
+                    case "SUBMISSION" -> ReferenceType.SUBMISSION;
                     default -> throw new CustomBusinessException(CommentErrorCode.INVALID_BOARD_TYPE);
                 };
 
@@ -207,6 +210,13 @@ public class CommentService {
                     throw new CustomBusinessException(CommentErrorCode.BOARD_NOT_FOUND);
                 }
                 yield freeBoard.getUserId();
+            }
+            case "SUBMISSION" -> {
+                AlgoSubmissionDto submission = submissionMapper.selectSubmissionById(boardId);
+                if (submission == null) {
+                    throw new CustomBusinessException(CommentErrorCode.BOARD_NOT_FOUND);
+                }
+                yield submission.getUserId();
             }
             default -> throw new CustomBusinessException(CommentErrorCode.INVALID_BOARD_TYPE);
         };

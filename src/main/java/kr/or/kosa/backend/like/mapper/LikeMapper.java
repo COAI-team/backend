@@ -37,4 +37,8 @@ public interface LikeMapper {
     List<LikeUserDto> selectLikeUsers(@Param("referenceType") ReferenceType referenceType,
                                       @Param("referenceId") Long referenceId,
                                       @Param("limit") int limit);
+
+    // 좋아요 수 조회 (추가)
+    int countLikes(@Param("referenceType") ReferenceType referenceType,
+                   @Param("referenceId") Long referenceId);
 }
