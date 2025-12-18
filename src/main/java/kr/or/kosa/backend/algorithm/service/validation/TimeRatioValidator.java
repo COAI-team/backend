@@ -365,13 +365,13 @@ public class TimeRatioValidator {
             }
 
             // TLE나 RE인 경우 null 반환
-            String status = tcResult.getStatus();
-            if ("TLE".equals(status) || "Time Limit Exceeded".equals(status)) {
+            String result = tcResult.getResult();
+            if ("TLE".equals(result) || "Time Limit Exceeded".equals(result)) {
                 log.debug("TLE 발생");
                 return null;
             }
-            if (status != null && (status.contains("Error") || status.contains("Runtime"))) {
-                log.debug("런타임 에러: {}", status);
+            if (result != null && (result.contains("Error") || result.contains("Runtime"))) {
+                log.debug("런타임 에러: {}", result);
                 return null;
             }
 
