@@ -133,4 +133,34 @@ public interface AlgorithmProblemMapper {
             @Param("size") int size,
             @Param("solved") String solved
     );
+
+    // ===== Phase 8: Fallback 전략용 랜덤 문제 조회 =====
+
+    /**
+     * 같은 난이도 + 같은 주제의 랜덤 문제 ID 조회 (Fallback 옵션 1)
+     *
+     * @param difficulty 난이도 (BRONZE, SILVER, GOLD, PLATINUM)
+     * @param topic      알고리즘 주제 (태그에 포함된 문제 검색)
+     * @return 랜덤 문제 ID (없으면 null)
+     */
+    Long findRandomProblemByDifficultyAndTopic(
+            @Param("difficulty") String difficulty,
+            @Param("topic") String topic
+    );
+
+    /**
+     * 같은 난이도의 랜덤 문제 ID 조회 (Fallback 옵션 2)
+     *
+     * @param difficulty 난이도
+     * @return 랜덤 문제 ID (없으면 null)
+     */
+    Long findRandomProblemByDifficulty(@Param("difficulty") String difficulty);
+
+    /**
+     * 사용 가능한 조합 목록 조회 (Fallback 옵션 3)
+     * 난이도별로 문제가 있는 태그(주제) 목록 반환
+     *
+     * @return 사용 가능한 조합 목록 [{difficulty, topic, count}, ...]
+     */
+    List<Map<String, Object>> findAvailableCombinations();
 }

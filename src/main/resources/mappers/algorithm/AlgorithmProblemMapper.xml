@@ -264,4 +264,41 @@
         LIMIT #{size} OFFSET #{offset}
     </select>
 
+    <!-- ===== Phase 8: Fallback 전략용 랜덤 문제 조회 ===== -->
+
+    <!-- 같은 난이도 + 같은 주제의 랜덤 문제 ID 조회 (Fallback 옵션 1) -->
+    <select id="findRandomProblemByDifficultyAndTopic" resultType="Long">
+        SELECT ALGO_PROBLEM_ID
+        FROM ALGO_PROBLEMS
+        WHERE ALGO_PROBLEM_STATUS = 1
+          AND ALGO_PROBLEM_DIFFICULTY = #{difficulty}
+          AND ALGO_PROBLEM_TAGS LIKE CONCAT('%', #{topic}, '%')
+        ORDER BY RAND()
+        LIMIT 1
+    </select>
+
+    <!-- 같은 난이도의 랜덤 문제 ID 조회 (Fallback 옵션 2) -->
+    <select id="findRandomProblemByDifficulty" resultType="Long">
+        SELECT ALGO_PROBLEM_ID
+        FROM ALGO_PROBLEMS
+        WHERE ALGO_PROBLEM_STATUS = 1
+          AND ALGO_PROBLEM_DIFFICULTY = #{difficulty}
+        ORDER BY RAND()
+        LIMIT 1
+    </select>
+
+    <!-- 사용 가능한 조합 목록 조회 (Fallback 옵션 3) -->
+    <select id="findAvailableCombinations" resultType="map">
+        SELECT
+            ALGO_PROBLEM_DIFFICULTY as difficulty,
+            ALGO_PROBLEM_TAGS as topic,
+            COUNT(*) as count
+        FROM ALGO_PROBLEMS
+        WHERE ALGO_PROBLEM_STATUS = 1
+        GROUP BY ALGO_PROBLEM_DIFFICULTY, ALGO_PROBLEM_TAGS
+        HAVING COUNT(*) > 0
+        ORDER BY count DESC
+        LIMIT 10
+    </select>
+
 </mapper>
