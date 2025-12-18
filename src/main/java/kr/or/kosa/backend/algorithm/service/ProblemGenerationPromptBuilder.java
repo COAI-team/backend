@@ -1,6 +1,7 @@
 package kr.or.kosa.backend.algorithm.service;
 
 import kr.or.kosa.backend.algorithm.dto.request.ProblemGenerationRequestDto;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.document.Document;
 import org.springframework.stereotype.Component;
@@ -11,10 +12,20 @@ import java.util.Map;
 /**
  * 알고리즘 문제 생성 프롬프트 빌더
  * RAG 기반 Few-shot 학습을 위한 프롬프트 구성
+ *
+ * Phase 2 개선 사항:
+ * - StoryKeywordPool 연동으로 테마별 다양한 스토리 소재 제공
+ * - 같은 테마라도 랜덤 키워드 조합으로 매번 다른 문제 생성
  */
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class ProblemGenerationPromptBuilder {
+
+    /**
+     * 스토리 키워드 풀 - 테마별 다양한 스토리 소재 제공
+     */
+    private final StoryKeywordPool storyKeywordPool;
 
     /**
      * 사용 가능한 스토리 테마 목록 (겨울/연말 시즌)
@@ -148,6 +159,9 @@ public class ProblemGenerationPromptBuilder {
             String themeDescription = STORY_THEMES.getOrDefault(themeKey, request.getAdditionalRequirements());
             sb.append(String.format("- 스토리 테마: %s\n", themeDescription));
             sb.append("  **테마에 맞는 스토리텔링을 문제 설명에 반드시 적용하세요.**\n");
+
+            // Phase 2: 스토리 키워드 섹션 추가
+            sb.append(buildStoryKeywordSection(themeKey));
         }
 
         // 3. JSON 응답 형식 (Code-First 방식: 입력만 생성, 출력은 코드 실행으로 생성)
@@ -230,6 +244,32 @@ public class ProblemGenerationPromptBuilder {
                 알고리즘 문제를 생성하세요.
                 응답은 JSON 형식으로 작성하세요.
                 """;
+    }
+
+    /**
+     * 스토리 키워드 섹션 생성 (Phase 2)
+     *
+     * 목적: 같은 테마라도 매번 다른 스토리가 생성되도록 랜덤 키워드 제공
+     *
+     * @param theme 테마 키 (예: "SANTA_DELIVERY")
+     * @return 프롬프트에 추가할 키워드 섹션 문자열
+     */
+    private String buildStoryKeywordSection(String theme) {
+        List<String> keywords = storyKeywordPool.getRandomKeywords(theme, 3);
+
+        if (keywords.isEmpty()) {
+            log.debug("테마 '{}' 에 대한 키워드가 없어 키워드 섹션을 생략합니다.", theme);
+            return "";
+        }
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("\n## 스토리 생성 참고사항\n\n");
+        sb.append(String.format("**반드시 활용할 키워드 (3개):** %s\n\n", String.join(", ", keywords)));
+        sb.append("위 키워드들을 문제 스토리에 자연스럽게 녹여서 생성하세요.\n");
+        sb.append("키워드를 직접 언급하거나, 해당 소재를 활용한 상황을 만들어 주세요.\n");
+
+        log.debug("테마 '{}' 에 대해 키워드 섹션 생성: {}", theme, keywords);
+        return sb.toString();
     }
 
     /**
