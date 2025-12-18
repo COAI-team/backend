@@ -153,4 +153,9 @@ public interface AnalysisMapper {
         UserMistakeStatDTO findMistakeStat(@Param("userId") Long userId, @Param("mistakeType") String mistakeType);
 
         List<UserMistakeStatDTO> findMistakeStatsByUserId(@Param("userId") Long userId);
+
+        // ========== Backfill / Maintenance ==========
+        List<CodeResultDTO> findAllCodeResults();
+
+        void updateCodeResult(CodeResultDTO result);
 }
