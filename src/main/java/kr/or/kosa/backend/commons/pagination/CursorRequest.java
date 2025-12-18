@@ -13,6 +13,11 @@ public class CursorRequest {
         this.size = Math.max(size, 1);
     }
 
+    // 정적 팩토리 메서드 - 알고리즘 댓글 사용
+    public static CursorRequest of(Long cursor, int size) {
+        return new CursorRequest(cursor, size);
+    }
+
     public boolean hasCursor() {
         return cursor != null && cursor > 0;
     }
