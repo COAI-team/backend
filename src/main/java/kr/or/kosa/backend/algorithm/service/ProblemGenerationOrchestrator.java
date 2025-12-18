@@ -2,6 +2,7 @@ package kr.or.kosa.backend.algorithm.service;
 
 import kr.or.kosa.backend.algorithm.dto.AlgoProblemDto;
 import kr.or.kosa.backend.algorithm.dto.AlgoTestcaseDto;
+import kr.or.kosa.backend.algorithm.dto.DifficultySpec;
 import kr.or.kosa.backend.algorithm.dto.ValidationResultDto;
 import kr.or.kosa.backend.algorithm.dto.request.ProblemGenerationRequestDto;
 import kr.or.kosa.backend.algorithm.dto.response.ProblemGenerationResponseDto;
@@ -30,6 +31,10 @@ import java.util.function.Consumer;
  * - 품질 등급 시스템 적용 (AUTO_APPROVED / AUTO_REJECTED)
  * - 모든 검증 통과 시 AUTO_APPROVED, 실패 시 AUTO_REJECTED
  * - AUTO_REJECTED된 문제는 Pool에 저장하지 않음
+ *
+ * Phase 4 개선:
+ * - AlgorithmProfileRegistry 연동으로 프로필 기반 시간/메모리 제한 적용
+ * - 유사도 검사에 테마 파라미터 전달 (Phase 3 연동)
  */
 @Slf4j
 @Service
@@ -44,6 +49,9 @@ public class ProblemGenerationOrchestrator {
     // RAG 관련 서비스
     private final ProblemVectorStoreService vectorStoreService;
     private final AlgorithmSynonymDictionary synonymDictionary;
+
+    // Phase 4: 알고리즘 프로필 레지스트리
+    private final AlgorithmProfileRegistry profileRegistry;
 
     // 검증기들
     private final StructureValidator structureValidator;
@@ -151,7 +159,9 @@ public class ProblemGenerationOrchestrator {
                         String.format("검증 중... (시도 %d/%d)", attempt, selfCorrectionService.getMaxAttempts() + 1),
                         20 + (attempt * 15));
 
-                validationResults = runAllValidations(generatedProblem);
+                // Phase 4: 테마 파라미터 전달 (Phase 3 유사도 검사 연동)
+                String theme = request.getAdditionalRequirements();
+                validationResults = runAllValidations(generatedProblem, theme);
                 boolean allPassed = validationResults.stream().allMatch(ValidationResultDto::isPassed);
 
                 if (allPassed) {
@@ -241,10 +251,14 @@ public class ProblemGenerationOrchestrator {
 
         // 5. 응답 파싱
         LLMResponseParser.ParsedResult parsed = llmResponseParser.parse(response, request);
+        
+        // 6. Phase 4: 프로필 기반 시간/메모리 제한 적용
+        AlgoProblemDto problem = parsed.problem();
+        applyProfileBasedLimits(problem, request.getTopic(), request.getDifficulty().name());
 
         // ParsedResult -> ProblemGenerationResponseDto 변환
         return ProblemGenerationResponseDto.builder()
-                .problem(parsed.problem())
+                .problem(problem)
                 .testCases(parsed.testCases())
                 .optimalCode(parsed.optimalCode())
                 .naiveCode(parsed.naiveCode())
@@ -304,8 +318,11 @@ public class ProblemGenerationOrchestrator {
 
     /**
      * 모든 검증 실행
+     *
+     * @param problem 검증할 문제
+     * @param theme   스토리 테마 (Phase 3 유사도 검사에 전달, nullable)
      */
-    private List<ValidationResultDto> runAllValidations(ProblemGenerationResponseDto problem) {
+    private List<ValidationResultDto> runAllValidations(ProblemGenerationResponseDto problem, String theme) {
         List<ValidationResultDto> results = new ArrayList<>();
 
         AlgoProblemDto problemDto = problem.getProblem();
@@ -320,9 +337,9 @@ public class ProblemGenerationOrchestrator {
                 problemDto, testCases, optimalCode, naiveCode);
         results.add(structureResult);
 
-        // 2. 유사도 검사
-        log.info("유사도 검사 실행");
-        ValidationResultDto similarityResult = similarityChecker.checkSimilarity(problemDto);
+        // 2. 유사도 검사 (Phase 3: 테마 기반 다단계 검사)
+        log.info("유사도 검사 실행 - 테마: {}", theme);
+        ValidationResultDto similarityResult = similarityChecker.checkSimilarity(problemDto, theme);
         results.add(similarityResult);
 
         // 3. 코드 실행 검증 (최적 코드가 있을 경우)
@@ -425,5 +442,34 @@ public class ProblemGenerationOrchestrator {
         public String getStatus() { return status; }
         public String getMessage() { return message; }
         public int getPercentage() { return percentage; }
+    }
+
+    /**
+     * Phase 4: 프로필 기반 시간/메모리 제한 적용
+     *
+     * AlgorithmProfileRegistry에서 해당 주제/난이도의 스펙을 조회하여
+     * 문제의 시간/메모리 제한을 덮어씁니다.
+     * LLM이 생성한 값보다 프로필 기반 값이 더 신뢰성 있습니다.
+     *
+     * @param problem    적용 대상 문제
+     * @param topic      알고리즘 주제
+     * @param difficulty 난이도
+     */
+    private void applyProfileBasedLimits(AlgoProblemDto problem, String topic, String difficulty) {
+        if (problem == null) {
+            return;
+        }
+
+        DifficultySpec spec = profileRegistry.getDifficultySpec(topic, difficulty);
+
+        int originalTimeLimit = problem.getTimelimit();
+        int originalMemoryLimit = problem.getMemorylimit();
+
+        problem.setTimelimit(spec.getTimeLimit());
+        problem.setMemorylimit(spec.getMemoryLimit());
+
+        log.debug("프로필 기반 제한 적용 - topic: {}, difficulty: {}", topic, difficulty);
+        log.debug("  시간 제한: {}ms → {}ms", originalTimeLimit, spec.getTimeLimit());
+        log.debug("  메모리 제한: {}MB → {}MB", originalMemoryLimit, spec.getMemoryLimit());
     }
 }
