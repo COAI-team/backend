@@ -47,7 +47,10 @@ public enum AlgoErrorCode implements ErrorCode {
     MISSION_ALREADY_COMPLETED("ALGO_4501", "이미 완료된 미션입니다."),
     MISSION_TYPE_INVALID("ALGO_4502", "잘못된 미션 유형입니다."),
     MISSION_WRONG_PROBLEM("ALGO_4503", "데일리 미션 문제가 아닙니다."),
-    LOGIN_REQUIRED("ALGO_4010", "로그인이 필요합니다.");
+    LOGIN_REQUIRED("ALGO_4010", "로그인이 필요합니다."),
+
+    // 공유된 풀이 관련 오류
+    FORBIDDEN("ALGO_5001", "이 문제를 먼저 풀어야 다른 사람의 풀이를 볼 수 있습니다.");
 
     // ================================================================
     // Fields + Getter

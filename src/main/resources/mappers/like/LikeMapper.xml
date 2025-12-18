@@ -72,4 +72,12 @@
         LIMIT #{limit}
     </select>
 
+    <!-- 좋아요 수 조회 -->
+    <select id="countLikes" resultType="int">
+        SELECT COUNT(*)
+        FROM `LIKE`
+        WHERE REFERENCE_TYPE = #{referenceType}
+        AND REFERENCE_ID = #{referenceId}
+    </select>
+
 </mapper>
