@@ -55,6 +55,7 @@ public class AIProblemGeneratorService {
      * - AlgorithmSynonymDictionary로 주제 확장
      * - RAG 기반 Few-shot 학습 지원
      */
+    @Deprecated(since = "2024-12", forRemoval = true)
     public ProblemGenerationResponseDto generateProblem(ProblemGenerationRequestDto request) {
         long startTime = System.currentTimeMillis();
 
