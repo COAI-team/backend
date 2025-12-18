@@ -25,6 +25,11 @@ import java.util.function.Consumer;
 /**
  * Phase 5-1: 문제 생성 메인 오케스트레이터
  * LLM 문제 생성 → 검증 → Self-Correction → DB 저장 전체 플로우 관리
+ *
+ * Phase 6 개선:
+ * - 품질 등급 시스템 적용 (AUTO_APPROVED / AUTO_REJECTED)
+ * - 모든 검증 통과 시 AUTO_APPROVED, 실패 시 AUTO_REJECTED
+ * - AUTO_REJECTED된 문제는 Pool에 저장하지 않음
  */
 @Slf4j
 @Service
@@ -175,14 +180,17 @@ public class ProblemGenerationOrchestrator {
                 }
             } while (attempt <= selfCorrectionService.getMaxAttempts());
 
-            // 4. 검증 결과 및 메타데이터 설정
-            generatedProblem.setValidationResults(validationResults);
+            // 4. Phase 6: 품질 등급 적용
+            generatedProblem = applyQualityGrading(generatedProblem, validationResults, attempt);
+
+            // 5. 메타데이터 설정
             generatedProblem.setGeneratedAt(LocalDateTime.now());
 
             double generationTime = (System.currentTimeMillis() - startTime) / 1000.0;
             generatedProblem.setGenerationTime(generationTime);
 
-            log.info("문제 생성 완료 (저장 없음) - 소요시간: {}초", generationTime);
+            log.info("문제 생성 완료 (저장 없음) - 소요시간: {}초, 품질등급: {}",
+                    generationTime, generatedProblem.getReviewStatus());
             return generatedProblem;
 
         } catch (Exception e) {
@@ -341,6 +349,53 @@ public class ProblemGenerationOrchestrator {
         log.info("검증 완료 - 통과: {}/{}", passedCount, results.size());
 
         return results;
+    }
+
+    /**
+     * Phase 6: 품질 등급 적용
+     *
+     * 구현 논리:
+     * - 모든 검증 통과 → AUTO_APPROVED (Pool 저장 및 사용자 제공 가능)
+     * - 하나라도 실패 → AUTO_REJECTED (Pool 저장 안 함, Fallback 적용)
+     *
+     * @param problem          생성된 문제
+     * @param validationResults 검증 결과 목록
+     * @param correctionAttempts Self-Correction 시도 횟수
+     * @return 품질 등급이 적용된 문제
+     */
+    private ProblemGenerationResponseDto applyQualityGrading(
+            ProblemGenerationResponseDto problem,
+            List<ValidationResultDto> validationResults,
+            int correctionAttempts) {
+
+        boolean allPassed = validationResults.stream().allMatch(ValidationResultDto::isPassed);
+
+        problem.setValidationResults(validationResults);
+
+        if (allPassed) {
+            log.info("품질 등급: AUTO_APPROVED - 모든 검증 통과 (시도 횟수: {})", correctionAttempts);
+            problem.setStatus(ProblemGenerationResponseDto.GenerationStatus.SUCCESS);
+            problem.setReviewStatus(ProblemGenerationResponseDto.ReviewStatus.AUTO_APPROVED);
+            problem.setMessage("모든 품질 검증을 통과했습니다.");
+            return problem;
+        }
+
+        // 실패한 검증기 목록 수집
+        List<String> failedValidators = validationResults.stream()
+                .filter(r -> !r.isPassed())
+                .map(ValidationResultDto::getValidatorName)
+                .toList();
+
+        log.warn("품질 등급: AUTO_REJECTED - 실패 검증기: {}, 시도 횟수: {}",
+                failedValidators, correctionAttempts);
+
+        problem.setStatus(ProblemGenerationResponseDto.GenerationStatus.VALIDATION_FAILED);
+        problem.setReviewStatus(ProblemGenerationResponseDto.ReviewStatus.AUTO_REJECTED);
+        problem.setMessage(String.format(
+                "품질 검증 실패. 실패 검증기: %s. %d회 Self-Correction 시도에도 해결되지 않음.",
+                failedValidators, correctionAttempts));
+
+        return problem;
     }
 
     /**
