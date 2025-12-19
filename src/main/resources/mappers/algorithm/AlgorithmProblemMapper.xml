@@ -224,6 +224,12 @@
         p.PROBLEM_TYPE as problemType,
         p.ALGO_CREATER as algoCreater,
         COALESCE(stats.solveCount, 0) as solveCount,
+        COALESCE(stats.totalSubmissions, 0) as totalSubmissions,
+        CASE
+        WHEN stats.totalSubmissions > 0
+        THEN ROUND((stats.solveCount * 100.0 / stats.totalSubmissions), 1)
+        ELSE 0
+        END as accuracy,
         CASE
         WHEN #{userId} IS NOT NULL AND EXISTS (
         SELECT 1 FROM ALGO_SUBMISSIONS s
@@ -237,7 +243,8 @@
         LEFT JOIN (
         SELECT
         ALGO_PROBLEM_ID,
-        COUNT(DISTINCT CASE WHEN JUDGE_RESULT = 'AC' THEN USER_ID END) as solveCount
+        COUNT(DISTINCT CASE WHEN JUDGE_RESULT = 'AC' THEN USER_ID END) as solveCount,
+        COUNT(*) as totalSubmissions
         FROM ALGO_SUBMISSIONS
         GROUP BY ALGO_PROBLEM_ID
         ) stats ON p.ALGO_PROBLEM_ID = stats.ALGO_PROBLEM_ID

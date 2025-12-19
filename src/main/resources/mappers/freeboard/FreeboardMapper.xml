@@ -9,6 +9,7 @@
         <id property="freeboardId" column="FREEBOARD_ID"/>
         <result property="userId" column="USER_ID"/>
         <result property="userNickname" column="USER_NICKNAME"/>
+        <result property="userImage" column="USER_IMAGE"/>
         <result property="freeboardTitle" column="FREEBOARD_TITLE"/>
         <result property="freeboardSummary" column="FREEBOARD_SUMMARY"/>
         <result property="freeboardClick" column="FREEBOARD_CLICK"/>
@@ -24,6 +25,7 @@
         f.FREEBOARD_ID,
         f.USER_ID,
         u.USER_NICKNAME,
+        u.USER_IMAGE,
         f.FREEBOARD_TITLE,
         SUBSTRING(f.FREEBOARD_PLAIN_TEXT, 1, 200) as FREEBOARD_SUMMARY,
         f.FREEBOARD_CLICK,
@@ -102,6 +104,7 @@
         <id property="freeboardId" column="FREEBOARD_ID"/>
         <result property="userId" column="USER_ID"/>
         <result property="userNickname" column="USER_NICKNAME"/>
+        <result property="userImage" column="USER_IMAGE"/>
         <result property="freeboardTitle" column="FREEBOARD_TITLE"/>
         <result property="freeboardContent" column="FREEBOARD_CONTENT"/>
         <result property="freeboardClick" column="FREEBOARD_CLICK"/>
@@ -118,6 +121,7 @@
         f.FREEBOARD_ID,
         f.USER_ID,
         u.USER_NICKNAME,
+        u.USER_IMAGE,
         f.FREEBOARD_TITLE,
         f.FREEBOARD_CONTENT,
         f.FREEBOARD_CLICK,
