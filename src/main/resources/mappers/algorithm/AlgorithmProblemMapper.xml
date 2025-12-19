@@ -283,4 +283,48 @@
         LIMIT #{size} OFFSET #{offset}
     </select>
 
+    <!-- 문제 목록 하단의 통계 정보 조회 -->
+    <!-- 통계 정보 조회 -->
+    <select id="selectProblemStatisticsForUser" resultType="map">
+        SELECT
+        (SELECT COUNT(*)
+        FROM ALGO_PROBLEMS
+        WHERE ALGO_PROBLEM_STATUS = 1) as totalProblems,
+
+        (SELECT COUNT(*)
+        FROM ALGO_SUBMISSIONS) as totalAttempts,
+
+        COALESCE(
+        (SELECT ROUND(AVG(accuracy), 1)
+        FROM (
+        SELECT
+        CASE
+        WHEN COUNT(*) > 0
+        THEN (COUNT(DISTINCT CASE WHEN JUDGE_RESULT = 'AC' THEN USER_ID END) * 100.0 / COUNT(*))
+        ELSE 0
+        END as accuracy
+        FROM ALGO_SUBMISSIONS
+        GROUP BY ALGO_PROBLEM_ID
+        ) as problem_accuracies
+        ), 0
+        ) as averageAccuracy,
+
+        <choose>
+            <when test="userId != null">
+                (SELECT COUNT(DISTINCT p.ALGO_PROBLEM_ID)
+                FROM ALGO_PROBLEMS p
+                WHERE p.ALGO_PROBLEM_STATUS = 1
+                AND EXISTS (
+                SELECT 1 FROM ALGO_SUBMISSIONS s
+                WHERE s.USER_ID = #{userId}
+                AND s.ALGO_PROBLEM_ID = p.ALGO_PROBLEM_ID
+                AND s.JUDGE_RESULT = 'AC'
+                )) as solvedProblems
+            </when>
+            <otherwise>
+                0 as solvedProblems
+            </otherwise>
+        </choose>
+    </select>
+
 </mapper>
