@@ -380,22 +380,16 @@ public class AlgorithmProblemController {
     }
 
     /**
-     * 통계 정보 조회
+     * 문제 목록 하단 통계 정보 조회
      * GET /api/algo/problems/statistics
      */
     @GetMapping("/statistics")
     public ResponseEntity<ApiResponse<ProblemStatisticsResponseDto>> getStatistics(
-            @AuthenticationPrincipal JwtAuthentication authentication) {
+            @RequestAttribute(value = "userId", required = false) Long userId) {
 
-        log.info("통계 정보 조회");
+        log.info("통계 정보 조회 - userId: {}", userId);
 
         try {
-            Long userId = null;
-            if (authentication != null) {
-                JwtUserDetails userDetails = (JwtUserDetails) authentication.getPrincipal();
-                userId = userDetails.id().longValue();
-            }
-
             ProblemStatisticsResponseDto statistics = algorithmProblemService.getProblemStatistics(userId);
 
             log.info("통계 정보 조회 성공 - {}", statistics);

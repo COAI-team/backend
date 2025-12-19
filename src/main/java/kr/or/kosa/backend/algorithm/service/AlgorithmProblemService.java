@@ -14,7 +14,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -128,7 +127,7 @@ public class AlgorithmProblemService {
     }
 
     /**
-     * 통계 정보 조회
+     * 문제 목록 하단의 통계 정보 조회
      *
      * @param userId 사용자 ID (nullable)
      * @return 통계 정보
@@ -137,16 +136,13 @@ public class AlgorithmProblemService {
         log.debug("통계 정보 조회 - userId: {}", userId);
 
         try {
-            // 전체 문제 수 조회
-            int totalProblems = getTotalProblemsCount();
+            Map<String, Object> stats = algorithmProblemMapper.selectProblemStatisticsForUser(userId);
 
-            // TODO: Mapper에 selectProblemStatistics 메서드 구현 필요
-            // 현재는 기본값 반환 (merge 충돌 해결을 위한 임시 구현)
             return ProblemStatisticsResponseDto.builder()
-                    .totalProblems(totalProblems)
-                    .solvedProblems(0)
-                    .averageAccuracy(0.0)
-                    .totalAttempts(0)
+                    .totalProblems(((Number) stats.get("totalProblems")).intValue())
+                    .solvedProblems(((Number) stats.get("solvedProblems")).intValue())
+                    .averageAccuracy(((Number) stats.get("averageAccuracy")).doubleValue())
+                    .totalAttempts(((Number) stats.get("totalAttempts")).intValue())
                     .build();
 
         } catch (Exception e) {
