@@ -213,7 +213,7 @@
         WHERE ALGO_PROBLEM_ID = #{problemId}
     </select>
 
-    <!-- 사용자 풀이 상태 포함 문제 목록 조회 -->
+    <!-- 사용자 풀이 상태 포함 문제 목록 조회 + 검색 기능 -->
     <select id="selectProblemsWithUserStatus" resultType="map">
         SELECT
         p.ALGO_PROBLEM_ID as algoProblemId,
@@ -223,6 +223,13 @@
         p.ALGO_PROBLEM_SOURCE as algoProblemSource,
         p.PROBLEM_TYPE as problemType,
         p.ALGO_CREATER as algoCreater,
+        COALESCE(stats.solveCount, 0) as solveCount,
+        COALESCE(stats.totalSubmissions, 0) as totalSubmissions,
+        CASE
+        WHEN stats.totalSubmissions > 0
+        THEN ROUND((stats.solveCount * 100.0 / stats.totalSubmissions), 1)
+        ELSE 0
+        END as accuracy,
         CASE
         WHEN #{userId} IS NOT NULL AND EXISTS (
         SELECT 1 FROM ALGO_SUBMISSIONS s
@@ -233,12 +240,24 @@
         ELSE 0
         END AS isSolved
         FROM ALGO_PROBLEMS p
+        LEFT JOIN (
+        SELECT
+        ALGO_PROBLEM_ID,
+        COUNT(DISTINCT CASE WHEN JUDGE_RESULT = 'AC' THEN USER_ID END) as solveCount,
+        COUNT(*) as totalSubmissions
+        FROM ALGO_SUBMISSIONS
+        GROUP BY ALGO_PROBLEM_ID
+        ) stats ON p.ALGO_PROBLEM_ID = stats.ALGO_PROBLEM_ID
         WHERE p.ALGO_PROBLEM_STATUS = 1
         <if test="difficulty != null and difficulty != ''">
             AND p.ALGO_PROBLEM_DIFFICULTY = #{difficulty}
         </if>
         <if test="tags != null and tags != ''">
             AND p.ALGO_PROBLEM_TAGS LIKE CONCAT('%', #{tags}, '%')
+        </if>
+        <if test="keyword != null and keyword != ''">
+            AND (p.ALGO_PROBLEM_TITLE LIKE CONCAT('%', #{keyword}, '%')
+            OR p.ALGO_PROBLEM_DESCRIPTION LIKE CONCAT('%', #{keyword}, '%'))
         </if>
         <if test="solved != null and solved != ''">
             <choose>
@@ -260,7 +279,7 @@
                 </when>
             </choose>
         </if>
-        ORDER BY p.ALGO_PROBLEM_ID ASC
+        ORDER BY p.ALGO_PROBLEM_ID DESC
         LIMIT #{size} OFFSET #{offset}
     </select>
 

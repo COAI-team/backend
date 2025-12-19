@@ -16,6 +16,7 @@ public class FreeboardListResponseDto {
     private Long freeboardId;
     private Long userId;
     private String userNickname;
+    private String userImage;
     private String freeboardTitle;
     private String freeboardSummary;
     private String freeboardRepresentImage;

@@ -84,14 +84,14 @@ public class AlgorithmProblemService {
      */
     public List<Map<String, Object>> getProblemsWithUserStatus(
             Long userId, int offset, int limit, String difficulty,
-            String source, String keyword, String topic, String problemType, String solved) {
+            String source, String keyword, String tags, String problemType, String solved) {
 
-        log.debug("문제 목록 조회 (풀이 상태 포함) - userId: {}, offset: {}, limit: {}, solved: {}",
-                userId, offset, limit, solved);
+        log.debug("문제 목록 조회 (풀이 상태 포함) - userId: {}, offset: {}, limit: {}, tags: {}, keyword: {}, solved: {}",
+                userId, offset, limit, tags, keyword, solved);
 
         try {
             List<Map<String, Object>> problems = algorithmProblemMapper.selectProblemsWithUserStatus(
-                    userId, difficulty, topic, offset, limit, solved);
+                    userId, difficulty, tags, keyword, offset, limit, solved);  // keyword 추가
 
             log.debug("문제 목록 조회 완료 - 조회된 문제 수: {}", problems.size());
 
