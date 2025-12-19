@@ -105,6 +105,7 @@ public class CodeboardService {
                 .codeboardId(codeboard.getCodeboardId())
                 .userId(codeboard.getUserId())
                 .userNickname(codeboard.getUserNickname())
+                .userImage(codeboard.getUserImage())
                 .analysisId(codeboard.getAnalysisId())
                 .codeboardTitle(codeboard.getCodeboardTitle())
                 .codeboardContent(codeboard.getCodeboardContent())

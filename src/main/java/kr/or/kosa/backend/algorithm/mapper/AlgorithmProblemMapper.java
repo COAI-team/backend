@@ -129,6 +129,7 @@ public interface AlgorithmProblemMapper {
             @Param("userId") Long userId,
             @Param("difficulty") String difficulty,
             @Param("tags") String tags,
+            @Param("keyword") String keyword,
             @Param("offset") int offset,
             @Param("size") int size,
             @Param("solved") String solved
