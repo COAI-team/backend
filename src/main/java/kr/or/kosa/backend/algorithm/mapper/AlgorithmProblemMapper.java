@@ -134,4 +134,11 @@ public interface AlgorithmProblemMapper {
             @Param("size") int size,
             @Param("solved") String solved
     );
+
+    /**
+     * 문제 목록 하단의 통계 정보 조회
+     * @param userId 사용자 ID (null 가능)
+     * @return 통계 정보 Map
+     */
+    Map<String, Object> selectProblemStatisticsForUser(@Param("userId") Long userId);
 }
