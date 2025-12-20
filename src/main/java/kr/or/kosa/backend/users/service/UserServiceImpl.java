@@ -238,7 +238,8 @@ public class UserServiceImpl implements UserService {
         }
 
         String token = passwordResetTokenService.createResetToken(users.getUserId());
-        String resetUrl = "https://localhost:5173/reset-password?token=" + token;
+        String resetUrl =
+                "https://code-nemsy-frontend.vercel.app/reset-password?token=" + token;
 
         boolean sent = emailVerificationService.send(
                 email,

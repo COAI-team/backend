@@ -43,10 +43,7 @@ public class SecurityConfig {
                                 "/",
                                 "/auth/github/**",
                                 "/oauth2/**",
-                                "/users/register",
-                                "/users/login",
-                                "/users/github/link",
-                                "/users/password/**",
+                                "/users/**",
                                 "/email/**",
                                 "/admin/**",
                                 "/codeAnalysis/**",
@@ -101,7 +98,9 @@ public class SecurityConfig {
                 "http://localhost:*",
                 "https://localhost:*",
                 "http://127.0.0.1:*",
-                "https://127.0.0.1:*"
+                "https://127.0.0.1:*",
+                "https://*.vercel.app",  // Vercel 프론트엔드 추가
+                "https://code-nemsy-frontend-*.vercel.app"  // 현재 프로젝트
         ));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         configuration.setAllowedHeaders(List.of("*"));
