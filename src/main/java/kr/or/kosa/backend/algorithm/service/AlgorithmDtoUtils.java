@@ -1,7 +1,6 @@
 package kr.or.kosa.backend.algorithm.service;
 
 import kr.or.kosa.backend.algorithm.dto.AlgoProblemDto;
-import kr.or.kosa.backend.algorithm.dto.AlgoTestcaseDto;
 import kr.or.kosa.backend.algorithm.dto.AlgoSubmissionDto;
 import kr.or.kosa.backend.algorithm.dto.enums.ProblemDifficulty;
 import kr.or.kosa.backend.algorithm.dto.enums.ProblemSource;

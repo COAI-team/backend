@@ -39,9 +39,15 @@ public class RateLimitInterceptor implements HandlerInterceptor {
         String uri = request.getRequestURI();
         String method = request.getMethod();
 
-        // GET 요청은 제한 없음
+        // GET 요청은 기본적으로 제한 없음 (단, SSE 스트리밍 엔드포인트는 예외)
         if ("GET".equalsIgnoreCase(method)) {
-            return true;
+            // SSE 스트리밍 엔드포인트는 사용량 추적 대상
+            // - /algo/problems/generate/validated/stream (문제 생성)
+            // - /algo/pool/draw/stream (풀에서 문제 뽑기)
+            if (!uri.contains("/stream")) {
+                return true;
+            }
+            log.debug("SSE 스트리밍 요청 감지 - Rate limit 적용: {}", uri);
         }
 
         // UsageType 결정
@@ -52,6 +58,16 @@ public class RateLimitInterceptor implements HandlerInterceptor {
 
         // 인증된 사용자 확인
         Long userId = getCurrentUserId();
+
+        // SSE 요청은 EventSource API 제한으로 Authorization 헤더 전송 불가
+        // → 쿼리 파라미터에서 userId 읽기 시도
+        if (userId == null && "GET".equalsIgnoreCase(method) && uri.contains("/stream")) {
+            userId = getUserIdFromQueryParam(request);
+            if (userId != null) {
+                log.debug("SSE 요청 - 쿼리 파라미터에서 userId 획득: {}", userId);
+            }
+        }
+
         if (userId == null) {
             sendErrorResponse(response, HttpStatus.UNAUTHORIZED, "로그인이 필요합니다.");
             return false;
@@ -80,10 +96,22 @@ public class RateLimitInterceptor implements HandlerInterceptor {
      * URI에서 UsageType 결정
      */
     private UsageType determineUsageType(String uri) {
-        if (uri.contains("/generate")) {
+        // Rate Limit 제외 대상: 공유하기 (무료 사용자도 기존 제출 결과 공유 가능)
+        if (uri.contains("/visibility")) {
+            return null;
+        }
+
+        // 문제 생성 관련 엔드포인트
+        if (uri.contains("/generate") || uri.contains("/pool/draw")) {
             return UsageType.GENERATE;
-        } else if (uri.contains("/solve") || uri.contains("/submit")) {
+        }
+        // 문제 풀이/제출 관련 엔드포인트
+        if (uri.contains("/solve") || uri.contains("/submit") || uri.contains("/submissions")) {
             return UsageType.SOLVE;
+        }
+        // 코드 분석 관련 엔드포인트
+        if (uri.contains("/analysis/analyze")) {
+            return UsageType.ANALYSIS;
         }
         return null;
     }
@@ -97,6 +125,22 @@ public class RateLimitInterceptor implements HandlerInterceptor {
             Object principal = jwtAuth.getPrincipal();
             if (principal instanceof JwtUserDetails userDetails) {
                 return userDetails.id().longValue();
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 쿼리 파라미터에서 userId 조회 (SSE 요청용)
+     * EventSource API는 Authorization 헤더 전송 불가하므로 쿼리 파라미터로 대체
+     */
+    private Long getUserIdFromQueryParam(HttpServletRequest request) {
+        String userIdParam = request.getParameter("userId");
+        if (userIdParam != null && !userIdParam.isEmpty()) {
+            try {
+                return Long.parseLong(userIdParam);
+            } catch (NumberFormatException e) {
+                log.warn("잘못된 userId 파라미터: {}", userIdParam);
             }
         }
         return null;

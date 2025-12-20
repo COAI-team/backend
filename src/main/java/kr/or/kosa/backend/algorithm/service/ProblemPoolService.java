@@ -2,12 +2,15 @@ package kr.or.kosa.backend.algorithm.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import kr.or.kosa.backend.algorithm.dto.AlgoProblemDto;
+import kr.or.kosa.backend.algorithm.dto.AlgoTestcaseDto;
 import kr.or.kosa.backend.algorithm.dto.PoolProblemDto;
 import kr.or.kosa.backend.algorithm.dto.PoolStatusDto;
 import kr.or.kosa.backend.algorithm.dto.enums.ProblemDifficulty;
 import kr.or.kosa.backend.algorithm.dto.enums.ProblemTopic;
 import kr.or.kosa.backend.algorithm.dto.request.ProblemGenerationRequestDto;
 import kr.or.kosa.backend.algorithm.dto.response.ProblemGenerationResponseDto;
+import kr.or.kosa.backend.algorithm.mapper.AlgorithmProblemMapper;
 import kr.or.kosa.backend.algorithm.mapper.ProblemPoolMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -33,6 +36,7 @@ import java.util.function.Consumer;
 public class ProblemPoolService {
 
     private final ProblemPoolMapper poolMapper;
+    private final AlgorithmProblemMapper algorithmProblemMapper;  // Phase 8: Fallback용
     private final ProblemGenerationOrchestrator generationOrchestrator;
     private final AlgorithmProblemService problemService;
     private final ProblemVectorStoreService vectorStoreService;
@@ -121,7 +125,12 @@ public class ProblemPoolService {
     }
 
     /**
-     * 실시간 문제 생성 (Fallback)
+     * 실시간 문제 생성 (Phase 8: Fallback 전략 적용)
+     *
+     * <p>흐름:
+     * <p>1. 실시간 문제 생성 시도
+     * <p>2. AUTO_APPROVED → 즉시 반환
+     * <p>3. AUTO_REJECTED → Fallback 전략 적용
      */
     private ProblemGenerationResponseDto generateRealtime(
             String difficulty,
@@ -136,8 +145,146 @@ public class ProblemPoolService {
                 .additionalRequirements("스토리 테마: " + theme)
                 .build();
 
-        // 기존 generateProblem 사용 (생성 + 저장 + 진행률 콜백)
-        return generationOrchestrator.generateProblem(request, userId, progressCallback);
+        try {
+            // 1. 실시간 문제 생성 시도
+            ProblemGenerationResponseDto result = generationOrchestrator.generateProblem(
+                    request, userId, progressCallback);
+
+            // 2. AUTO_APPROVED면 바로 반환
+            if (result.isApproved()) {
+                log.info("✅ [실시간 생성] 성공 - 품질 등급: AUTO_APPROVED");
+                return result;
+            }
+
+            // 3. AUTO_REJECTED면 Fallback 전략 적용
+            log.warn("⚠️ [실시간 생성] 품질 미달 (AUTO_REJECTED) - Fallback 전략 적용");
+            return applyFallbackStrategy(difficulty, topic, theme, userId, result);
+
+        } catch (Exception e) {
+            log.error("❌ [실시간 생성] 예외 발생 - Fallback 전략 적용", e);
+            return applyFallbackStrategy(difficulty, topic, theme, userId, null);
+        }
+    }
+
+    // ===== Phase 8: Fallback 전략 =====
+
+    /**
+     * Fallback 전략 적용
+     *
+     * <p>옵션 1: 같은 난이도 + 같은 주제의 기존 문제 제공
+     * <p>옵션 2: 같은 난이도의 다른 주제 문제 제공
+     * <p>옵션 3: 가능한 조합 추천 안내
+     *
+     * @param difficulty   요청 난이도
+     * @param topic        요청 주제
+     * @param theme        요청 테마
+     * @param userId       사용자 ID
+     * @param failedResult 실패한 생성 결과 (nullable)
+     * @return Fallback 응답
+     */
+    private ProblemGenerationResponseDto applyFallbackStrategy(
+            String difficulty,
+            String topic,
+            String theme,
+            Long userId,
+            ProblemGenerationResponseDto failedResult) {
+
+        log.info("🔄 [Fallback] 시작 - difficulty: {}, topic: {}, theme: {}", difficulty, topic, theme);
+
+        // 옵션 1: 같은 난이도 + 같은 주제의 기존 문제
+        Long existingProblemId = algorithmProblemMapper.findRandomProblemByDifficultyAndTopic(difficulty, topic);
+        if (existingProblemId != null) {
+            log.info("✅ [Fallback 옵션1] 같은 난이도+주제 문제 발견 - problemId: {}", existingProblemId);
+            return buildFallbackResponse(
+                    existingProblemId,
+                    "요청하신 조합의 새 문제 생성에 실패하여, 같은 난이도와 주제의 기존 문제를 제공합니다.",
+                    failedResult
+            );
+        }
+
+        // 옵션 2: 같은 난이도의 다른 주제 문제
+        existingProblemId = algorithmProblemMapper.findRandomProblemByDifficulty(difficulty);
+        if (existingProblemId != null) {
+            log.info("✅ [Fallback 옵션2] 같은 난이도 문제 발견 - problemId: {}", existingProblemId);
+            return buildFallbackResponse(
+                    existingProblemId,
+                    "요청하신 주제의 새 문제 생성에 실패하여, 같은 난이도의 다른 문제를 제공합니다.",
+                    failedResult
+            );
+        }
+
+        // 옵션 3: 가능한 조합 추천
+        log.warn("⚠️ [Fallback 옵션3] 기존 문제 없음 - 가능한 조합 추천");
+        return buildRecommendationResponse(difficulty, topic, failedResult);
+    }
+
+    /**
+     * Fallback 응답 생성 (기존 문제 제공)
+     */
+    private ProblemGenerationResponseDto buildFallbackResponse(
+            Long problemId,
+            String message,
+            ProblemGenerationResponseDto failedResult) {
+
+        try {
+            // 기존 문제 조회
+            AlgoProblemDto problem = problemService.getProblemDetail(problemId);
+
+            if (problem == null) {
+                log.error("Fallback 문제 조회 실패 - problemId: {}", problemId);
+                return buildRecommendationResponse(null, null, failedResult);
+            }
+
+            // 테스트케이스 조회
+            List<AlgoTestcaseDto> testCases = algorithmProblemMapper.selectTestCasesByProblemId(problemId);
+
+            return ProblemGenerationResponseDto.builder()
+                    .problemId(problemId)
+                    .problem(problem)
+                    .testCases(testCases)
+                    .status(ProblemGenerationResponseDto.GenerationStatus.SUCCESS)
+                    .reviewStatus(ProblemGenerationResponseDto.ReviewStatus.AUTO_APPROVED)
+                    .message(message)
+                    .fallbackUsed(true)
+                    .validationResults(failedResult != null ? failedResult.getValidationResults() : null)
+                    .build();
+
+        } catch (Exception e) {
+            log.error("Fallback 응답 생성 실패", e);
+            return buildRecommendationResponse(null, null, failedResult);
+        }
+    }
+
+    /**
+     * 추천 응답 생성 (기존 문제가 없을 때)
+     */
+    private ProblemGenerationResponseDto buildRecommendationResponse(
+            String difficulty,
+            String topic,
+            ProblemGenerationResponseDto failedResult) {
+
+        // 사용 가능한 조합 조회
+        List<Map<String, Object>> availableCombinations = algorithmProblemMapper.findAvailableCombinations();
+
+        List<String> suggestions = availableCombinations.stream()
+                .map(combo -> String.format("%s - %s (%d개 문제)",
+                        combo.get("difficulty"),
+                        combo.get("topic"),
+                        ((Number) combo.get("count")).intValue()))
+                .toList();
+
+        String message = suggestions.isEmpty()
+                ? "현재 제공 가능한 문제가 없습니다. 잠시 후 다시 시도해 주세요."
+                : "요청하신 조합의 문제 생성에 실패했습니다. 다음 조합의 문제를 시도해 보세요.";
+
+        return ProblemGenerationResponseDto.builder()
+                .status(ProblemGenerationResponseDto.GenerationStatus.VALIDATION_FAILED)
+                .reviewStatus(ProblemGenerationResponseDto.ReviewStatus.AUTO_REJECTED)
+                .message(message)
+                .fallbackUsed(true)
+                .suggestedCombinations(suggestions)
+                .validationResults(failedResult != null ? failedResult.getValidationResults() : null)
+                .build();
     }
 
     // ===== 데일리 미션용 문제 소비 =====
@@ -176,14 +323,16 @@ public class ProblemPoolService {
 
     /**
      * 풀에 문제 추가 (스케줄러에서 호출)
+     * <p>Phase 6: AUTO_APPROVED 문제만 풀에 저장
      * <p>1. 문제 생성 (저장 없음)
-     * <p>2. JSON 직렬화 → 풀에 저장
-     * <p>3. Vector DB에 저장 (유사도 검사용)
+     * <p>2. 품질 등급 확인 (AUTO_APPROVED만 통과)
+     * <p>3. JSON 직렬화 → 풀에 저장
+     * <p>4. Vector DB에 저장 (유사도 검사용)
      *
      * @param difficulty 난이도
      * @param topic      알고리즘 주제 (displayName)
      * @param theme      스토리 테마
-     * @return 생성된 풀 문제 ID
+     * @return 생성된 풀 문제 ID (AUTO_REJECTED면 null 반환)
      */
     @Transactional
     public Long generateForPool(String difficulty, String topic, String theme) {
@@ -202,10 +351,11 @@ public class ProblemPoolService {
             ProblemGenerationResponseDto generated = generationOrchestrator.generateWithoutSaving(request);
 
             // 디버그: 저장 전 데이터 확인
-            log.info("🔍 [Pool 저장 전] generationTime: {}, validationResults: {}, optimalCode: {}",
+            log.info("🔍 [Pool 저장 전] generationTime: {}, validationResults: {}, optimalCode: {}, reviewStatus: {}",
                     generated.getGenerationTime(),
                     generated.getValidationResults() != null ? generated.getValidationResults().size() + "개" : "null",
-                    generated.getOptimalCode() != null ? generated.getOptimalCode().length() + "자" : "null");
+                    generated.getOptimalCode() != null ? generated.getOptimalCode().length() + "자" : "null",
+                    generated.getReviewStatus());
 
             if (generated.getValidationResults() != null && !generated.getValidationResults().isEmpty()) {
                 generated.getValidationResults().forEach(vr ->
@@ -213,10 +363,19 @@ public class ProblemPoolService {
                             vr.getValidatorName(), vr.isPassed(), vr.getMetadata()));
             }
 
-            // 2. JSON 직렬화
+            // 2. Phase 6: 품질 등급 확인 - AUTO_APPROVED만 풀에 저장
+            if (!generated.isApproved()) {
+                log.warn("❌ [Pool 저장 거부] 품질 등급 미달 - reviewStatus: {}, message: {}",
+                        generated.getReviewStatus(), generated.getMessage());
+                return null;  // 스케줄러에서 재시도 또는 다음 조합으로 이동
+            }
+
+            log.info("✅ [Pool 저장 승인] 품질 등급 통과 - reviewStatus: {}", generated.getReviewStatus());
+
+            // 3. JSON 직렬화
             String contentJson = objectMapper.writeValueAsString(generated);
 
-            // 3. 풀에 저장
+            // 4. 풀에 저장
             int generationTimeMs = (int) (System.currentTimeMillis() - startTime);
             PoolProblemDto poolProblem = PoolProblemDto.builder()
                     .difficulty(difficulty)
@@ -229,7 +388,7 @@ public class ProblemPoolService {
 
             poolMapper.insert(poolProblem);
 
-            // 4. Vector DB에 저장 (유사도 검사용 - 풀 문제도 포함)
+            // 5. Vector DB에 저장 (유사도 검사용 - 풀 문제도 포함)
             storeToVectorDb(generated, poolProblem.getAlgoPoolId());
 
             log.info("풀 채우기 완료 - poolId: {}, 소요시간: {}ms", poolProblem.getAlgoPoolId(), generationTimeMs);

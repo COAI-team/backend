@@ -26,6 +26,9 @@ public class SubmissionResponseDto {
     private Long problemId;
     private String problemTitle;
     private String problemDescription; // 문제 설명 (제출 결과 페이지에서 문제 확인용)
+    private String inputFormat;        // 입력 형식 설명
+    private String outputFormat;       // 출력 형식 설명
+    private String constraints;        // 제한 사항
     private String difficulty;         // 난이도 (BRONZE, SILVER, GOLD, PLATINUM)
     private Integer timeLimit;         // 시간 제한 (ms)
     private Integer memoryLimit;       // 메모리 제한 (MB)
