@@ -251,7 +251,7 @@ public class ProblemGenerationPromptBuilder {
                 - Python 코드나 표현식 (join, range, for 등)을 절대 사용하지 마세요.
                 - 잘못된 예시: "input": "".join(str(x) for x in range(100))
                 - 올바른 예시: "input": "1 2 3 4 5"
-                - 큰 데이터가 필요한 경우 적당한 크���(10~100개)의 실제 데이터를 작성하세요.
+                - 큰 데이터가 필요한 경우 적당한 크기(10~100개)의 실제 데이터를 작성하세요.
                 - 실제 실행 가능한 구체적인 데이터를 사용하세요.
                 """);
 
