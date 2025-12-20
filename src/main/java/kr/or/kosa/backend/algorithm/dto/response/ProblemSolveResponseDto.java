@@ -23,6 +23,12 @@ public class ProblemSolveResponseDto {
     private String difficulty;
     private Integer timeLimit;
     private Integer memoryLimit;
+    private String algoProblemTags;  // 문제 태그 (JSON 형태)
+
+    // 구조화된 문제 내용 (DB에서 직접 가져옴)
+    private String inputFormat;      // 입력 형식 설명
+    private String outputFormat;     // 출력 형식 설명
+    private String constraints;      // 제한 사항
 
     // 문제 통계 정보
     private Integer totalAttempts;  // 총 제출 수

@@ -398,9 +398,31 @@ public class AlgorithmProblemService {
                     Map<String, Object> metadata = result.getMetadata();
 
                     if ("SimilarityChecker".equals(result.getValidatorName())) {
-                        // SimilarityChecker는 "maxFoundSimilarity" 키로 저장함 (0~1 범위)
-                        if (metadata != null && metadata.containsKey("maxFoundSimilarity")) {
-                            similarityScore = ((Number) metadata.get("maxFoundSimilarity")).doubleValue() * 100; // 0~1 → 0~100 변환
+                        // SimilarityChecker 유사도 점수 추출 (다단계 검사 또는 Jaccard 폴백)
+                        if (metadata != null) {
+                            // Phase 3: 다단계 검사 (VectorDB_MultiLevel) - 최대 유사도 추출
+                            Double maxSim = null;
+                            if (metadata.containsKey("collected_maxSimilarity")) {
+                                Double val = ((Number) metadata.get("collected_maxSimilarity")).doubleValue();
+                                maxSim = (maxSim == null) ? val : Math.max(maxSim, val);
+                            }
+                            if (metadata.containsKey("generated_maxSimilarity")) {
+                                Double val = ((Number) metadata.get("generated_maxSimilarity")).doubleValue();
+                                maxSim = (maxSim == null) ? val : Math.max(maxSim, val);
+                            }
+                            if (metadata.containsKey("sameTheme_maxSimilarity")) {
+                                Double val = ((Number) metadata.get("sameTheme_maxSimilarity")).doubleValue();
+                                maxSim = (maxSim == null) ? val : Math.max(maxSim, val);
+                            }
+                            // Jaccard 폴백 (0~1 범위)
+                            if (metadata.containsKey("maxFoundSimilarity")) {
+                                Double val = ((Number) metadata.get("maxFoundSimilarity")).doubleValue();
+                                maxSim = (maxSim == null) ? val : Math.max(maxSim, val);
+                            }
+                            // 최대 유사도를 0~100 범위로 변환하여 저장
+                            if (maxSim != null) {
+                                similarityScore = maxSim * 100;
+                            }
                         }
                         similarityValid = result.isPassed();
                     }

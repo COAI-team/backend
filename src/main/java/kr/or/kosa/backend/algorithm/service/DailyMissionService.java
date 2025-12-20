@@ -10,7 +10,6 @@ import kr.or.kosa.backend.algorithm.mapper.DailyMissionMapper;
 import kr.or.kosa.backend.pay.entity.Subscription;
 import kr.or.kosa.backend.pay.repository.SubscriptionMapper;
 import kr.or.kosa.backend.pay.service.PointService;
-import kr.or.kosa.backend.users.mapper.UserMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -31,7 +30,6 @@ public class DailyMissionService {
 
     private final DailyMissionMapper missionMapper;
     private final AlgorithmSubmissionMapper submissionMapper;  // 잔디 캘린더용
-    private final UserMapper userMapper;
     private final PointService pointService;
     private final RateLimitService rateLimitService;
     private final SubscriptionMapper subscriptionMapper;
@@ -332,6 +330,7 @@ public class DailyMissionService {
         return new UsageInfoResult(
                 usage.generateCount(),
                 usage.solveCount(),
+                usage.analysisCount(),
                 usage.getTotal(),
                 remaining,
                 isSubscriber
@@ -395,6 +394,7 @@ public class DailyMissionService {
     public record UsageInfoResult(
             int generateCount,
             int solveCount,
+            int analysisCount,
             int totalUsage,
             int remaining,
             boolean isSubscriber

@@ -70,13 +70,14 @@ public class RateLimitService {
         Map<Object, Object> entries = redisTemplate.opsForHash().entries(key);
 
         if (entries.isEmpty()) {
-            return new UsageInfo(0, 0);
+            return new UsageInfo(0, 0, 0);
         }
 
         int generate = parseIntOrZero(entries.get("GENERATE"));
         int solve = parseIntOrZero(entries.get("SOLVE"));
+        int analysis = parseIntOrZero(entries.get("ANALYSIS"));
 
-        return new UsageInfo(generate, solve);
+        return new UsageInfo(generate, solve, analysis);
     }
 
     /**
@@ -141,15 +142,16 @@ public class RateLimitService {
     /**
      * 사용량 정보 DTO
      */
-    public record UsageInfo(int generateCount, int solveCount) {
+    public record UsageInfo(int generateCount, int solveCount, int analysisCount) {
         public int getTotal() {
-            return generateCount + solveCount;
+            return generateCount + solveCount + analysisCount;
         }
 
         public Map<String, Integer> toMap() {
             Map<String, Integer> map = new HashMap<>();
             map.put("generate", generateCount);
             map.put("solve", solveCount);
+            map.put("analysis", analysisCount);
             map.put("total", getTotal());
             return map;
         }
