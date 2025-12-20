@@ -17,11 +17,11 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/users")
-@CrossOrigin(origins = {
-        "http://localhost:5173",
-        "https://localhost:5173",
-        "https://code-nemsy-frontend-ib16omxd0-minseok-chois-projects.vercel.app"
-})
+//@CrossOrigin(origins = {
+//        "http://localhost:5173",
+//        "https://localhost:5173",
+//        "https://code-nemsy-frontend-ib16omxd0-minseok-chois-projects.vercel.app"
+//})
 @RequiredArgsConstructor
 public class UserPointController {
 
