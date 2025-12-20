@@ -96,6 +96,11 @@ public class RateLimitInterceptor implements HandlerInterceptor {
      * URI에서 UsageType 결정
      */
     private UsageType determineUsageType(String uri) {
+        // Rate Limit 제외 대상: 공유하기 (무료 사용자도 기존 제출 결과 공유 가능)
+        if (uri.contains("/visibility")) {
+            return null;
+        }
+
         // 문제 생성 관련 엔드포인트
         if (uri.contains("/generate") || uri.contains("/pool/draw")) {
             return UsageType.GENERATE;
