@@ -20,6 +20,7 @@ public class RateLimitConfig implements WebMvcConfigurer {
         registry.addInterceptor(rateLimitInterceptor)
                 .addPathPatterns("/algo/problems/generate/**")  // 문제 생성 (POST + SSE GET)
                 .addPathPatterns("/algo/submissions/**")        // 코드 제출 (기존 /algo/solving/** 수정)
-                .addPathPatterns("/algo/pool/draw/**");         // 풀에서 문제 뽑기 (SSE GET)
+                .addPathPatterns("/algo/pool/draw/**")          // 풀에서 문제 뽑기 (SSE GET)
+                .addPathPatterns("/analysis/analyze-stored");   // 코드 분석
     }
 }

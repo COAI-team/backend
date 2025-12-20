@@ -104,6 +104,10 @@ public class RateLimitInterceptor implements HandlerInterceptor {
         if (uri.contains("/solve") || uri.contains("/submit") || uri.contains("/submissions")) {
             return UsageType.SOLVE;
         }
+        // 코드 분석 관련 엔드포인트
+        if (uri.contains("/analysis/analyze")) {
+            return UsageType.ANALYSIS;
+        }
         return null;
     }
 

@@ -330,6 +330,7 @@ public class DailyMissionService {
         return new UsageInfoResult(
                 usage.generateCount(),
                 usage.solveCount(),
+                usage.analysisCount(),
                 usage.getTotal(),
                 remaining,
                 isSubscriber
@@ -393,6 +394,7 @@ public class DailyMissionService {
     public record UsageInfoResult(
             int generateCount,
             int solveCount,
+            int analysisCount,
             int totalUsage,
             int remaining,
             boolean isSubscriber
