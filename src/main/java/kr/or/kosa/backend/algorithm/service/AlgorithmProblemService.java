@@ -78,73 +78,19 @@ public class AlgorithmProblemService {
         }
     }
 
-
-//     문제 목록 조회 (V2 - 통계 포함 제거할 예정
-//     @param request 문제 목록 조회 요청 DTO
-//     @return 문제 목록 및 페이징 정보
-//
-//    public Map<String, Object> getProblemListWithStats(ProblemListRequestDto request) {
-//        log.debug("문제 목록 조회 (V2) - request: {}", request);
-//
-//        try {
-//            // 문제 목록 조회
-//            List<AlgoProblemDto> problems = getProblemsWithFilter(
-//                    request.getOffset(),
-//                    request.getLimit(),
-//                    request.getDifficulty(),
-//                    request.getSource(),
-//                    request.getKeyword(),
-//                    request.getTopic(),
-//                    request.getProblemType()
-//            );
-//
-//            // 전체 개수 조회
-//            int totalCount = getTotalProblemsCountWithFilter(
-//                    request.getDifficulty(),
-//                    request.getSource(),
-//                    request.getKeyword(),
-//                    request.getTopic(),
-//                    request.getProblemType(),
-//                    null,
-//                    null
-//            );
-//
-//            // 페이징 정보 계산
-//            int totalPages = (int) Math.ceil((double) totalCount / request.getLimit());
-//
-//            // 응답 데이터 구성
-//            Map<String, Object> responseData = new HashMap<>();
-//            responseData.put("problems", problems);
-//            responseData.put("totalCount", totalCount);
-//            responseData.put("currentPage", request.getPage());
-//            responseData.put("pageSize", request.getLimit());
-//            responseData.put("totalPages", totalPages);
-//            responseData.put("hasNext", request.getPage() < totalPages);
-//            responseData.put("hasPrevious", request.getPage() > 1);
-//
-//            log.debug("문제 목록 조회 완료 - totalCount: {}, problems: {}", totalCount, problems.size());
-//
-//            return responseData;
-//
-//        } catch (Exception e) {
-//            log.error("문제 목록 조회 실패 (V2)", e);
-//            throw new RuntimeException("문제 목록 조회 중 오류가 발생했습니다.", e);
-//        }
-//    }
-
     /**
      * 사용자 풀이 상태 포함 문제 목록 조회
      */
     public List<Map<String, Object>> getProblemsWithUserStatus(
             Long userId, int offset, int limit, String difficulty,
-            String source, String keyword, String topic, String problemType, String solved) {
+            String source, String keyword, String tags, String problemType, String solved) {
 
-        log.debug("문제 목록 조회 (풀이 상태 포함) - userId: {}, offset: {}, limit: {}, solved: {}",
-                userId, offset, limit, solved);
+        log.debug("문제 목록 조회 (풀이 상태 포함) - userId: {}, offset: {}, limit: {}, tags: {}, keyword: {}, solved: {}",
+                userId, offset, limit, tags, keyword, solved);
 
         try {
             List<Map<String, Object>> problems = algorithmProblemMapper.selectProblemsWithUserStatus(
-                    userId, difficulty, topic, offset, limit, solved);
+                    userId, difficulty, tags, keyword, offset, limit, solved);  // keyword 추가
 
             log.debug("문제 목록 조회 완료 - 조회된 문제 수: {}", problems.size());
 
@@ -181,7 +127,7 @@ public class AlgorithmProblemService {
     }
 
     /**
-     * 통계 정보 조회
+     * 문제 목록 하단의 통계 정보 조회
      *
      * @param userId 사용자 ID (nullable)
      * @return 통계 정보
@@ -190,16 +136,13 @@ public class AlgorithmProblemService {
         log.debug("통계 정보 조회 - userId: {}", userId);
 
         try {
-            // 전체 문제 수 조회
-            int totalProblems = getTotalProblemsCount();
+            Map<String, Object> stats = algorithmProblemMapper.selectProblemStatisticsForUser(userId);
 
-            // TODO: Mapper에 selectProblemStatistics 메서드 구현 필요
-            // 현재는 기본값 반환 (merge 충돌 해결을 위한 임시 구현)
             return ProblemStatisticsResponseDto.builder()
-                    .totalProblems(totalProblems)
-                    .solvedProblems(0)
-                    .averageAccuracy(0.0)
-                    .totalAttempts(0)
+                    .totalProblems(((Number) stats.get("totalProblems")).intValue())
+                    .solvedProblems(((Number) stats.get("solvedProblems")).intValue())
+                    .averageAccuracy(((Number) stats.get("averageAccuracy")).doubleValue())
+                    .totalAttempts(((Number) stats.get("totalAttempts")).intValue())
                     .build();
 
         } catch (Exception e) {

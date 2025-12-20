@@ -25,7 +25,7 @@
             COALESCE(SUM(freeboard_click), 0) AS total_views,
             COALESCE(AVG(freeboard_click), 0) AS avg_views,
             SUM(CASE WHEN freeboard_deleted_yn = 'Y' THEN 1 ELSE 0 END) AS deleted_post_count
-        FROM freeboard
+        FROM FREEBOARD
         WHERE DATE(freeboard_created_at) = #{targetDate}
     </select>
 
@@ -38,7 +38,7 @@
             COALESCE(SUM(code_board_click), 0) AS total_views,
             COALESCE(AVG(code_board_click), 0) AS avg_views,
             SUM(CASE WHEN code_board_deleted_yn = 'Y' THEN 1 ELSE 0 END) AS deleted_post_count
-        FROM code_board
+        FROM CODEBOARD
         WHERE DATE(code_board_created_at) = #{targetDate}
     </select>
 
@@ -51,8 +51,8 @@
             COALESCE(SUM(algorithm_board_click), 0) AS total_views,
             COALESCE(AVG(algorithm_board_click), 0) AS avg_views,
             SUM(CASE WHEN algorithm_board_deleted_yn = 'Y' THEN 1 ELSE 0 END) AS deleted_post_count
-        FROM algorithm_board
-        WHERE DATE(algorithm_board_created_at) = #{targetDate}
+        FROM ALGO_PROBLEMS
+        WHERE DATE(created_at) = #{targetDate}
     </select>
 
     <!-- 통계 데이터 저장 -->

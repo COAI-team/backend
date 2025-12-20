@@ -129,6 +129,7 @@ public interface AlgorithmProblemMapper {
             @Param("userId") Long userId,
             @Param("difficulty") String difficulty,
             @Param("tags") String tags,
+            @Param("keyword") String keyword,
             @Param("offset") int offset,
             @Param("size") int size,
             @Param("solved") String solved
@@ -163,4 +164,10 @@ public interface AlgorithmProblemMapper {
      * @return 사용 가능한 조합 목록 [{difficulty, topic, count}, ...]
      */
     List<Map<String, Object>> findAvailableCombinations();
+    /**
+     * 문제 목록 하단의 통계 정보 조회
+     * @param userId 사용자 ID (null 가능)
+     * @return 통계 정보 Map
+     */
+    Map<String, Object> selectProblemStatisticsForUser(@Param("userId") Long userId);
 }

@@ -3,6 +3,7 @@ package kr.or.kosa.backend.like.service;
 import kr.or.kosa.backend.commons.exception.custom.CustomBusinessException;
 import kr.or.kosa.backend.like.domain.Like;
 import kr.or.kosa.backend.like.domain.ReferenceType;
+import kr.or.kosa.backend.like.dto.LikeToggleResponse;
 import kr.or.kosa.backend.like.dto.LikeUserDto;
 import kr.or.kosa.backend.like.exception.LikeErrorCode;
 import kr.or.kosa.backend.like.mapper.LikeMapper;
@@ -29,7 +30,7 @@ public class LikeService {
     private static final long RATE_LIMIT_SECONDS = 3; // 3초에 1번만 허용
 
     @Transactional
-    public boolean toggleLike(Long userId, ReferenceType referenceType, Long referenceId) {
+    public LikeToggleResponse toggleLike(Long userId, ReferenceType referenceType, Long referenceId) {
         if (userId == null) {
             throw new CustomBusinessException(LikeErrorCode.UNAUTHORIZED);
         }
@@ -62,6 +63,7 @@ public class LikeService {
 
         Like existingLike = likeMapper.selectLike(userId, referenceType, referenceId);
 
+        boolean liked;
         if (existingLike != null) {
             // 좋아요 취소
             int deleted = likeMapper.deleteLike(userId, referenceType, referenceId);
@@ -70,7 +72,7 @@ public class LikeService {
             }
             log.info("좋아요 취소 완료 - userId: {}, referenceType: {}, referenceId: {}",
                     userId, referenceType, referenceId);
-            return false;
+            liked = false;
         } else {
             // 좋아요 추가
             Like likeRecord = Like.builder()
@@ -85,8 +87,16 @@ public class LikeService {
             }
             log.info("좋아요 추가 완료 - userId: {}, referenceType: {}, referenceId: {}",
                     userId, referenceType, referenceId);
-            return true;
+            liked = true;
         }
+
+        // 현재 좋아요 수 조회
+        int likeCount = likeMapper.countLikes(referenceType, referenceId);
+
+        return LikeToggleResponse.builder()
+                .liked(liked)
+                .likeCount(likeCount)
+                .build();
     }
 
     public List<Long> getLikedIds(Long userId, ReferenceType referenceType, List<Long> referenceIds) {

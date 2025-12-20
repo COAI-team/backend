@@ -1,10 +1,6 @@
 package kr.or.kosa.backend.algorithm.service;
 
-import kr.or.kosa.backend.algorithm.dto.AlgoProblemDto;
-import kr.or.kosa.backend.algorithm.dto.AlgoSubmissionDto;
-import kr.or.kosa.backend.algorithm.dto.AlgoTestcaseDto;
-import kr.or.kosa.backend.algorithm.dto.LanguageDto;
-import kr.or.kosa.backend.algorithm.dto.UserAlgoLevelDto;
+import kr.or.kosa.backend.algorithm.dto.*;
 import kr.or.kosa.backend.algorithm.dto.enums.AiFeedbackStatus;
 import kr.or.kosa.backend.algorithm.dto.enums.AiFeedbackType;
 import kr.or.kosa.backend.algorithm.dto.enums.JudgeResult;
@@ -17,11 +13,12 @@ import kr.or.kosa.backend.algorithm.dto.request.TestRunRequestDto;
 import kr.or.kosa.backend.algorithm.dto.response.ProblemSolveResponseDto;
 import kr.or.kosa.backend.algorithm.dto.response.SubmissionResponseDto;
 import kr.or.kosa.backend.algorithm.dto.response.TestRunResponseDto;
+import kr.or.kosa.backend.algorithm.exception.AlgoErrorCode;
 import kr.or.kosa.backend.algorithm.mapper.AlgorithmProblemMapper;
 import kr.or.kosa.backend.algorithm.mapper.AlgorithmSubmissionMapper;
 import kr.or.kosa.backend.algorithm.mapper.DailyMissionMapper;
 import kr.or.kosa.backend.algorithm.mapper.MonitoringMapper;
-import kr.or.kosa.backend.algorithm.dto.MonitoringSessionDto;
+import kr.or.kosa.backend.commons.exception.custom.CustomBusinessException;
 import kr.or.kosa.backend.commons.pagination.PageRequest;
 import kr.or.kosa.backend.commons.pagination.PageResponse;
 import lombok.RequiredArgsConstructor;
@@ -258,37 +255,40 @@ public class AlgorithmSolvingService {
         AlgoProblemDto problem = problemMapper.selectProblemById(submission.getAlgoProblemId());
         return convertToSubmissionResponse(submission, problem, null);
     }
-
+    
     /**
-     * 문제별 공유된 제출 목록 조회 (다른 사람의 풀이)
+     * 문제별 공유된 제출 목록 조회 (다른 사람의 풀이) + 풀이 유저 정보 포함
+     * 본인이 해당 문제를 AC(Accept) 처리한 적이 있어야만 조회 가능
      */
     @Transactional(readOnly = true)
-    public PageResponse<SubmissionResponseDto> getSharedSubmissions(Long problemId, int page, int size) {
-        log.info("공유된 제출 목록 조회 - problemId: {}, page: {}, size: {}", problemId, page, size);
+    public PageResponse<AlgoSubmissionShareDto> getSharedSubmissions(Long problemId, Long currentUserId, int page, int size) {
+        log.info("공유된 제출 목록 조회 - problemId: {}, userId: {}, page: {}, size: {}",
+                problemId, currentUserId, page, size);
 
-        // 1. 페이지 요청 객체 생성
+        // 1. 로그인 체크
+        if (currentUserId == null) {
+            throw new CustomBusinessException(AlgoErrorCode.UNAUTHORIZED);
+        }
+
+        // 2. 사용자가 이 문제를 정답 처리한 적이 있는지 확인
+        boolean hasSolved = submissionMapper.hasUserSolvedProblem(currentUserId, problemId);
+
+        if (!hasSolved) {
+            throw new CustomBusinessException(AlgoErrorCode.FORBIDDEN);
+        }
+
+        // 3. 권한 확인 완료 - 공유 풀이 조회
         PageRequest pageRequest = new PageRequest(page, size);
-
-        // 2. 총 개수 조회
         int totalCount = submissionMapper.countPublicSubmissionsByProblemId(problemId);
 
-        // 3. 제출 목록 조회
-        List<AlgoSubmissionDto> submissions = submissionMapper.selectPublicSubmissionsByProblemId(
+        List<AlgoSubmissionShareDto> submissions = submissionMapper.selectSharedSubmissionsWithUser(
                 problemId,
-                pageRequest.getOffset(),
-                pageRequest.getSize()
+                currentUserId,
+                pageRequest.getSize(),
+                pageRequest.getOffset()
         );
 
-        // 4. DTO 변환
-        List<SubmissionResponseDto> content = submissions.stream()
-                .map(submission -> {
-                    AlgoProblemDto problem = problemMapper.selectProblemById(submission.getAlgoProblemId());
-                    return convertToSubmissionResponse(submission, problem, null);
-                })
-                .collect(Collectors.toList());
-
-        // 5. PageResponse 반환
-        return new PageResponse<>(content, pageRequest, totalCount);
+        return new PageResponse<>(submissions, pageRequest, totalCount);
     }
 
     /**

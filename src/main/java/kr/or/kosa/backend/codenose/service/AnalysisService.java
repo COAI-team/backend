@@ -160,6 +160,17 @@ public class AnalysisService {
                     userContext.substring(0, Math.min(userContext.length(), 100)) + "...");
 
             // 3. 프롬프트 생성 (시스템 프롬프트 + 사용자 컨텍스트 + 요청사항)
+
+            // 2.5. 코드 스타일 분석 (10가지 기준) - Main Agent에게 "이 유저는 이런 스타일이다"라고 알려주기 위함
+            Instant styleStart = Instant.now();
+            langfuseService.startSpan("StyleAnalysis", styleStart, Collections.emptyMap());
+
+            String styleJson = analyzeCodeStyle(storedFile.getFileContent());
+            log.info("Code Style extracted: {}", styleJson != null ? "Success" : "Failed");
+
+            langfuseService.endSpan(null, Instant.now(), Collections.emptyMap());
+
+            // 3. 프롬프트 생성 (시스템 프롬프트 + 사용자 컨텍스트 + 요청사항 + 스타일)
             Instant promptStart = Instant.now();
             langfuseService.startSpan("PromptGeneration", promptStart, Collections.emptyMap());
 
@@ -167,7 +178,8 @@ public class AnalysisService {
                     requestDto.getAnalysisTypes(),
                     requestDto.getToneLevel(),
                     requestDto.getCustomRequirements(),
-                    userContext);
+                    userContext,
+                    styleJson);
 
             String metadataPrompt = promptGenerator.createMetadataPrompt(storedFile.getFileContent());
 
@@ -187,6 +199,19 @@ public class AnalysisService {
             langfuseService.endSpan(null, Instant.now(), Collections.emptyMap()); // AgenticWorkflow 스팬 종료
 
             String cleanedResponse = cleanMarkdownCodeBlock(aiResponseContent);
+
+            // 5.5. 스타일 분석 결과를 최종 응답 JSON에 병합 (DB 저장 전)
+            if (styleJson != null) {
+                try {
+                    com.fasterxml.jackson.databind.node.ObjectNode mainNode = (com.fasterxml.jackson.databind.node.ObjectNode) objectMapper
+                            .readTree(cleanedResponse);
+                    JsonNode styleNode = objectMapper.readTree(styleJson);
+                    mainNode.set("styleAnalysis", styleNode); // Root에 styleAnalysis 추가
+                    cleanedResponse = objectMapper.writeValueAsString(mainNode);
+                } catch (Exception e) {
+                    log.error("Failed to merge style analysis", e);
+                }
+            }
 
             // 5. 분석 결과를 CODE_ANALYSIS_HISTORY 테이블에 저장
             String analysisId = saveAnalysisResult(storedFile, requestDto, cleanedResponse, metadataJson,
@@ -402,6 +427,20 @@ public class AnalysisService {
     }
 
     /**
+     * 코드 스타일 분석 (10가지 기준)
+     */
+    private String analyzeCodeStyle(String code) {
+        try {
+            String prompt = promptGenerator.createStyleAnalysisPrompt(code);
+            String response = chatLanguageModel.generate(prompt);
+            return cleanMarkdownCodeBlock(response);
+        } catch (Exception e) {
+            log.error("코드 스타일 분석 실패", e);
+            return null; // 실패 시 null 반환 (메인 로직은 계속 진행)
+        }
+    }
+
+    /**
      * 메타데이터 추출용 AI 호출
      */
     private String extractMetadata(String prompt) {
@@ -451,7 +490,8 @@ public class AnalysisService {
                     List.of("Code Review", "Bug Detection"), // Default analysis types
                     1, // Default Tone (Level 1: The Tired Mentor)
                     "Focus on logic and security",
-                    userContext);
+                    userContext,
+                    null);
 
             // 3. Agentic Workflow 실행
             String aiResponseContent = agenticWorkflowService.executeWorkflow(code, systemPromptWithTone);
@@ -548,5 +588,108 @@ public class AnalysisService {
             log.error("분석 결과 저장 실패: {}", e.getMessage(), e);
             throw new RuntimeException("분석 결과 저장에 실패했습니다: " + e.getMessage());
         }
+
+    }
+
+    /**
+     * 메타데이터 및 스타일 분석 백필 (Backfill / Re-analysis)
+     * 
+     * 저장된 모든 분석 기록을 순회하며:
+     * 1. 원본 코드를 다시 가져옵니다.
+     * 2. 새로운 '코드 스타일 분석(Coding DNA)'을 수행합니다.
+     * 3. 메타데이터를 다시 추출합니다.
+     * 4. DB의 분석 결과 JSON과 METADATA 컬럼을 업데이트합니다.
+     * 5. Vector Store(Qdrant)에 최신 정보를 다시 Ingest합니다.
+     * 
+     * 주의: 데이터 양에 따라 시간이 오래 걸릴 수 있는 무거운 작업입니다.
+     */
+    public String backfillMetadata() {
+        log.info("Starting Metadata Backfill Process...");
+        List<CodeResultDTO> allResults = analysisMapper.findAllCodeResults();
+        int successCount = 0;
+        int failureCount = 0;
+
+        for (CodeResultDTO result : allResults) {
+            try {
+                log.info("Backfilling Analysis ID: {}", result.getAnalysisId());
+
+                // 1. 원본 파일 내용 조회 (저장 당시 스냅샷이 없으면 최신파일 조회 시도)
+                // 현재 구조상 CodeResultDTO에는 파일 내용이 없음. GithubFileDTO를 찾아야 함.
+                // 꼼수: result.getFilePath()와 RepoUrl로 GithubFiles를 찾거나,
+                // 만약 Analysis ID가 GithubFile ID와 연동이 안되어 있다면(구조상),
+                // 가장 정확한 건 당시 분석했던 '코드 내용'이 필요한데,
+                // 현재 DB 스키마상 CODE_ANALYSIS_HISTORY에는 '코드 원본'이 저장되지 않음.
+                // 따라서 GITHUB_FILES 테이블에서 해당 경로의 최신 파일을 가져와야 함 (근사치).
+
+                // 더 정확한 방법: result.getRepositoryUrl() + result.getFilePath() 로 GITHUB_FILES 조회
+                GithubFileDTO fileDto = analysisMapper.findLatestFileContent(result.getRepositoryUrl(),
+                        result.getFilePath());
+
+                if (fileDto == null) {
+                    log.warn("Skipping {}: Original file not found in DB.", result.getAnalysisId());
+                    failureCount++;
+                    continue;
+                }
+
+                String codeContent = fileDto.getFileContent();
+
+                // 2. 새로운 스타일 분석 실행
+                String styleJson = analyzeCodeStyle(codeContent);
+
+                // 3. 메타데이터 재추출
+                String metadataPrompt = promptGenerator.createMetadataPrompt(codeContent);
+                String metadataJson = extractMetadata(metadataPrompt);
+
+                // 4. 기존 분석 결과 JSON 업데이트 (Code Style 병합)
+                String originalJson = result.getAnalysisResult();
+                String updatedJson = originalJson;
+
+                if (styleJson != null) {
+                    try {
+                        JsonNode originalNode = objectMapper.readTree(originalJson);
+                        if (originalNode instanceof com.fasterxml.jackson.databind.node.ObjectNode) {
+                            JsonNode styleNode = objectMapper.readTree(styleJson);
+                            ((com.fasterxml.jackson.databind.node.ObjectNode) originalNode).set("styleAnalysis",
+                                    styleNode);
+                            updatedJson = objectMapper.writeValueAsString(originalNode);
+                        }
+                    } catch (Exception e) {
+                        log.error("Failed to merge style JSON for backfill", e);
+                    }
+                }
+
+                // 5. DTO 업데이트 및 DB 저장
+                result.setAnalysisResult(updatedJson);
+                result.setMetadata(metadataJson);
+                // AI 점수나 제안 등은 그대로 유지하거나 파싱해서 업데이트할 수도 있음 (여기선 생략)
+
+                analysisMapper.updateCodeResult(result);
+
+                // 6. Vector Store Re-ingest
+                try {
+                    RagDto.IngestRequest ingestRequest = new RagDto.IngestRequest(
+                            String.valueOf(result.getUserId()),
+                            metadataJson,
+                            updatedJson,
+                            result.getFilePath().substring(result.getFilePath().lastIndexOf(".") + 1),
+                            result.getFilePath(),
+                            "Backfeed Re-analysis",
+                            result.getCustomRequirements(),
+                            result.getAnalysisId());
+                    ragService.ingestCode(ingestRequest);
+                } catch (Exception e) {
+                    log.error("Failed to re-ingest to Vector Store", e);
+                    // DB 저장은 성공했으므로 카운트는 성공으로 간주하거나 별도 처리
+                }
+
+                successCount++;
+
+            } catch (Exception e) {
+                log.error("Failed to backfill Analysis ID: " + result.getAnalysisId(), e);
+                failureCount++;
+            }
+        }
+
+        return String.format("Backfill Complete. Success: %d, Failure: %d", successCount, failureCount);
     }
 }

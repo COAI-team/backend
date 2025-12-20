@@ -1,5 +1,6 @@
 package kr.or.kosa.backend.algorithm.controller;
 
+import kr.or.kosa.backend.algorithm.dto.AlgoSubmissionShareDto;
 import kr.or.kosa.backend.algorithm.dto.LanguageDto;
 import kr.or.kosa.backend.algorithm.dto.request.SubmissionRequestDto;
 import kr.or.kosa.backend.algorithm.dto.request.TestRunRequestDto;
@@ -237,25 +238,22 @@ public class AlgorithmSolvingController {
     }
 
     /**
-     * 문제별 공유된 제출 목록 조회 (다른 사람의 풀이)
+     * 문제별 공유된 제출 목록 조회 (다른 사람의 풀이) + 풀이 유저 정보 포함
      */
     @GetMapping("/problems/{problemId}/solutions")
-    public ResponseEntity<ApiResponse<PageResponse<SubmissionResponseDto>>> getSharedSubmissions(
-            @PathVariable("problemId") Long problemId,
+    public ResponseEntity<ApiResponse<PageResponse<AlgoSubmissionShareDto>>> getSharedSubmissions(
+            @PathVariable Long problemId,
             @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "20") int size) {
-
-        log.info("공유된 제출 목록 조회 - problemId: {}, page: {}, size: {}", problemId, page, size);
-
-        try {
-            PageResponse<SubmissionResponseDto> response = solvingService.getSharedSubmissions(problemId, page, size);
-
-            return ResponseEntity.ok(new ApiResponse<>("0000", "공유된 제출 목록 조회 완료", response));
-
-        } catch (Exception e) {
-            log.error("공유된 제출 목록 조회 중 예외 발생", e);
-            throw new CustomBusinessException(AlgoErrorCode.SUBMISSION_NOT_FOUND);
-        }
+            @RequestParam(defaultValue = "20") int size,
+            @RequestAttribute(value = "userId", required = false) Long userId
+    ) {
+        PageResponse<AlgoSubmissionShareDto> response = solvingService.getSharedSubmissions(
+                problemId,
+                userId,
+                page,
+                size
+        );
+        return ResponseEntity.ok(ApiResponse.success(response));
     }
 
     /**

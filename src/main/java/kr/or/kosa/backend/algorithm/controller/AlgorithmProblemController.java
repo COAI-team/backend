@@ -335,41 +335,41 @@ public class AlgorithmProblemController {
 
     @GetMapping
     public ResponseEntity<ApiResponse<Map<String, Object>>> getProblems(
-            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(required = false) String difficulty,
             @RequestParam(required = false) String source,
             @RequestParam(required = false) String keyword,
-            @RequestParam(required = false) String topic,
+            @RequestParam(required = false) String tags,
             @RequestParam(required = false) String problemType,
-            @RequestParam(required = false) String solved,  // 추가
+            @RequestParam(required = false) String solved,
             @RequestAttribute(value = "userId", required = false) Long userId) {
 
-        log.info("문제 목록 조회 요청 - userId: {}, page: {}, size: {}, solved: {}",
-                userId, page, size, solved);
+        log.info("문제 목록 조회 요청 - userId: {}, page: {}, size: {}, difficulty: {}, tags: {}, keyword: {}, solved: {}",
+                userId, page, size, difficulty, tags, keyword, solved);
 
         try {
-            if (page < 1) page = 1;
+            if (page < 0) page = 0;
             if (size < 1 || size > 100) size = 10;
 
-            int offset = (page - 1) * size;
+            int offset = page * size;
 
             List<Map<String, Object>> problems = algorithmProblemService.getProblemsWithUserStatus(
-                    userId, offset, size, difficulty, source, keyword, topic, problemType, solved);
+                    userId, offset, size, difficulty, source, keyword, tags, problemType, solved);
 
             int totalCount = algorithmProblemService.getTotalProblemsCountWithFilter(
-                    difficulty, source, keyword, topic, problemType, userId, solved);  // userId, solved 추가
+                    difficulty, source, keyword, tags, problemType, userId, solved);
 
             int totalPages = (int) Math.ceil((double) totalCount / size);
 
             Map<String, Object> responseData = new HashMap<>();
             responseData.put("problems", problems);
-            responseData.put("currentPage", page);
+            responseData.put("currentPage", page + 1);
             responseData.put("pageSize", size);
             responseData.put("totalCount", totalCount);
             responseData.put("totalPages", totalPages);
-            responseData.put("hasNext", page < totalPages);
-            responseData.put("hasPrevious", page > 1);
+            responseData.put("hasNext", page < totalPages - 1);
+            responseData.put("hasPrevious", page > 0);
 
             return ResponseEntity.ok(ApiResponse.success(responseData));
 
@@ -380,22 +380,16 @@ public class AlgorithmProblemController {
     }
 
     /**
-     * 통계 정보 조회
+     * 문제 목록 하단 통계 정보 조회
      * GET /api/algo/problems/statistics
      */
     @GetMapping("/statistics")
     public ResponseEntity<ApiResponse<ProblemStatisticsResponseDto>> getStatistics(
-            @AuthenticationPrincipal JwtAuthentication authentication) {
+            @RequestAttribute(value = "userId", required = false) Long userId) {
 
-        log.info("통계 정보 조회");
+        log.info("통계 정보 조회 - userId: {}", userId);
 
         try {
-            Long userId = null;
-            if (authentication != null) {
-                JwtUserDetails userDetails = (JwtUserDetails) authentication.getPrincipal();
-                userId = userDetails.id().longValue();
-            }
-
             ProblemStatisticsResponseDto statistics = algorithmProblemService.getProblemStatistics(userId);
 
             log.info("통계 정보 조회 성공 - {}", statistics);

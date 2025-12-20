@@ -130,7 +130,8 @@ public class AnalysisWithoutRagService {
                     requestDto.getAnalysisTypes(),
                     requestDto.getToneLevel(),
                     requestDto.getCustomRequirements(),
-                    userContext);
+                    userContext,
+                    null);
 
             // 4. Agentic Workflow 실행
             String aiResponseContent = agenticWorkflowService.executeWorkflow(storedFile.getFileContent(),

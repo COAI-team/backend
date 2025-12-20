@@ -48,7 +48,6 @@ public class SecurityConfig {
                                 "/users/github/link",
                                 "/users/password/**",
                                 "/email/**",
-                                "/algo/**",
                                 "/admin/**",
                                 "/codeAnalysis/**",
 
@@ -65,13 +64,13 @@ public class SecurityConfig {
                                 "/codeboard/**",
                                 "/comment",
                                 "/comment/**",
-                                "/like/*/*/users",  // 좋아요 누른 사용자 목록 확인
+                                "/like/*/*/users",
                                 "/like/**",
-                                "/analysis/**"
+                                "/algo/**"
                         ).permitAll()
 
                         // (Token Auth)
-                        .requestMatchers("/api/mcp/token").authenticated() // User Token Issue
+                        .requestMatchers("/api/mcp/token").authenticated()
                         // (JWT Auth)
                         .anyRequest().authenticated()
                 )
@@ -97,7 +96,6 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        // 로컬 개발용: http/https + 모든 포트(5173, 9443 등) 허용
         configuration.setAllowedOriginPatterns(List.of(
                 "*",
                 "http://localhost:*",
