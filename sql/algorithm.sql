@@ -353,22 +353,6 @@ CREATE TABLE `PROBLEM_VALIDATION_LOGS` (
 -- =============================================
 -- Rate Limiting & Daily Mission 테이블
 -- =============================================
-
--- 사용자 일일 사용량 추적 테이블 (히스토리 보존용)
-CREATE TABLE `USER_DAILY_USAGE` (
-    `USAGE_ID` BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '사용량 고유 식별자',
-    `USER_ID` BIGINT NOT NULL COMMENT '사용자 ID',
-    `USAGE_DATE` DATE NOT NULL COMMENT '사용 날짜',
-    `GENERATE_COUNT` INT DEFAULT 0 COMMENT 'AI 문제 생성 횟수',
-    `SOLVE_COUNT` INT DEFAULT 0 COMMENT '문제 풀기 횟수',
-    `CREATED_AT` TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '생성 일시',
-    `UPDATED_AT` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '수정 일시',
-
-    UNIQUE KEY `uk_user_date` (`USER_ID`, `USAGE_DATE`),
-    INDEX `idx_usage_date` (`USAGE_DATE`),
-    FOREIGN KEY (`USER_ID`) REFERENCES `USERS`(`USER_ID`) ON DELETE CASCADE
-) ENGINE = InnoDB AUTO_INCREMENT = 1 DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '사용자 일일 사용량';
-
 -- 데일리 미션 테이블
 CREATE TABLE `DAILY_MISSIONS` (
     `MISSION_ID` BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '미션 고유 식별자',
