@@ -6,33 +6,6 @@ SET CHARACTER SET utf8mb4;
 -- -- 데이터베이스 생성
 CREATE DATABASE IF NOT EXISTS `algo` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE `algo`;
--- -- =============================================
--- -- 0. 사용자 테이블 (외래키 참조를 위해 먼저 생성)
--- -- =============================================
---     create table USERS
--- (
---     USER_ID           bigint auto_increment
---         primary key,
---     USER_EMAIL        varchar(255)                                               not null,
---     USER_PW           varchar(255)                                               not null,
---     USER_NAME         varchar(100)                                               not null,
---     USER_NICKNAME     varchar(50)                                                not null,
---     USER_IMAGE        varchar(500)                                               null,
---     USER_GRADE        int                              default 1                 not null,
---     USER_ROLE         enum ('ROLE_USER', 'ROLE_ADMIN') default 'ROLE_USER'       not null,
---     USER_ISDELETED    tinyint(1)                       default 0                 not null,
---     USER_DELETEDAT    datetime                                                   null,
---     USER_CREATEDAT    datetime                         default CURRENT_TIMESTAMP not null,
---     USER_UPDATEDAT    datetime                         default CURRENT_TIMESTAMP null on update CURRENT_TIMESTAMP,
---     USER_ENABLED      tinyint(1)                       default 1                 not null,
---     USER_ISSUBSCRIBED tinyint(1)                       default 0                 not null,
---     constraint UQ_USERS_EMAIL
---         unique (USER_EMAIL),
---     constraint UQ_USERS_NICKNAME
---         unique (USER_NICKNAME)
--- );
--- INSERT INTO USERS (USER_ID, USER_EMAIL, USER_PW, USER_NAME, USER_NICKNAME, USER_IMAGE, USER_GRADE, USER_ROLE, USER_ISDELETED, USER_DELETEDAT, USER_CREATEDAT, USER_UPDATEDAT, USER_ENABLED, USER_ISSUBSCRIBED) 
--- VALUES (1, 'dummyuser@example.com', '$2a$10$abcdefghijklmnopqrstuvwxyz0123456789.hashed.password.string', '테스트사용자', '더미닉네임1', NULL, 1, 'ROLE_USER', 0, NULL, NOW(), NOW(), 1, 0);
 -- =============================================
 -- 1. 알고리즘 문제 테이블 (SQL 문제 지원 추가)
 -- =============================================
@@ -353,22 +326,6 @@ CREATE TABLE `PROBLEM_VALIDATION_LOGS` (
 -- =============================================
 -- Rate Limiting & Daily Mission 테이블
 -- =============================================
-
--- 사용자 일일 사용량 추적 테이블 (히스토리 보존용)
-CREATE TABLE `USER_DAILY_USAGE` (
-    `USAGE_ID` BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '사용량 고유 식별자',
-    `USER_ID` BIGINT NOT NULL COMMENT '사용자 ID',
-    `USAGE_DATE` DATE NOT NULL COMMENT '사용 날짜',
-    `GENERATE_COUNT` INT DEFAULT 0 COMMENT 'AI 문제 생성 횟수',
-    `SOLVE_COUNT` INT DEFAULT 0 COMMENT '문제 풀기 횟수',
-    `CREATED_AT` TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '생성 일시',
-    `UPDATED_AT` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '수정 일시',
-
-    UNIQUE KEY `uk_user_date` (`USER_ID`, `USAGE_DATE`),
-    INDEX `idx_usage_date` (`USAGE_DATE`),
-    FOREIGN KEY (`USER_ID`) REFERENCES `USERS`(`USER_ID`) ON DELETE CASCADE
-) ENGINE = InnoDB AUTO_INCREMENT = 1 DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '사용자 일일 사용량';
-
 -- 데일리 미션 테이블
 CREATE TABLE `DAILY_MISSIONS` (
     `MISSION_ID` BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '미션 고유 식별자',
