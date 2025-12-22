@@ -19,7 +19,7 @@ import java.time.LocalDate;
 
 @RestController
 @RequestMapping("/payments")
-@CrossOrigin(origins = {"http://localhost:5173", "https://localhost:5173"})
+//@CrossOrigin(origins = {"http://localhost:5173", "https://localhost:5173"})
 public class PaymentsController {
 
     private final PaymentsService paymentsService;

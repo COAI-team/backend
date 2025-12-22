@@ -5,9 +5,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
-import java.util.Collections;
-import java.util.concurrent.TimeUnit;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Service
@@ -49,8 +48,7 @@ public class PasswordResetTokenService {
      */
     public boolean deleteToken(String token) {
         try {
-            Long deleted = redisTemplate.delete(Collections.singleton(RESET_TOKEN_PREFIX + token));
-            return deleted > 0;
+            return redisTemplate.delete(RESET_TOKEN_PREFIX + token);
         } catch (Exception e) {
             log.error("Failed to delete reset token {}: {}", token, e.getMessage());
             return false;

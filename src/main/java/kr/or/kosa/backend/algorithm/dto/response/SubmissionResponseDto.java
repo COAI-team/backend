@@ -26,6 +26,9 @@ public class SubmissionResponseDto {
     private Long problemId;
     private String problemTitle;
     private String problemDescription; // 문제 설명 (제출 결과 페이지에서 문제 확인용)
+    private String inputFormat;        // 입력 형식 설명
+    private String outputFormat;       // 출력 형식 설명
+    private String constraints;        // 제한 사항
     private String difficulty;         // 난이도 (BRONZE, SILVER, GOLD, PLATINUM)
     private Integer timeLimit;         // 시간 제한 (ms)
     private Integer memoryLimit;       // 메모리 제한 (MB)
@@ -71,6 +74,10 @@ public class SubmissionResponseDto {
 
     // GitHub 커밋 URL (NULL: 미커밋, 값: 커밋완료)
     private String githubCommitUrl;
+
+    // XP 관련 (2025-12-17 추가)
+    private Integer earnedXp;       // 이번 제출로 획득한 XP (AC일 때만)
+    private Boolean isFirstSolve;   // 첫 정답 여부 (1.5배 보너스 적용)
 
     // 제출 시각
     private LocalDateTime submittedAt;

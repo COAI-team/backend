@@ -1,6 +1,8 @@
 package kr.or.kosa.backend.algorithm.service;
 
+import kr.or.kosa.backend.algorithm.dto.DifficultySpec;
 import kr.or.kosa.backend.algorithm.dto.request.ProblemGenerationRequestDto;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.document.Document;
 import org.springframework.stereotype.Component;
@@ -11,21 +13,44 @@ import java.util.Map;
 /**
  * 알고리즘 문제 생성 프롬프트 빌더
  * RAG 기반 Few-shot 학습을 위한 프롬프트 구성
+ *
+ * Phase 2 개선 사항:
+ * - StoryKeywordPool 연동으로 테마별 다양한 스토리 소재 제공
+ * - 같은 테마라도 랜덤 키워드 조합으로 매번 다른 문제 생성
+ *
+ * Phase 1 개선 사항:
+ * - AlgorithmProfileRegistry 연동으로 알고리즘별/난이도별 스펙 제공
+ * - 프로필 기반 가이드라인으로 더 정확한 문제 생성
  */
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class ProblemGenerationPromptBuilder {
 
     /**
-     * 사용 가능한 스토리 테마 목록
-     * 프론트엔드에서 선택 가능한 테마들
+     * 스토리 키워드 풀 - 테마별 다양한 스토리 소재 제공
+     */
+    private final StoryKeywordPool storyKeywordPool;
+
+    /**
+     * 알고리즘 프로필 레지스트리 - 알고리즘별 난이도별 스펙 제공 (Phase 1)
+     */
+    private final AlgorithmProfileRegistry profileRegistry;
+
+    /**
+     * 사용 가능한 스토리 테마 목록 (겨울/연말 시즌)
+     * 프론트엔드 ProblemGenerator.jsx의 STORY_THEMES와 동기화 필수
+     *
+     * 동기화 대상:
+     * - coai-frontend/src/pages/algorithm/ProblemGenerator.jsx
+     * - coai-backend/src/main/java/.../controller/ProblemPoolController.java (ACTIVE_THEMES)
      */
     public static final Map<String, String> STORY_THEMES = Map.of(
-            "SPACE", "우주 탐사대 - 우주선, 행성, 위성 탐사 미션. 예: 탐사선이 N개의 행성을 방문하려 한다...",
-            "GAME", "게임 개발자 - RPG 게임 밸런싱, 아이템 조합, 스킬 시스템. 예: 마법사의 스킬 조합에서 최대 데미지를...",
-            "FINANCE", "금융 분석가 - 주식 거래, 투자 포트폴리오 최적화. 예: N일간의 주가 데이터에서 최대 이익을...",
-            "COOKING", "요리 대회 - 레시피 최적화, 재료 조합, 요리 점수 계산. 예: K가지 재료로 만들 수 있는 요리의...",
-            "FESTIVAL", "음악 페스티벌 - 공연 스케줄링, 무대 배치, 관객 동선. 예: N개의 밴드가 M개의 무대에서..."
+            "SANTA_DELIVERY", "산타의 선물 배달 - 크리스마스 이브에 산타와 루돌프가 선물을 배달하는 이야기. 굴뚝, 썰매, 선물 상자, 밤하늘을 배경으로 한 스토리.",
+            "SNOWBALL_FIGHT", "눈싸움 대작전 - 겨울 마을에서 펼쳐지는 눈싸움 대회. 눈덩이, 눈더미, 팀 진영, 눈밭을 배경으로 한 스토리.",
+            "CHRISTMAS_TREE", "크리스마스 트리 장식 - 크리스마스 트리를 꾸미는 이야기. 전구, 오너먼트, 별, 리본, 가지를 소재로 한 스토리.",
+            "NEW_YEAR_FIREWORKS", "새해 불꽃놀이 - 새해 카운트다운과 함께 펼쳐지는 불꽃놀이. 불꽃, 밤하늘, 색상, 타이밍을 소재로 한 스토리.",
+            "SKI_RESORT", "스키장 - 눈 덮인 산의 스키 리조트 이야기. 슬로프, 리프트, 스키어, 눈밭을 배경으로 한 스토리."
     );
 
     /**
@@ -88,6 +113,17 @@ public class ProblemGenerationPromptBuilder {
                   - 문제 설명은 순수하게 상황과 요구사항만 서술해야 합니다.
                   - 문제에 알고리즘 토픽, 주제는 절대 포함하지 마세요.
 
+                ## naiveCode 생성 요구사항 (필수!)
+
+                naiveCode는 optimalCode와 **동일한 정답을 출력**해야 합니다. 이것은 품질 검증의 핵심입니다.
+
+                1. **동일 입력 -> 동일 출력**: 같은 입력에 대해 optimal과 naive가 반드시 같은 결과를 출력해야 합니다.
+                2. **정확성 우선**: 알고리즘 효율성보다 정확성이 중요합니다. naive는 느리지만 정확해야 합니다.
+                3. **오버플로우 주의**: naive에서도 long 사용 등 오버플로우 방지 처리를 해야 합니다.
+                4. **naive는 시간복잡도만 다르게**: naive는 O(N^2) 이상의 비효율적 알고리즘을 사용하되, 결과는 optimal과 완전히 동일해야 합니다.
+
+                **검증 실패 예시**: optimal과 naive의 출력이 다르면 품질 검증에 자동 실패합니다.
+
                 ## 응답 형식
                 반드시 유효한 JSON으로만 응답하세요. 다른 텍스트는 절대 포함하지 마세요.
                 """;
@@ -121,7 +157,10 @@ public class ProblemGenerationPromptBuilder {
             }
         }
 
-        // 2. 생성 요청 본문
+        // 2. 프로필 기반 가이드라인 추가 (Phase 1)
+        sb.append(buildProfileGuidelines(request.getTopic(), request.getDifficulty().name()));
+
+        // 3. 생성 요청 본문
         sb.append("## 새로운 문제 생성 요청\n\n");
 
         if (references != null && !references.isEmpty()) {
@@ -140,13 +179,21 @@ public class ProblemGenerationPromptBuilder {
         }
 
         if (request.getAdditionalRequirements() != null && !request.getAdditionalRequirements().isBlank()) {
-            String themeKey = request.getAdditionalRequirements().toUpperCase();
-            String themeDescription = STORY_THEMES.getOrDefault(themeKey, request.getAdditionalRequirements());
+            String additionalReqs = request.getAdditionalRequirements();
+            // "스토리 테마: " 프리픽스 제거하여 순수 테마 키 추출
+            String themeKey = additionalReqs.toUpperCase();
+            if (themeKey.startsWith("스토리 테마: ")) {
+                themeKey = themeKey.substring("스토리 테마: ".length());
+            }
+            String themeDescription = STORY_THEMES.getOrDefault(themeKey, additionalReqs);
             sb.append(String.format("- 스토리 테마: %s\n", themeDescription));
             sb.append("  **테마에 맞는 스토리텔링을 문제 설명에 반드시 적용하세요.**\n");
+
+            // Phase 2: 스토리 키워드 섹션 추가
+            sb.append(buildStoryKeywordSection(themeKey));
         }
 
-        // 3. JSON 응답 형식 (Code-First 방식: 입력만 생성, 출력은 코드 실행으로 생성)
+        // 4. JSON 응답 형식 (Code-First 방식: 입력만 생성, 출력은 코드 실행으로 생성)
         sb.append("""
 
                 **응답 형식 (JSON):**
@@ -204,7 +251,7 @@ public class ProblemGenerationPromptBuilder {
                 - Python 코드나 표현식 (join, range, for 등)을 절대 사용하지 마세요.
                 - 잘못된 예시: "input": "".join(str(x) for x in range(100))
                 - 올바른 예시: "input": "1 2 3 4 5"
-                - 큰 데이터가 필요한 경우 적당한 크���(10~100개)의 실제 데이터를 작성하세요.
+                - 큰 데이터가 필요한 경우 적당한 크기(10~100개)의 실제 데이터를 작성하세요.
                 - 실제 실행 가능한 구체적인 데이터를 사용하세요.
                 """);
 
@@ -226,6 +273,72 @@ public class ProblemGenerationPromptBuilder {
                 알고리즘 문제를 생성하세요.
                 응답은 JSON 형식으로 작성하세요.
                 """;
+    }
+
+    /**
+     * 프로필 기반 가이드라인 생성 (Phase 1)
+     *
+     * 알고리즘 프로필에서 해당 주제/난이도의 스펙을 가져와
+     * LLM에 전달할 구체적인 가이드라인을 생성합니다.
+     *
+     * @param topic      알고리즘 주제 (예: "동적 프로그래밍", "DFS/BFS")
+     * @param difficulty 난이도 (BRONZE, SILVER, GOLD, PLATINUM)
+     * @return 프롬프트에 추가할 가이드라인 섹션 문자열
+     */
+    private String buildProfileGuidelines(String topic, String difficulty) {
+        if (!profileRegistry.hasProfile(topic)) {
+            log.debug("프로필 없음: {} → 가이드라인 섹션 생략", topic);
+            return "";
+        }
+
+        DifficultySpec spec = profileRegistry.getDifficultySpec(topic, difficulty);
+        String displayName = profileRegistry.getDisplayName(topic);
+        String promptAdditions = profileRegistry.getPromptAdditions(topic);
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("\n## 알고리즘 특성 기반 가이드라인\n\n");
+        sb.append(String.format("**%s - %s 난이도 기준:**\n", displayName, difficulty));
+        sb.append(String.format("- 입력 크기: %s\n", spec.getInputSize()));
+        sb.append(String.format("- 시간 제한: %d ms\n", spec.getTimeLimit()));
+        sb.append(String.format("- 메모리 제한: %d MB\n", spec.getMemoryLimit()));
+        sb.append(String.format("- 기대 시간복잡도: %s\n", spec.getTimeComplexity()));
+        sb.append(String.format("- 문제 특성: %s\n\n", spec.getDescription()));
+
+        // 알고리즘별 추가 가이드라인
+        if (promptAdditions != null && !promptAdditions.isBlank()) {
+            sb.append("**알고리즘별 추가 지침:**\n");
+            sb.append(promptAdditions);
+            sb.append("\n");
+        }
+
+        log.debug("프로필 가이드라인 생성: {} - {}", displayName, difficulty);
+        return sb.toString();
+    }
+
+    /**
+     * 스토리 키워드 섹션 생성 (Phase 2)
+     *
+     * 목적: 같은 테마라도 매번 다른 스토리가 생성되도록 랜덤 키워드 제공
+     *
+     * @param theme 테마 키 (예: "SANTA_DELIVERY")
+     * @return 프롬프트에 추가할 키워드 섹션 문자열
+     */
+    private String buildStoryKeywordSection(String theme) {
+        List<String> keywords = storyKeywordPool.getRandomKeywords(theme, 3);
+
+        if (keywords.isEmpty()) {
+            log.debug("테마 '{}' 에 대한 키워드가 없어 키워드 섹션을 생략합니다.", theme);
+            return "";
+        }
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("\n## 스토리 생성 참고사항\n\n");
+        sb.append(String.format("**반드시 활용할 키워드 (3개):** %s\n\n", String.join(", ", keywords)));
+        sb.append("위 키워드들을 문제 스토리에 자연스럽게 녹여서 생성하세요.\n");
+        sb.append("키워드를 직접 언급하거나, 해당 소재를 활용한 상황을 만들어 주세요.\n");
+
+        log.debug("테마 '{}' 에 대해 키워드 섹션 생성: {}", theme, keywords);
+        return sb.toString();
     }
 
     /**

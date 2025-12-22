@@ -12,6 +12,7 @@ import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
@@ -31,7 +32,7 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
         // 2) provider 이름 (google, github, naver…)
         String provider = userRequest.getClientRegistration()
                 .getRegistrationId()
-                .toLowerCase();
+                .toLowerCase(Locale.ROOT);
 
         // 3) provider 별 attribute 통일
         Map<String, Object> attributes = oAuth2User.getAttributes();
@@ -56,7 +57,6 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
         Users existingUser = userMapper.findByEmail(email);
 
         if (existingUser != null) {
-
             // 기존 social provider 조회
             String existingProvider = userMapper.findSocialProviderByUserId(existingUser.getUserId());
 
@@ -66,13 +66,15 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
                 return new CustomUserPrincipal(newUser, attributes, provider);
             }
 
-            // provider 같으면 연동
-            userMapper.insertSocialAccount(
-                    existingUser.getUserId(),
-                    provider,
-                    providerId,
-                    email
-            );
+            // provider 같고 이미 연동된 경우 불필요한 insert를 피함
+            if (existingProvider == null) {
+                userMapper.insertSocialAccount(
+                        existingUser.getUserId(),
+                        provider,
+                        providerId,
+                        email
+                );
+            }
 
             return new CustomUserPrincipal(existingUser, attributes, provider);
         }
@@ -95,10 +97,12 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
             email = provider + "-" + providerId + "@noemail.com";
         }
 
+        String resolvedName = name != null ? name : provider + "User";
+
         Users newUser = new Users();
         newUser.setUserEmail(email);
-        newUser.setUserName(name != null ? name : provider + "User");
-        newUser.setUserNickname(name != null ? name : provider + "User");
+        newUser.setUserName(resolvedName);
+        newUser.setUserNickname(resolvedName);
         newUser.setUserImage(picture);
         newUser.setUserPw(UUID.randomUUID().toString());
         newUser.setUserRole("ROLE_USER");
@@ -111,12 +115,16 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
         }
 
         // SOCIAL_LOGIN INSERT
-        userMapper.insertSocialAccount(
+        int socialInserted = userMapper.insertSocialAccount(
                 newUser.getUserId(),
                 provider,
                 providerId,
                 email
         );
+
+        if (socialInserted != 1) {
+            throw new CustomBusinessException(UserErrorCode.USER_UPDATE_FAILED);
+        }
 
         return newUser;
     }

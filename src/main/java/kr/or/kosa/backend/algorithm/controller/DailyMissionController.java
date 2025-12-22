@@ -74,6 +74,10 @@ public class DailyMissionController {
     /**
      * 미션 완료 처리
      * POST /api/algo/missions/complete
+     *
+     * 요청 바디:
+     * - missionType: "PROBLEM_GENERATE" 또는 "PROBLEM_SOLVE" (필수)
+     * - problemId: 실제로 푼 문제 ID (PROBLEM_SOLVE일 때 필수)
      */
     @PostMapping("/complete")
     public ResponseEntity<ApiResponse<Map<String, Object>>> completeMission(
@@ -96,11 +100,18 @@ public class DailyMissionController {
             throw new CustomBusinessException(AlgoErrorCode.MISSION_TYPE_INVALID);
         }
 
-        DailyMissionService.MissionCompleteResult result = dailyMissionService.completeMission(userId, missionType);
+        // PROBLEM_SOLVE 미션일 경우 problemId 필수
+        Long problemId = request.get("problemId") != null
+                ? Long.valueOf(request.get("problemId").toString()) : null;
+
+        DailyMissionService.MissionCompleteResult result =
+                dailyMissionService.completeMission(userId, missionType, problemId);
 
         if (!result.success()) {
             if (result.message().contains("찾을 수 없습니다")) {
                 throw new CustomBusinessException(AlgoErrorCode.MISSION_NOT_FOUND);
+            } else if (result.message().contains("데일리 미션 문제가 아닙니다")) {
+                throw new CustomBusinessException(AlgoErrorCode.MISSION_WRONG_PROBLEM);
             } else {
                 throw new CustomBusinessException(AlgoErrorCode.MISSION_ALREADY_COMPLETED);
             }
@@ -148,6 +159,27 @@ public class DailyMissionController {
         log.debug("레벨 조회 - userId: {}, level: {}", userId, level.getAlgoLevel());
 
         return ResponseEntity.ok(ApiResponse.success(level));
+    }
+
+    /**
+     * 일별 문제 풀이 수 조회 (GitHub 잔디 캘린더용)
+     * GET /api/algo/missions/contributions
+     *
+     * @param months 조회할 개월 수 (기본 12개월)
+     * @return 날짜별 정답 수 리스트 [{solveDate: "2025-12-01", solveCount: 3}, ...]
+     */
+    @GetMapping("/contributions")
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getContributions(
+            @AuthenticationPrincipal JwtAuthentication authentication,
+            @RequestParam(required = false) Long testUserId,
+            @RequestParam(defaultValue = "12") int months) {
+
+        Long userId = getUserId(authentication, testUserId);
+
+        List<Map<String, Object>> contributions = dailyMissionService.getDailySolveCounts(userId, months);
+        log.info("📊 잔디 캘린더 조회 - userId: {}, 데이터 수: {}", userId, contributions.size());
+
+        return ResponseEntity.ok(ApiResponse.success(contributions));
     }
 
     /**

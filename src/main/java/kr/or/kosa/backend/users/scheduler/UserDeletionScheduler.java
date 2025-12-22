@@ -25,9 +25,15 @@ public class UserDeletionScheduler {
 
         List<Users> users = userMapper.findUsersToDelete(now);
 
+        if (users.isEmpty()) {
+            return;
+        }
+
+        // Process candidates without additional allocations where possible
         for (Users u : users) {
 
             Long userId = u.getUserId(); // 필드명 변경
+            String anonymizedEmail = "deleted_" + userId + "@deleted.com";
 
             // Soft delete 적용
             if (userMapper.softDeleteUser(userId) <= 0) {
@@ -37,7 +43,7 @@ public class UserDeletionScheduler {
             // 개인정보 익명화
             if (userMapper.anonymizeUser(
                     userId,
-                    "deleted_" + userId + "@deleted.com",
+                    anonymizedEmail,
                     "탈퇴회원"
             ) <= 0) {
                 log.warn("Anonymize failed for userId={}", userId);

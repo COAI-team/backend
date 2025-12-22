@@ -43,12 +43,8 @@ public class SecurityConfig {
                                 "/",
                                 "/auth/github/**",
                                 "/oauth2/**",
-                                "/users/register",
-                                "/users/login",
-                                "/users/github/link",
-                                "/users/password/**",
+                                "/users/**",
                                 "/email/**",
-                                "/algo/**",
                                 "/admin/**",
                                 "/codeAnalysis/**",
 
@@ -65,13 +61,13 @@ public class SecurityConfig {
                                 "/codeboard/**",
                                 "/comment",
                                 "/comment/**",
-                                "/like/*/*/users",  // 좋아요 누른 사용자 목록 확인
+                                "/like/*/*/users",
                                 "/like/**",
-                                "/analysis/**"
+                                "/algo/**"
                         ).permitAll()
 
                         // (Token Auth)
-                        .requestMatchers("/api/mcp/token").authenticated() // User Token Issue
+                        .requestMatchers("/api/mcp/token").authenticated()
                         // (JWT Auth)
                         .anyRequest().authenticated()
                 )
@@ -97,13 +93,14 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        // 로컬 개발용: http/https + 모든 포트(5173, 9443 등) 허용
         configuration.setAllowedOriginPatterns(List.of(
-                "*",
-                "http://localhost:*",
-                "https://localhost:*",
-                "http://127.0.0.1:*",
-                "https://127.0.0.1:*"
+                "*"
+//                "http://localhost:*",
+//                "https://localhost:*",
+//                "http://127.0.0.1:*",
+//                "https://127.0.0.1:*",
+//                "https://*.vercel.app",  // Vercel 프론트엔드 추가
+//                "https://code-nemsy-frontend-*.vercel.app"  // 현재 프로젝트
         ));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         configuration.setAllowedHeaders(List.of("*"));

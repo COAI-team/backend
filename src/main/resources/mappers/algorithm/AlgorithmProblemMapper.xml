@@ -213,7 +213,7 @@
         WHERE ALGO_PROBLEM_ID = #{problemId}
     </select>
 
-    <!-- 사용자 풀이 상태 포함 문제 목록 조회 -->
+    <!-- 사용자 풀이 상태 포함 문제 목록 조회 + 검색 기능 -->
     <select id="selectProblemsWithUserStatus" resultType="map">
         SELECT
         p.ALGO_PROBLEM_ID as algoProblemId,
@@ -223,6 +223,13 @@
         p.ALGO_PROBLEM_SOURCE as algoProblemSource,
         p.PROBLEM_TYPE as problemType,
         p.ALGO_CREATER as algoCreater,
+        COALESCE(stats.solveCount, 0) as solveCount,
+        COALESCE(stats.totalSubmissions, 0) as totalSubmissions,
+        CASE
+        WHEN stats.totalSubmissions > 0
+        THEN ROUND((stats.solveCount * 100.0 / stats.totalSubmissions), 1)
+        ELSE 0
+        END as accuracy,
         CASE
         WHEN #{userId} IS NOT NULL AND EXISTS (
         SELECT 1 FROM ALGO_SUBMISSIONS s
@@ -233,12 +240,24 @@
         ELSE 0
         END AS isSolved
         FROM ALGO_PROBLEMS p
+        LEFT JOIN (
+        SELECT
+        ALGO_PROBLEM_ID,
+        COUNT(DISTINCT CASE WHEN JUDGE_RESULT = 'AC' THEN USER_ID END) as solveCount,
+        COUNT(*) as totalSubmissions
+        FROM ALGO_SUBMISSIONS
+        GROUP BY ALGO_PROBLEM_ID
+        ) stats ON p.ALGO_PROBLEM_ID = stats.ALGO_PROBLEM_ID
         WHERE p.ALGO_PROBLEM_STATUS = 1
         <if test="difficulty != null and difficulty != ''">
             AND p.ALGO_PROBLEM_DIFFICULTY = #{difficulty}
         </if>
         <if test="tags != null and tags != ''">
             AND p.ALGO_PROBLEM_TAGS LIKE CONCAT('%', #{tags}, '%')
+        </if>
+        <if test="keyword != null and keyword != ''">
+            AND (p.ALGO_PROBLEM_TITLE LIKE CONCAT('%', #{keyword}, '%')
+            OR p.ALGO_PROBLEM_DESCRIPTION LIKE CONCAT('%', #{keyword}, '%'))
         </if>
         <if test="solved != null and solved != ''">
             <choose>
@@ -260,8 +279,89 @@
                 </when>
             </choose>
         </if>
-        ORDER BY p.ALGO_PROBLEM_ID ASC
+        ORDER BY p.ALGO_PROBLEM_ID DESC
         LIMIT #{size} OFFSET #{offset}
+    </select>
+
+    <!-- ===== Phase 8: Fallback 전략용 랜덤 문제 조회 ===== -->
+
+    <!-- 같은 난이도 + 같은 주제의 랜덤 문제 ID 조회 (Fallback 옵션 1) -->
+    <select id="findRandomProblemByDifficultyAndTopic" resultType="Long">
+        SELECT ALGO_PROBLEM_ID
+        FROM ALGO_PROBLEMS
+        WHERE ALGO_PROBLEM_STATUS = 1
+          AND ALGO_PROBLEM_DIFFICULTY = #{difficulty}
+          AND ALGO_PROBLEM_TAGS LIKE CONCAT('%', #{topic}, '%')
+        ORDER BY RAND()
+        LIMIT 1
+    </select>
+
+    <!-- 같은 난이도의 랜덤 문제 ID 조회 (Fallback 옵션 2) -->
+    <select id="findRandomProblemByDifficulty" resultType="Long">
+        SELECT ALGO_PROBLEM_ID
+        FROM ALGO_PROBLEMS
+        WHERE ALGO_PROBLEM_STATUS = 1
+          AND ALGO_PROBLEM_DIFFICULTY = #{difficulty}
+        ORDER BY RAND()
+        LIMIT 1
+    </select>
+
+    <!-- 사용 가능한 조합 목록 조회 (Fallback 옵션 3) -->
+    <select id="findAvailableCombinations" resultType="map">
+        SELECT
+            ALGO_PROBLEM_DIFFICULTY as difficulty,
+            ALGO_PROBLEM_TAGS as topic,
+            COUNT(*) as count
+        FROM ALGO_PROBLEMS
+        WHERE ALGO_PROBLEM_STATUS = 1
+        GROUP BY ALGO_PROBLEM_DIFFICULTY, ALGO_PROBLEM_TAGS
+        HAVING COUNT(*) > 0
+        ORDER BY count DESC
+        LIMIT 10
+    </select>
+    
+    <!-- 문제 목록 하단의 통계 정보 조회 -->
+    <!-- 통계 정보 조회 -->
+    <select id="selectProblemStatisticsForUser" resultType="map">
+        SELECT
+        (SELECT COUNT(*)
+        FROM ALGO_PROBLEMS
+        WHERE ALGO_PROBLEM_STATUS = 1) as totalProblems,
+
+        (SELECT COUNT(*)
+        FROM ALGO_SUBMISSIONS) as totalAttempts,
+
+        COALESCE(
+        (SELECT ROUND(AVG(accuracy), 1)
+        FROM (
+        SELECT
+        CASE
+        WHEN COUNT(*) > 0
+        THEN (COUNT(DISTINCT CASE WHEN JUDGE_RESULT = 'AC' THEN USER_ID END) * 100.0 / COUNT(*))
+        ELSE 0
+        END as accuracy
+        FROM ALGO_SUBMISSIONS
+        GROUP BY ALGO_PROBLEM_ID
+        ) as problem_accuracies
+        ), 0
+        ) as averageAccuracy,
+
+        <choose>
+            <when test="userId != null">
+                (SELECT COUNT(DISTINCT p.ALGO_PROBLEM_ID)
+                FROM ALGO_PROBLEMS p
+                WHERE p.ALGO_PROBLEM_STATUS = 1
+                AND EXISTS (
+                SELECT 1 FROM ALGO_SUBMISSIONS s
+                WHERE s.USER_ID = #{userId}
+                AND s.ALGO_PROBLEM_ID = p.ALGO_PROBLEM_ID
+                AND s.JUDGE_RESULT = 'AC'
+                )) as solvedProblems
+            </when>
+            <otherwise>
+                0 as solvedProblems
+            </otherwise>
+        </choose>
     </select>
 
 </mapper>

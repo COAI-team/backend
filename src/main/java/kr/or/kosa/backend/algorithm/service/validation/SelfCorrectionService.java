@@ -18,6 +18,10 @@ import java.util.List;
 /**
  * Phase 4-5: Self-Correction 서비스
  * 검증 실패 시 LLM을 통해 문제를 수정하고 재검증
+ *
+ * Phase 6 개선:
+ * - 검증기별 맞춤 가이드라인 제공
+ * - 구체적인 수정 방향 안내로 Self-Correction 성공률 향상
  */
 @Slf4j
 @Service
@@ -57,11 +61,11 @@ public class SelfCorrectionService {
             return null;
         }
 
-        // 실패한 검증 결과들의 오류 메시지 수집
-        String errorSummary = collectErrorSummary(validationResults);
+        // Phase 6: 검증기별 맞춤 가이드라인 수집 (기존 오류 요약 대신 사용)
+        String validatorGuidelines = collectValidatorSpecificGuidelines(validationResults);
 
-        // Self-Correction 프롬프트 생성
-        String correctionPrompt = buildCorrectionPrompt(problem, testCases, optimalCode, naiveCode, errorSummary);
+        // Self-Correction 프롬프트 생성 (검증기별 가이드라인 적용)
+        String correctionPrompt = buildCorrectionPrompt(problem, testCases, optimalCode, naiveCode, validatorGuidelines);
 
         try {
             // LLM에 수정 요청
@@ -84,26 +88,83 @@ public class SelfCorrectionService {
     }
 
     /**
-     * 검증 오류 요약 수집
+     * Phase 6: 검증기별 맞춤 가이드라인 수집
+     * 각 검증기의 실패 원인에 따라 구체적인 수정 방향 제공
      */
-    private String collectErrorSummary(List<ValidationResultDto> validationResults) {
-        StringBuilder summary = new StringBuilder();
+    private String collectValidatorSpecificGuidelines(List<ValidationResultDto> validationResults) {
+        StringBuilder guidelines = new StringBuilder();
 
         for (ValidationResultDto result : validationResults) {
             if (!result.isPassed()) {
-                summary.append("- [").append(result.getValidatorName()).append("] ");
-                summary.append(String.join("; ", result.getErrors()));
-                summary.append("\n");
-            }
-
-            if (!result.getWarnings().isEmpty()) {
-                summary.append("- [").append(result.getValidatorName()).append(" 경고] ");
-                summary.append(String.join("; ", result.getWarnings()));
-                summary.append("\n");
+                guidelines.append(buildValidatorSpecificGuideline(result));
+                guidelines.append("\n");
             }
         }
 
-        return summary.toString();
+        return guidelines.toString();
+    }
+
+    /**
+     * Phase 6: 검증기별 맞춤 가이드라인 생성
+     *
+     * 구현 논리:
+     * - 각 검증기의 특성에 맞는 구체적인 수정 방향 제공
+     * - 일반적인 오류 메시지 대신 실행 가능한 해결책 안내
+     * - 이를 통해 Self-Correction 성공률 향상
+     */
+    private String buildValidatorSpecificGuideline(ValidationResultDto result) {
+        String validatorName = result.getValidatorName();
+        String errors = String.join("; ", result.getErrors());
+
+        return switch (validatorName) {
+            case "StructureValidator" -> String.format("""
+                #### 구조 검증 실패
+                **오류:** %s
+                **해결 방법:**
+                1. 필수 필드(제목, 설명, 입출력 형식, 제약조건)를 모두 포함하세요
+                2. 테스트 케이스를 최소 3개 이상 생성하세요
+                3. 설명이 50자 이상이 되도록 충분히 작성하세요
+                4. optimalCode와 naiveCode를 반드시 포함하세요
+                """, errors);
+
+            case "SimilarityChecker" -> String.format("""
+                #### 유사도 검사 실패
+                **오류:** %s
+                **해결 방법:**
+                1. 문제 스토리를 **완전히 새로운 상황**으로 변경하세요
+                2. 변수명/상황설정이 **근본적으로 다르게** 하세요
+                3. 같은 알고리즘이라도 다른 소재를 사용하세요
+                4. 예: "배낭문제" → "선물 상자 최적화", "최단경로" → "선물 배달 경로"
+                """, errors);
+
+            case "CodeExecutionValidator" -> String.format("""
+                #### 코드 실행 검증 실패
+                **오류:** %s
+                **해결 방법:**
+                1. optimalCode의 문법 오류를 수정하세요
+                2. 모든 테스트 케이스가 통과하도록 확인하세요
+                3. 입력 형식이 문제 설명과 일치하는지 확인하세요
+                4. 출력 형식이 예제와 정확히 일치하는지 확인하세요
+                5. 코드 마지막에 함수 호출이 있는지 확인하세요 (예: solve() 호출)
+                """, errors);
+
+            case "TimeRatioValidator" -> String.format("""
+                #### 시간 비율 검증 실패
+                **오류:** %s
+                **해결 방법:**
+                1. optimalCode가 효율적인 알고리즘을 사용하는지 확인하세요
+                2. naiveCode는 반드시 비효율적인 완전탐색을 사용하세요
+                3. naive와 optimal의 시간복잡도 차이가 명확해야 합니다
+                4. 예: optimal O(N log N) vs naive O(N²) 또는 O(2^N)
+                5. naiveCode가 정확한 결과를 출력하는지 확인하세요 (출력 일치 필수)
+                """, errors);
+
+            default -> String.format("""
+                #### %s 실패
+                **오류:** %s
+                **해결 방법:** 위 오류 내용을 참고하여 수정하세요.
+                """, validatorName, errors);
+        };
     }
 
     /**

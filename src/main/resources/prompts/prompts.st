@@ -238,7 +238,7 @@ Use these criteria to judge the accuracy of the analysis:
   - [BAD_SUGGESTION] (e.g., "Proposed replacement introduces a syntax error.")
   - [WRONG_TARGET] (e.g., "Result did not analysed target code and included the analysis of past history.")
   - [TECHNICAL_ACCURACY] (e.g., "Proposed replacement introduces a syntax error.")
-  - [RESULT] (e.g., "Number does not match")
+  - [RESULT] (e.g., "aiScore does not match")
   - [LANGUAGE] (e.g., "Result is not in Korean")
 
 === MISTAKE_REPORT_PROMPT ===
@@ -273,4 +273,42 @@ The user's repetitive mistakes:
     ... (Total 3 questions)
   ]
 }
+
+=== CODE_STYLE_ANALYSIS_PROMPT ===
+You are a 'Code Identifier'. Your goal is to identify the "Coding DNA" and "Style" of the user from the provided code snippet.
+Analyze the code based on the following 10 criteria:
+
+1. 인지 부하 및 가독 임계치 (Cognitive Load & Readability Threshold): 중첩 깊이(Nesting Depth)와 로컬 상태(Local State)의 수를 측정하여 코드를 읽을 때의 피로도를 평가합니다.
+2. 테스트 용이성 및 순수성 (Testability & Purity): 부수 효과(Side Effects)의 분리 여부와 의존성 주입(DI) 등 하드코딩된 의존성 유무를 확인합니다.
+3. 도메인 표현력 (Domain Expressiveness): 원시 타입 집착(Primitive Obsession)을 피하고, 비즈니스 의도가 명확히 드러나는 네이밍을 사용하는지 봅니다.
+4. 변경의 국소성 (Locality of Change): 산탄총 수술(Shotgun Surgery)을 방지하고 DIP(의존 역전)를 준수하여 수정 범위가 최소화되는지 평가합니다.
+5. 방어적 설계 및 관측 가능성 (Defensibility & Observability): 맥락 있는 예외 처리와 의미 있는 로깅(Tracing)이 갖춰져 있는지 확인합니다.
+6. 현대적 관용구 활용도 (Modern Idiomatic Usage): 언어의 최신 기능(Record, Dataclass 등)을 활용해 보일러플레이트를 줄이고 표준 라이브러리를 잘 쓰는지 봅니다.
+7. 리소스 효율성 및 성능 감각 (Resource Efficiency): 지연 로딩, 불필요한 객체 생성 방지 등 성능을 고려한 패턴이 적용되었는지 봅니다.
+8. 인터페이스 설계의 일관성 (Interface Consistency): 최소 놀람의 원칙(POLA)을 따르고 파라미터 순서 및 타입이 일관적인지 평가합니다.
+9. 동시성 및 상태 관리 (Concurrency & State Management): 불변성(Immutability)을 지향하고 스레드 안전성(Thread Safety)을 고려하는지 확인합니다.
+10. 문서화 및 결정의 근거 (Documentation & Rationale): 단순한 '무엇'이 아닌 '왜(Why)'를 설명하는 주석이나 ADR 형태의 기록이 코드에 녹아있는지 봅니다.
+
+Output strictly in JSON format:
+{
+  "styleProfile": {
+    "cognitiveLoad": "Description...",
+    "testability": "Description...",
+    "domainExpressiveness": "Description...",
+    "localityOfChange": "Description...",
+    "defensibility": "Description...",
+    "modernIdiomatic": "Description...",
+    "resourceEfficiency": "Description...",
+    "interfaceConsistency": "Description...",
+    "concurrency": "Description...",
+    "documentationRationale": "Description..."
+  },
+  "summary": "A concise summary of the user's coding style in Korean (e.g., '가독성을 중시하는 실용적인 OOP 개발자')."
+}
+
+Code to analyze:
+'''
+%s
+'''
+
 

@@ -34,7 +34,7 @@ public class PromptGenerator {
    * @return 완성된 시스템 프롬프트 문자열
    */
   public String createSystemPrompt(List<String> analysisTypes, int toneLevel, String customRequirements,
-      String userContext) {
+      String userContext, String styleContext) {
 
     // 분석 유형이 없으면 기본값 설정
     String analysisTypesStr = analysisTypes != null && !analysisTypes.isEmpty()
@@ -53,8 +53,17 @@ public class PromptGenerator {
         : "No prior history available.";
 
     // 템플릿 로드 후 값 주입
+    // 템플릿 로드 후 값 주입 (Style Context 추가)
     String template = promptManager.getPrompt("CODENOSE_SYSTEM_PROMPT");
-    return String.format(template, analysisTypesStr, tone, requirements, context);
+
+    // 템플릿에 %s 슬롯이 하나 더 필요하므로, prompts.st의 CODENOSE_SYSTEM_PROMPT도 수정해야 함.
+    // 하지만 현재는 4개만 받으므로, userContext에 합쳐서 전달하는 전략 사용
+    String combinedContext = context;
+    if (styleContext != null && !styleContext.isEmpty()) {
+      combinedContext += "\n\n### [USER CODE STYLE & DNA]\n" + styleContext;
+    }
+
+    return String.format(template, analysisTypesStr, tone, requirements, combinedContext);
   }
 
   /**
@@ -75,9 +84,14 @@ public class PromptGenerator {
     return String.format(template, mistakesContext);
   }
 
+  public String createStyleAnalysisPrompt(String codeContent) {
+    String template = promptManager.getPrompt("CODE_STYLE_ANALYSIS_PROMPT");
+    return String.format(template, codeContent);
+  }
+
   // 하위 호환성을 위한 오버로딩 (Context가 없는 경우)
   public String createSystemPrompt(List<String> analysisTypes, int toneLevel, String customRequirements) {
-    return createSystemPrompt(analysisTypes, toneLevel, customRequirements, null);
+    return createSystemPrompt(analysisTypes, toneLevel, customRequirements, null, null);
   }
 
   /**

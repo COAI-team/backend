@@ -10,6 +10,8 @@ import java.util.Map;
 
 public record CustomUserPrincipal(Users user, Map<String, Object> attributes, String provider) implements OAuth2User {
 
+    private static final Collection<? extends GrantedAuthority> NO_AUTHORITIES = Collections.emptyList();
+
     @Override
     public Map<String, Object> getAttributes() {
         return attributes;
@@ -17,7 +19,7 @@ public record CustomUserPrincipal(Users user, Map<String, Object> attributes, St
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return Collections.emptyList(); // JWT 기반이면 권한 필요 없음
+        return NO_AUTHORITIES; // JWT 기반이면 권한 필요 없음
     }
 
     @Override

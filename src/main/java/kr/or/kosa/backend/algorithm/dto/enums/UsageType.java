@@ -11,7 +11,8 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public enum UsageType {
     GENERATE("AI 문제 생성"),
-    SOLVE("문제 풀기");
+    SOLVE("문제 풀기"),
+    ANALYSIS("코드 분석");
 
     private final String description;
 }

@@ -1,10 +1,13 @@
 package kr.or.kosa.backend.algorithm.mapper;
 
 import kr.or.kosa.backend.algorithm.dto.AlgoSubmissionDto;
+import kr.or.kosa.backend.algorithm.dto.AlgoSubmissionShareDto;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
+import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 알고리즘 제출 관련 MyBatis 매퍼
@@ -67,6 +70,16 @@ public interface AlgorithmSubmissionMapper {
     );
 
     /**
+     * 문제별 제출 목록 조회 (공개된 것만) + 유저정보 포함
+     */
+    List<AlgoSubmissionShareDto> selectSharedSubmissionsWithUser(
+            @Param("problemId") Long problemId,
+            @Param("currentUserId") Long currentUserId,
+            @Param("size") int size,
+            @Param("offset") int offset
+    );
+
+    /**
      * 특정 사용자의 특정 문제 최고 점수 제출 조회
      * @param userId 사용자 ID
      * @param problemId 문제 ID
@@ -120,4 +133,21 @@ public interface AlgorithmSubmissionMapper {
      */
     int countPublicSubmissionsByProblemId(@Param("problemId") Long problemId);
 
+    /**
+     * 사용자의 일별 정답(AC) 수 조회 (GitHub 잔디 캘린더용)
+     * @param userId 사용자 ID
+     * @param startDate 시작일
+     * @param endDate 종료일
+     * @return 날짜별 정답 수 리스트 [{solveDate, solveCount}, ...]
+     */
+    List<Map<String, Object>> selectDailySolveCountsByUserId(
+            @Param("userId") Long userId,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate
+    );
+
+    /**
+     * 사용자가 특정 문제를 AC 처리한 적이 있는지 확인
+     */
+    boolean hasUserSolvedProblem(@Param("userId") Long userId, @Param("problemId") Long problemId);
 }
