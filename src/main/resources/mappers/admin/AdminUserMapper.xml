@@ -39,20 +39,15 @@
 
         ORDER BY
         <choose>
-            <when test="sortField != null and sortField != ''">
-                ${sortField}
-                <if test="sortOrder != null and sortOrder != ''">
-                    ${sortOrder}
-                </if>
-                <if test="sortOrder == null or sortOrder == ''">
-                    ASC
-                </if>
-            </when>
-            <otherwise>
-                USER_ID DESC
-            </otherwise>
+            <when test="sortField == 'USER_ID'">USER_ID</when>
+            <when test="sortField == 'USER_GRADE'">USER_GRADE</when>
+            <when test="sortField == 'USER_ROLE'">USER_ROLE</when>
+            <otherwise>USER_ID</otherwise>
         </choose>
-
+        <choose>
+            <when test="sortOrder == 'DESC'">DESC</when>
+            <otherwise>ASC</otherwise>
+        </choose>
         LIMIT #{offset}, #{limit}
     </select>
 
