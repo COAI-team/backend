@@ -113,7 +113,8 @@
         WHEN MAX(s.end_date) > NOW() THEN 'ACTIVE'
         WHEN MAX(s.end_date) IS NULL THEN 'NONE'
         ELSE 'EXPIRED'
-        END AS subscription_status
+        END AS subscription_status,
+        s.subscription_type
         FROM USERS u
         LEFT JOIN user_points up ON up.user_id = u.USER_ID
         LEFT JOIN subscriptions s ON s.user_id = u.USER_ID AND s.status = 'ACTIVE'
@@ -149,7 +150,7 @@
     <update id="banUser" >
         UPDATE USERS
             SET USER_DELETEDAT = NOW(),
-            USER_ISDELETED = 1
+            USER_ISDELETED = 2
         WHERE USER_ID = #{userId}
     </update>
 </mapper>
