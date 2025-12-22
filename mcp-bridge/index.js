@@ -8,14 +8,16 @@ import {
 import axios from 'axios';
 
 // 환경 변수 설정 (기본값: 로컬 개발 서버)
-const SERVER_URL = process.env.COAI_SERVER_URL || 'https://localhost:9443/api/mcp/analyze';
+const SERVER_URL = process.env.COAI_SERVER_URL || 'https://api.co-ai.run/api/mcp/analyze';
 const MCP_TOKEN = process.env.COAI_MCP_TOKEN || 'codenose-mcp-secret-key';
 const USER_ID = process.env.COAI_USER_ID || '1';
 
 // HTTPS 인증서 무시 (개발용/Self-signed 이슈 방지)
+// HTTPS 인증서 무시 (로컬 개발용: localhost일 때만)
+const isLocal = SERVER_URL.includes('localhost') || SERVER_URL.includes('127.0.0.1');
 const axiosInstance = axios.create({
   httpsAgent: new (await import('https')).Agent({  
-    rejectUnauthorized: false 
+    rejectUnauthorized: !isLocal 
   })
 });
 
