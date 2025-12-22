@@ -2,6 +2,7 @@ package kr.or.kosa.backend.admin.controller;
 
 
 import kr.or.kosa.backend.admin.dto.BoardItems;
+import kr.or.kosa.backend.admin.dto.request.DeleteBoardRequestDto;
 import kr.or.kosa.backend.admin.dto.request.UserBoardSearchConditionRequestDto;
 import kr.or.kosa.backend.admin.dto.response.AdminCodeBoardDetailResponseDto;
 import kr.or.kosa.backend.admin.dto.response.AdminFreeBoardDetailResponseDto;
@@ -16,7 +17,7 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/admin")
-public class AdminUserBoardController {
+public class  AdminUserBoardController {
     private final AdminUserBoardService adminUserBoardService;
 
     public AdminUserBoardController(AdminUserBoardService adminUserBoardService) {
@@ -55,4 +56,14 @@ public class AdminUserBoardController {
         AdminFreeBoardDetailResponseDto result = adminUserBoardService.getOneFreeBoard(boardId);
         return ResponseEntity.ok(ApiResponse.success(result));
     }
+
+    @DeleteMapping("/boarddelte")
+    public ResponseEntity<ApiResponse<Void>> deleteBoard(
+        @RequestBody DeleteBoardRequestDto deleteBoardRequestDto
+        ){
+        adminUserBoardService.deleteBoard(deleteBoardRequestDto);
+        return null;
+    }
+
+
 }
