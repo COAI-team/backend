@@ -12,4 +12,5 @@ public class UserFindResponseDto{
     private int userGrade;
     private String userRole;
     private int isDeleted;
+
 }
