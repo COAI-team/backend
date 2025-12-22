@@ -2,93 +2,347 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
-<mapper namespace="kr.or.kosa.backend.batch.mapper.BoardStatisticsMapper">
-
-    <!-- 결과 매핑 -->
-    <resultMap id="dailyStatisticsResultMap" type="kr.or.kosa.backend.batch.dto.DailyBoardStatisticsDto">
-        <id property="statisticsId" column="statistics_id"/>
-        <result property="statDate" column="stat_date"/>
-        <result property="boardType" column="board_type"/>
-        <result property="postCount" column="post_count"/>
-        <result property="totalViews" column="total_views"/>
-        <result property="avgViews" column="avg_views"/>
-        <result property="deletedPostCount" column="deleted_post_count"/>
-        <result property="createdAt" column="created_at"/>
-    </resultMap>
-
-    <!-- 자유게시판 일간 통계 집계 -->
-    <select id="aggregateFreeboardStatistics" resultMap="dailyStatisticsResultMap">
-        SELECT
-            #{targetDate} AS stat_date,
-            'free' AS board_type,
-            COUNT(*) AS post_count,
-            COALESCE(SUM(freeboard_click), 0) AS total_views,
-            COALESCE(AVG(freeboard_click), 0) AS avg_views,
-            SUM(CASE WHEN freeboard_deleted_yn = 'Y' THEN 1 ELSE 0 END) AS deleted_post_count
-        FROM FREEBOARD
-        WHERE DATE(freeboard_created_at) = #{targetDate}
-    </select>
-
-    <!-- 코드게시판 일간 통계 집계 -->
-    <select id="aggregateCodeboardStatistics" resultMap="dailyStatisticsResultMap">
-        SELECT
-            #{targetDate} AS stat_date,
-            'code' AS board_type,
-            COUNT(*) AS post_count,
-            COALESCE(SUM(code_board_click), 0) AS total_views,
-            COALESCE(AVG(code_board_click), 0) AS avg_views,
-            SUM(CASE WHEN code_board_deleted_yn = 'Y' THEN 1 ELSE 0 END) AS deleted_post_count
-        FROM CODEBOARD
-        WHERE DATE(code_board_created_at) = #{targetDate}
-    </select>
-
-    <!-- 알고리즘게시판 일간 통계 집계 -->
-    <select id="aggregateAlgoboardStatistics" resultMap="dailyStatisticsResultMap">
-        SELECT
-            #{targetDate} AS stat_date,
-            'algo' AS board_type,
-            COUNT(*) AS post_count,
-            COALESCE(SUM(algorithm_board_click), 0) AS total_views,
-            COALESCE(AVG(algorithm_board_click), 0) AS avg_views,
-            SUM(CASE WHEN algorithm_board_deleted_yn = 'Y' THEN 1 ELSE 0 END) AS deleted_post_count
-        FROM ALGO_PROBLEMS
-        WHERE DATE(created_at) = #{targetDate}
-    </select>
-
-    <!-- 통계 데이터 저장 -->
-    <insert id="insertDailyStatistics" parameterType="kr.or.kosa.backend.batch.dto.DailyBoardStatisticsDto">
-        INSERT INTO daily_board_statistics (
+<mapper namespace="kr.or.kosa.backend.batch.mapper.AdminStatisticsBatchMapper">
+    <insert id="insertDailyStats">
+        <![CDATA[
+        INSERT INTO ADMIN_DAILY_STATS (
             stat_date,
-            board_type,
-            post_count,
-            total_views,
-            avg_views,
-            deleted_post_count,
-            created_at
-        ) VALUES (
-            #{statDate},
-            #{boardType},
-            #{postCount},
-            #{totalViews},
-            #{avgViews},
-            #{deletedPostCount},
-            NOW()
+            total_user_count,
+            new_user_count,
+            payment_count,
+            revenue
         )
+        SELECT
+            #{targetDate},
+            (SELECT COUNT(*)
+             FROM USERS
+             WHERE USER_ROLE = 'ROLE_USER'
+             AND USER_DELETEDAT IS NULL),
+
+            (SELECT COUNT(*)
+             FROM USERS
+             WHERE USER_ROLE = 'ROLE_USER'
+             AND USER_DELETEDAT IS NULL
+             AND USER_CREATEDAT >= #{targetDate}
+             AND USER_CREATEDAT < DATE_ADD(#{targetDate}, INTERVAL 1 DAY)),
+
+            (SELECT COUNT(*)
+             FROM PAYMENTS
+             WHERE STATUS = 'DONE'
+             AND APPROVED_AT >= #{targetDate}
+             AND APPROVED_AT < DATE_ADD(#{targetDate}, INTERVAL 1 DAY)),
+
+            (SELECT IFNULL(SUM(amount), 0)
+             FROM PAYMENTS
+             WHERE STATUS = 'DONE'
+             AND APPROVED_AT >= #{targetDate}
+             AND APPROVED_AT < DATE_ADD(#{targetDate}, INTERVAL 1 DAY))
+        ]]>
     </insert>
 
-    <!-- 통계 존재 여부 확인 -->
-    <select id="checkStatisticsExists" resultType="int">
+    <select id="exists" resultType="int">
         SELECT COUNT(*)
-        FROM daily_board_statistics
-        WHERE stat_date = #{statDate}
-          AND board_type = #{boardType}
+        FROM ADMIN_SALES_MONTHLY_STATS
+        WHERE stat_year = #{year}
+        AND stat_month = #{month}
     </select>
 
-    <!-- 기존 통계 삭제 -->
-    <delete id="deleteDailyStatistics">
-        DELETE FROM daily_board_statistics
-        WHERE stat_date = #{statDate}
-          AND board_type = #{boardType}
+    <delete id="delete">
+        DELETE
+        FROM ADMIN_SALES_MONTHLY_STATS
+        WHERE stat_year = #{year}
+        AND stat_month = #{month}
     </delete>
 
+    <insert id="insertMonthlySalesStats">
+        INSERT INTO ADMIN_SALES_MONTHLY_STATS (
+        stat_year,
+        stat_month,
+        payment_count,
+        revenue
+        )
+        SELECT
+        #{year},
+        #{month},
+        COUNT(*) AS payment_count,
+        IFNULL(SUM(amount), 0) AS revenue
+        FROM PAYMENTS
+        WHERE STATUS = 'DONE'
+        AND YEAR(APPROVED_AT) = #{year}
+        AND MONTH(APPROVED_AT) = #{month}
+    </insert>
+
+    <insert id="insertMonthlySalesByPlan">
+        INSERT INTO ADMIN_SALES_PLAN_MONTHLY_STATS (
+        stat_year,
+        stat_month,
+        plan_code,
+        payment_count,
+        revenue
+        )
+        SELECT
+        #{year},
+        #{month},
+        plan_code,
+        COUNT(*) AS payment_count,
+        IFNULL(SUM(amount), 0) AS revenue
+        FROM PAYMENTS
+        WHERE STATUS = 'DONE'
+        AND YEAR(APPROVED_AT) = #{year}
+        AND MONTH(APPROVED_AT) = #{month}
+        GROUP BY plan_code
+    </insert>
+
+    <delete id="deleteByPlan">
+        DELETE FROM ADMIN_SALES_PLAN_MONTHLY_STATS
+        WHERE stat_year = #{year}
+        AND stat_month = #{month}
+    </delete>
+
+
+    <!-- 월별 유저 통계 존재 여부 -->
+    <select id="existsUserMonthlyStats" resultType="int">
+        SELECT COUNT(*)
+        FROM ADMIN_USER_MONTHLY_STATS
+        WHERE stat_year = #{year}
+        AND stat_month = #{month}
+    </select>
+
+    <!-- 월별 유저 통계 삭제 -->
+    <delete id="deleteUserMonthlyStats">
+        DELETE
+        FROM ADMIN_USER_MONTHLY_STATS
+        WHERE stat_year = #{year}
+        AND stat_month = #{month}
+    </delete>
+
+    <!-- 월별 유저 통계 INSERT -->
+    <insert id="insertUserMonthlyStats">
+        <![CDATA[
+    INSERT INTO ADMIN_USER_MONTHLY_STATS (
+        stat_year,
+        stat_month,
+        new_user_count,
+        total_user_count
+    )
+    SELECT
+        #{year},
+        #{month},
+
+        COUNT(CASE
+            WHEN YEAR(USER_CREATEDAT) = #{year}
+             AND MONTH(USER_CREATEDAT) = #{month}
+            THEN 1 END) AS new_user_count,
+
+        COUNT(*) AS total_user_count
+    FROM USERS
+    WHERE USER_ROLE = 'ROLE_USER'
+      AND USER_DELETEDAT IS NULL
+      AND USER_CREATEDAT <
+          LAST_DAY(CONCAT(#{year}, '-', #{month}, '-01')) + INTERVAL 1 DAY
+]]>
+    </insert>
+
+<!--    유저 MAU-->
+    <delete id="deleteMonthlyMau">
+        DELETE FROM ADMIN_MAU_MONTHLY_STATS
+        WHERE stat_year = #{year}
+        AND stat_month = #{month}
+    </delete>
+
+    <insert id="insertMonthlyMau">
+        INSERT INTO ADMIN_MAU_MONTHLY_STATS (
+        stat_year,
+        stat_month,
+        mau_count
+        )
+        SELECT
+        #{year},
+        #{month},
+        COUNT(DISTINCT user_id)
+        FROM (
+        SELECT USER_ID AS user_id
+        FROM ALGO_SUBMISSIONS
+        WHERE YEAR(SUBMITTED_AT) = #{year}
+        AND MONTH(SUBMITTED_AT) = #{month}
+
+        UNION
+
+        SELECT USER_ID AS user_id
+        FROM CODE_ANALYSIS_HISTORY
+        WHERE YEAR(CREATED_AT) = #{year}
+        AND MONTH(CREATED_AT) = #{month}
+        ) t
+    </insert>
+
+
+    <!--    월별 분석 타입-->
+    <delete id="deleteAnalysisTypeMonthly">
+        DELETE FROM ADMIN_ANALYSIS_TYPE_MONTHLY_STATS
+        WHERE stat_year = #{year}
+        AND stat_month = #{month}
+    </delete>
+
+    <insert id="insertAnalysisTypeMonthly">
+        <![CDATA[
+            INSERT INTO ADMIN_ANALYSIS_TYPE_MONTHLY_STATS (
+                stat_year,
+                stat_month,
+                analysis_type,
+                analysis_count
+            )
+            SELECT
+                #{year}  AS stat_year,
+                #{month} AS stat_month,
+                analysis_type,
+                COUNT(*) AS analysis_count
+            FROM (
+                SELECT
+                    JSON_UNQUOTE(
+                        JSON_EXTRACT(ANALYANALYSIS_RESULTSIS_RESULT, '$.name')
+                    ) AS analysis_type
+                FROM CODE_ANALYSIS_HISTORY
+                WHERE CREATED_AT >= DATE(CONCAT(#{year}, '-', LPAD(#{month}, 2, '0'), '-01'))
+                  AND CREATED_AT <  DATE_ADD(
+                        DATE(CONCAT(#{year}, '-', LPAD(#{month}, 2, '0'), '-01')),
+                        INTERVAL 1 MONTH
+                    )
+                  AND JSON_EXTRACT(ANALYANALYSIS_RESULTSIS_RESULT, '$.name') IS NOT NULL
+            ) t
+            GROUP BY analysis_type
+            ]]>
+    </insert>
+
+    <!--    코드분석 이용자 월별 내역-->
+    <delete id="deleteCodeAnalysisRankingMonthly">
+        DELETE FROM ADMIN_CODE_ANALYSIS_RANKING_MONTHLY
+        WHERE stat_year = #{year}
+        AND stat_month = #{month}
+    </delete>
+
+    <insert id="insertMonthlyCodeAnalysisRanking">
+        <![CDATA[
+        INSERT INTO ADMIN_CODE_ANALYSIS_RANKING_MONTHLY (
+            stat_year,
+            stat_month,
+            ranking,
+            user_id,
+            user_nickname,
+            user_email,
+            analysis_count
+        )
+        SELECT
+            #{year}  AS stat_year,
+            #{month} AS stat_month,
+            ranking,
+            u.USER_ID,
+            u.USER_NICKNAME,
+            u.USER_EMAIL,
+            analysis_count
+        FROM (
+            SELECT
+                user_id,
+                COUNT(*) AS analysis_count,
+                ROW_NUMBER() OVER (ORDER BY COUNT(*) DESC) AS ranking
+            FROM CODE_ANALYSIS_HISTORY
+            WHERE CREATED_AT >= DATE(CONCAT(#{year}, '-', LPAD(#{month}, 2, '0'), '-01'))
+              AND CREATED_AT <  DATE_ADD(
+                    DATE(CONCAT(#{year}, '-', LPAD(#{month}, 2, '0'), '-01')),
+                    INTERVAL 1 MONTH
+                )
+            GROUP BY user_id
+            ORDER BY analysis_count DESC
+            LIMIT 10
+        ) ranked
+        JOIN USERS u ON u.USER_ID = ranked.user_id
+        ]]>
+    </insert>
+
+
+
+    <!--    월간 알고리즘 문제 푼 통계-->
+    <delete id="deleteAlgoSolveRankingMonthly">
+        DELETE FROM ADMIN_ALGO_SOLVE_RANKING_MONTHLY
+        WHERE stat_year = #{year}
+        AND stat_month = #{month}
+    </delete>
+
+    <insert id="insertMonthlyAlgoSolveRanking">
+        <![CDATA[
+        INSERT INTO ADMIN_ALGO_SOLVE_RANKING_MONTHLY (
+            stat_year,
+            stat_month,
+            ranking,
+            user_id,
+            user_nickname,
+            user_email,
+            solve_count
+        )
+        SELECT
+            #{year}  AS stat_year,
+            #{month} AS stat_month,
+            ranking,
+            u.USER_ID,
+            u.USER_NICKNAME,
+            u.USER_EMAIL,
+            solve_count
+        FROM (
+            SELECT
+                USER_ID,
+                COUNT(*) AS solve_count,
+                ROW_NUMBER() OVER (ORDER BY COUNT(*) DESC) AS ranking
+            FROM ALGO_SUBMISSIONS
+            WHERE SUBMITTED_AT >= DATE(CONCAT(#{year}, '-', LPAD(#{month}, 2, '0'), '-01'))
+              AND SUBMITTED_AT <  DATE_ADD(
+                    DATE(CONCAT(#{year}, '-', LPAD(#{month}, 2, '0'), '-01')),
+                    INTERVAL 1 MONTH
+                )
+            GROUP BY USER_ID
+            ORDER BY solve_count DESC
+            LIMIT 10
+        ) ranked
+        JOIN USERS u ON u.USER_ID = ranked.USER_ID
+        ]]>
+    </insert>
+
+    <!--    언어별 랭킹-->
+    <delete id="deleteLanguageRankingMonthly">
+        DELETE FROM ADMIN_LANGUAGE_RANKING_MONTHLY
+        WHERE stat_year = #{year}
+        AND stat_month = #{month}
+    </delete>
+
+    <insert id="insertMonthlyLanguageRanking">
+        INSERT INTO ADMIN_LANGUAGE_RANKING_MONTHLY (
+        stat_year,
+        stat_month,
+        ranking,
+        language_name,
+        usage_count
+        )
+        SELECT
+        #{year},
+        #{month},
+        ranking,
+        language_name,
+        usage_count
+        FROM (
+        SELECT
+        ROW_NUMBER() OVER (ORDER BY COUNT(*) DESC) AS ranking,
+        l.LANGUAGE_NAME AS language_name,
+        COUNT(*) AS usage_count
+        FROM ALGO_SUBMISSIONS t
+        JOIN LANGUAGES l ON l.LANGUAGE_ID = t.LANGUAGE_ID
+        WHERE t.SUBMITTED_AT <![CDATA[ >= ]]> DATE(CONCAT(#{year}, '-', LPAD(#{month}, 2, '0'), '-01'))
+        <![CDATA[
+          AND t.SUBMITTED_AT < DATE_ADD(
+                DATE(CONCAT(#{year}, '-', LPAD(#{month}, 2, '0'), '-01')),
+                INTERVAL 1 MONTH
+          )
+          ]]>
+        GROUP BY l.LANGUAGE_NAME
+        ORDER BY usage_count DESC
+        LIMIT 10
+        ) ranked
+    </insert>
 </mapper>

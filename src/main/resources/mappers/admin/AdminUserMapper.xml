@@ -20,22 +20,22 @@
         SELECT USER_ID, USER_EMAIL, USER_NICKNAME, USER_GRADE, USER_ROLE
         FROM USERS
         <where>
-            <choose>
-                <when test="statusFilter instanceof java.lang.Integer">
-                    USER_ISDELETED = #{statusFilter}
-                </when>
-                <when test="roleFilter instanceof java.lang.String and roleFilter != ''">
-                    USER_ROLE = #{roleFilter}
-                </when>
-            </choose>
+            <if test="statusFilter != null and statusFilter != ''">
+                USER_ISDELETED = #{statusFilter}
+            </if>
 
-            <if test="userEmail != null &amp;&amp; userEmail != ''">
+            <if test="roleFilter != null and roleFilter != ''">
+                AND USER_ROLE = #{roleFilter}
+            </if>
+
+            <if test="userEmail != null and userEmail != ''">
                 AND USER_EMAIL LIKE CONCAT('%', #{userEmail}, '%')
             </if>
         </where>
         ORDER BY ${sortField} ${sortOrder}
-        LIMIT #{limit} OFFSET #{offset}
+        LIMIT #{offset}, #{limit}
     </select>
+
 
     <select id="totalCount" resultType="int"
     >

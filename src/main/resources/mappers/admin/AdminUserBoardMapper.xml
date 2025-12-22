@@ -183,5 +183,17 @@
         WHERE f.FREEBOARD_ID = #{boardId}
     </select>
 
+    <update id="deleteFreeBoard">
+        UPDATE FREEBOARD
+        SET FREEBOARD_DELETED_YN = 'Y'
+        WHERE FREEBOARD_ID  = #{boardId}
+    </update>
+
+    <update id="deleteCodeBoard">
+        UPDATE CODEBOARD
+        SET CODEBOARD_DELETED_YN = 'Y'
+        WHERE CODEBOARD_ID  = #{boardId}
+    </update>
+
 </mapper>
 

@@ -19,4 +19,6 @@ public interface AdminUserBoardMapper {
     AlgoBoardDetailResponseDto findOneAlgoBoardByBoardId(@Param("boardId") long boardId);
     CodeBoardAnalysisDetailDto findOneCodeBoardByBoardId(@Param("boardId") long boardId);
     AdminFreeBoardDetailResponseDto findOnefreeBoardByBoardId(@Param("boardId") long boardId);
+    int deleteFreeBoard(@Param("boardId") long boardId);
+    int deleteCodeBoard(@Param("boardId") long boardId);
 }
