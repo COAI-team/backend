@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="kr.or.kosa.backend.battle.mapper.BattlePointHoldMapper">
+
+    <resultMap id="BattlePointHoldMap" type="kr.or.kosa.backend.battle.domain.BattlePointHold">
+        <id column="MATCH_ID" property="matchId"/>
+        <id column="USER_ID" property="userId"/>
+        <result column="AMOUNT" property="amount"/>
+        <result column="STATUS" property="status"/>
+        <result column="POINT_HISTORY_ID" property="pointHistoryId"/>
+        <result column="CREATED_AT" property="createdAt"/>
+        <result column="UPDATED_AT" property="updatedAt"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="kr.or.kosa.backend.battle.domain.BattlePointHold">
+        INSERT INTO BATTLE_POINT_HOLDS (
+        MATCH_ID,
+        USER_ID,
+        AMOUNT,
+        STATUS,
+        POINT_HISTORY_ID,
+        CREATED_AT,
+        UPDATED_AT
+        ) VALUES (
+        #{matchId},
+        #{userId},
+        #{amount},
+        #{status},
+        #{pointHistoryId},
+        NOW(),
+        NOW()
+        )
+    </insert>
+
+    <update id="updateStatus">
+        UPDATE BATTLE_POINT_HOLDS
+        SET STATUS = #{status},
+            POINT_HISTORY_ID = #{pointHistoryId},
+            UPDATED_AT = NOW()
+        WHERE MATCH_ID = #{matchId}
+          AND USER_ID = #{userId}
+    </update>
+
+    <select id="findByMatchAndUser" resultMap="BattlePointHoldMap">
+        SELECT
+            MATCH_ID,
+            USER_ID,
+            AMOUNT,
+            STATUS,
+            POINT_HISTORY_ID,
+            CREATED_AT,
+            UPDATED_AT
+        FROM BATTLE_POINT_HOLDS
+        WHERE MATCH_ID = #{matchId}
+          AND USER_ID = #{userId}
+    </select>
+
+    <select id="findByMatchId" resultMap="BattlePointHoldMap">
+        SELECT
+            MATCH_ID,
+            USER_ID,
+            AMOUNT,
+            STATUS,
+            POINT_HISTORY_ID,
+            CREATED_AT,
+            UPDATED_AT
+        FROM BATTLE_POINT_HOLDS
+        WHERE MATCH_ID = #{matchId}
+    </select>
+</mapper>

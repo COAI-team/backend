@@ -14,6 +14,7 @@
         <result column="payment_key"      property="paymentKey"/>
         <result column="order_name"       property="orderName"/>
         <result column="customer_name"    property="customerName"/>
+        <result column="cancel_reason"    property="cancelReason"/>
 
         <!-- BigDecimal 금액들 -->
         <result column="original_amount"  property="originalAmount"/>
@@ -55,6 +56,7 @@
         plan_code,
         order_name,
         customer_name,
+        cancel_reason,
         original_amount,
         used_point,
         amount,
@@ -67,6 +69,7 @@
         #{planCode},
         #{orderName},
         #{customerName},
+        #{cancelReason},
         #{originalAmount},
         #{usedPoint},
         #{amount},
@@ -85,6 +88,7 @@
         p.payment_key,
         p.order_name,
         p.customer_name,
+        p.cancel_reason,
         p.original_amount,
         p.used_point,
         p.amount,
@@ -114,6 +118,7 @@
         p.payment_key,
         p.order_name,
         p.customer_name,
+        p.cancel_reason,
         p.original_amount,
         p.used_point,
         p.amount,
@@ -161,9 +166,12 @@
     <update id="updatePaymentStatusToCanceled">
         UPDATE payments
         SET
-        status      = #{status},
-        canceled_at = NOW()
+        status        = #{status},
+        canceled_at   = #{canceledAt},
+        cancel_reason = #{cancelReason},
+        pg_raw_response = #{pgRawResponse}
         WHERE order_id = #{orderId}
+          AND status = 'DONE'
     </update>
 
     <!-- ================== READY 단계: 기존 orderId 덮어쓰기 ================== -->
@@ -175,6 +183,7 @@
         plan_code       = #{planCode},
         order_name      = #{orderName},
         customer_name   = #{customerName},
+        cancel_reason   = #{cancelReason},
         original_amount = #{originalAmount},
         used_point      = #{usedPoint},
         amount          = #{amount},
@@ -193,6 +202,7 @@
         p.payment_key,
         p.order_name,
         p.customer_name,
+        p.cancel_reason,
         p.original_amount,
         p.used_point,
         p.amount,
@@ -224,6 +234,7 @@
         p.payment_key,
         p.order_name,
         p.customer_name,
+        p.cancel_reason,
         p.original_amount,
         p.used_point,
         p.amount,

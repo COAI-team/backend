@@ -23,6 +23,7 @@ public class PerformanceMonitoringAspect {
         this.objectMapper = objectMapper;
     }
 
+
     /**
      * 🔥 기존 포인트컷(잘못된 매칭):
      * execution(* kr.or.kosa.backend..controller..*(..))
