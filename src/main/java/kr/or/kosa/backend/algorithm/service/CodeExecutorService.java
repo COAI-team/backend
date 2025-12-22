@@ -30,7 +30,7 @@ public class CodeExecutorService {
     private final PistonService pistonService;
     private final LanguageService languageService;
 
-    @Value("${code-executor.provider:piston}") // judge0, piston
+    @Value("${code-executor.provider:judge0}") // judge0, piston
     private String provider;
 
     public CodeExecutorService(Judge0Service judge0Service, PistonService pistonService, LanguageService languageService) {

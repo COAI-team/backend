@@ -1,13 +1,13 @@
 package kr.or.kosa.backend.config;
 
 import java.util.List;
-
+import jakarta.servlet.DispatcherType;
 import kr.or.kosa.backend.security.jwt.JwtAuthenticationFilter;
 import kr.or.kosa.backend.security.jwt.JwtProvider;
 import lombok.RequiredArgsConstructor;
-
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
@@ -21,7 +21,6 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-import org.springframework.http.HttpMethod;
 
 @Configuration
 @RequiredArgsConstructor
@@ -34,11 +33,11 @@ public class SecurityConfig {
         http
                 .cors(Customizer.withDefaults())
                 .csrf(AbstractHttpConfigurer::disable)
-                .sessionManagement(session -> session
-                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-
-                        // 인증 없이 접근 허용
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                        .requestMatchers("/error").permitAll()
+                        .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
                         .requestMatchers(
                                 "/",
                                 "/auth/github/**",
@@ -51,35 +50,28 @@ public class SecurityConfig {
                                 "/algo/**",
                                 "/admin/**",
                                 "/codeAnalysis/**",
-
-                                // API 계열
                                 "/api/**",
-
-                                // WebSocket / Chat
                                 "/ws/**",
                                 "/chat/messages"
                         ).permitAll()
-
                         .requestMatchers(HttpMethod.GET,
                                 "/freeboard/**",
                                 "/codeboard/**",
                                 "/comment",
                                 "/comment/**",
-                                "/like/*/*/users",  // 좋아요 누른 사용자 목록 확인
+                                "/like/*/*/users",
                                 "/like/**",
-                                "/analysis/**"
+                                "/analysis/**",
+                                "/battle/**"
                         ).permitAll()
-
-                        // (Token Auth)
-                        .requestMatchers("/api/mcp/token").authenticated() // User Token Issue
-                        // (JWT Auth)
+                        .requestMatchers("/battle/**").authenticated()
+                        .requestMatchers("/api/mcp/token").authenticated()
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(
                         new JwtAuthenticationFilter(jwtProvider),
                         UsernamePasswordAuthenticationFilter.class
                 );
-
         return http.build();
     }
 
@@ -89,21 +81,20 @@ public class SecurityConfig {
     }
 
     @Bean
-    public AuthenticationManager authenticationManager(AuthenticationConfiguration config)
-            throws Exception {
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
         return config.getAuthenticationManager();
     }
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        // 로컬 개발용: http/https + 모든 포트(5173, 9443 등) 허용
         configuration.setAllowedOriginPatterns(List.of(
                 "*",
                 "http://localhost:*",
                 "https://localhost:*",
                 "http://127.0.0.1:*",
-                "https://127.0.0.1:*"
+                "https://127.0.0.1:*",
+                "https://192.168.5.6:*"
         ));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         configuration.setAllowedHeaders(List.of("*"));

@@ -11,6 +11,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -222,10 +225,28 @@ public class PaymentsServiceImpl implements PaymentsService {
             throw new IllegalArgumentException("승인 후 7일이 지나 환불할 수 없습니다.");
         }
 
+        // 업그레이드 케이스: 더 높은 티어가 ACTIVE이면 하위 티어 환불 차단
+        enforceUpgradeRefundOrder(userId, paymentToCancel.getPlanCode());
+
         // 토스 취소 API 호출
         String newStatus = tossPaymentsClient.cancelPayment(paymentKey, cancelReason);
 
-        paymentsMapper.updatePaymentStatusToCanceled(paymentToCancel.getOrderId(), newStatus);
+        Map<String, Object> latestPayment = tossPaymentsClient.inquirePayment(paymentKey, paymentToCancel.getOrderId());
+        LocalDateTime canceledAt = extractCanceledAt(latestPayment);
+        String rawJson = null;
+        try {
+            rawJson = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(latestPayment);
+        } catch (Exception e) {
+            rawJson = null;
+        }
+
+        paymentsMapper.updatePaymentStatusToCanceled(
+                paymentToCancel.getOrderId(),
+                newStatus,
+                canceledAt != null ? canceledAt : LocalDateTime.now(),
+                cancelReason,
+                rawJson
+        );
         subscriptionDomainService.cancelSubscriptionByOrderId(paymentToCancel.getOrderId());
 
         BigDecimal usedPoint = nvl(paymentToCancel.getUsedPoint());
@@ -235,6 +256,63 @@ public class PaymentsServiceImpl implements PaymentsService {
 
         return paymentsMapper.findPaymentByOrderId(paymentToCancel.getOrderId())
                 .orElse(paymentToCancel);
+    }
+
+    private void enforceUpgradeRefundOrder(Long userId, String targetPlan) {
+        if (userId == null || targetPlan == null) return;
+        String target = targetPlan.toUpperCase();
+        List<Subscription> actives = subscriptionDomainService.getActiveSubscriptions(userId);
+        if (actives == null || actives.isEmpty()) return;
+
+        int targetRank = tierRank(target);
+        int highestRank = actives.stream()
+                .map(Subscription::getSubscriptionType)
+                .filter(java.util.Objects::nonNull)
+                .map(String::toUpperCase)
+                .mapToInt(this::tierRank)
+                .max()
+                .orElse(targetRank);
+
+        if (highestRank > targetRank) {
+            throw new IllegalStateException("상위 구독(예: PRO)이 활성화되어 있습니다. 상위 구독을 먼저 환불해 주세요.");
+        }
+    }
+
+    private int tierRank(String plan) {
+        if (plan == null) return 0;
+        String p = plan.toUpperCase();
+        switch (p) {
+            case "PRO":
+                return 2;
+            case "BASIC":
+                return 1;
+            default:
+                return 0;
+        }
+    }
+
+    private LocalDateTime extractCanceledAt(Map<String, Object> paymentMap) {
+        if (paymentMap == null) return null;
+        try {
+            Object cancelsObj = paymentMap.get("cancels");
+            if (cancelsObj instanceof Iterable<?> cancels) {
+                for (Object item : cancels) {
+                    if (item instanceof Map<?, ?> m) {
+                        Object at = m.get("canceledAt");
+                        if (at instanceof String s && !s.isBlank()) {
+                            return OffsetDateTime.parse(s).atZoneSameInstant(ZoneId.of("Asia/Seoul")).toLocalDateTime();
+                        }
+                    }
+                }
+            }
+            Object updated = paymentMap.get("approvedAt");
+            if (updated instanceof String s && !s.isBlank()) {
+                return OffsetDateTime.parse(s).atZoneSameInstant(ZoneId.of("Asia/Seoul")).toLocalDateTime();
+            }
+        } catch (Exception e) {
+            // ignore parse errors, fallback to now by caller
+        }
+        return null;
     }
 
     @Override
@@ -529,6 +607,19 @@ public class PaymentsServiceImpl implements PaymentsService {
         LocalDateTime latestRequestedAt = latest.getRequestedAt();
         if (latestRequestedAt == null) {
             return false;
+        }
+
+        // 예외: PRO → BASIC 업그레이드 전체 환불 등, 짧은 시간 내 서로 다른 플랜을 연속 취소한 경우는 1회로 간주
+        LocalDateTime prevRequestedAt = previous.getRequestedAt();
+        if (prevRequestedAt != null) {
+            long minutes = Math.abs(java.time.Duration.between(latestRequestedAt, prevRequestedAt).toMinutes());
+            boolean withinOneHour = minutes <= 60;
+            boolean differentPlan = latest.getPlanCode() != null
+                    && previous.getPlanCode() != null
+                    && !latest.getPlanCode().equalsIgnoreCase(previous.getPlanCode());
+            if (withinOneHour && differentPlan) {
+                return false;
+            }
         }
 
         return latestRequestedAt.isAfter(LocalDateTime.now().minusDays(30));
