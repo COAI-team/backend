@@ -88,6 +88,7 @@ public class SecurityConfig {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOriginPatterns(List.of(
                 "*",
+                "https://api.co-ai.run",
                 "https://www.co-ai.run",
                 "https://co-ai.run",
                 "https://code-nemsy-frontend.vercel.app"
