@@ -87,7 +87,10 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOriginPatterns(List.of(
-                "*"
+                "*",
+                "https://www.co-ai.run",
+                "https://co-ai.run",
+                "https://code-nemsy-frontend.vercel.app"
 //                "http://localhost:*",
 //                "https://localhost:*",
 //                "http://127.0.0.1:*",
