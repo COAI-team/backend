@@ -54,6 +54,7 @@ public class SecurityConfig {
                                 "/freeboard/**",
                                 "/codeboard/**",
                                 "/comment",
+                                "/admin/**",
                                 "/comment/**",
                                 "/like/*/*/users",
                                 "/like/**",
