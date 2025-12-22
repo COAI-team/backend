@@ -141,7 +141,6 @@
         t.AI_FEEDBACK                 AS aiFeedback,
         t.AI_FEEDBACK_TYPE            AS aiFeedbackType,
         t.SOLVE_MODE                  AS solveMode,
-        t.SOLVING_DURATION_SECONDS    AS solvingDurationSeconds,
         t.SUBMITTED_AT                AS submittedAt
         FROM ALGO_SUBMISSIONS t
         JOIN ALGO_PROBLEMS ap ON ap.ALGO_PROBLEM_ID = t.ALGO_PROBLEM_ID

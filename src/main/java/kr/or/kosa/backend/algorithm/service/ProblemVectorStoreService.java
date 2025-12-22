@@ -39,7 +39,7 @@ public class ProblemVectorStoreService {
     @Value("${spring.ai.vectorstore.qdrant.port:6334}")
     private int qdrantPort;
 
-    @Value("${QDRANT_COLLECTION:coai_documents}")
+    @Value("${QDRANT_COLLECTION_ALGORITHM:coai_documents}")
     private String collectionName;
 
     /**
