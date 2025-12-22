@@ -128,17 +128,26 @@
 
 
     <select id="findOneAlgoBoardByBoardId" resultType="kr.or.kosa.backend.admin.dto.response.AlgoBoardDetailResponseDto">
-        select  t.ALGOSUBMISSION_ID ,t.USER_ID , u.USER_NICKNAME ,
-        ap.ALGO_PROBLEM_TITLE, ap.ALGO_PROBLEM_DESCRIPTION,
-        ap.ALGO_PROBLEM_DIFFICULTY, ap.PROBLEM_TYPE,
-        t.SOURCE_CODE, l.LANGUAGE_NAME, t.AI_FEEDBACK,
-        t.AI_FEEDBACK_TYPE, t.SOLVE_MODE, t.SOLVING_DURATION_SECONDS,
-        t.SUBMITTED_AT
-        from ALGO_SUBMISSIONS t
-        join ALGO_PROBLEMS ap on ap.ALGO_PROBLEM_ID = t.ALGO_PROBLEM_ID
-        join LANGUAGES l on l.LANGUAGE_ID = t.LANGUAGE_ID
-        join USERS u on u.USER_ID = t.USER_ID
-        where t.ALGOSUBMISSION_ID  = #{boardId}
+        SELECT
+        t.ALGOSUBMISSION_ID            AS algoSubmissionId,
+        t.USER_ID                     AS userId,
+        u.USER_NICKNAME               AS userNickName,
+        ap.ALGO_PROBLEM_TITLE         AS algoProblemTitle,
+        ap.ALGO_PROBLEM_DESCRIPTION   AS algoProblemDescription,
+        ap.ALGO_PROBLEM_DIFFICULTY    AS algoProblemDifficulty,
+        ap.PROBLEM_TYPE               AS problemType,
+        t.SOURCE_CODE                 AS sourceCode,
+        l.LANGUAGE_NAME               AS language,
+        t.AI_FEEDBACK                 AS aiFeedback,
+        t.AI_FEEDBACK_TYPE            AS aiFeedbackType,
+        t.SOLVE_MODE                  AS solveMode,
+        t.SOLVING_DURATION_SECONDS    AS solvingDurationSeconds,
+        t.SUBMITTED_AT                AS submittedAt
+        FROM ALGO_SUBMISSIONS t
+        JOIN ALGO_PROBLEMS ap ON ap.ALGO_PROBLEM_ID = t.ALGO_PROBLEM_ID
+        JOIN LANGUAGES l ON l.LANGUAGE_ID = t.LANGUAGE_ID
+        JOIN USERS u ON u.USER_ID = t.USER_ID
+        WHERE t.ALGOSUBMISSION_ID = #{boardId}
     </select>
 
 
