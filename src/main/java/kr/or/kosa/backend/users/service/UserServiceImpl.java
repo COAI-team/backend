@@ -534,7 +534,7 @@ public class UserServiceImpl implements UserService {
         // 1) 이메일 정규화
         String normalizedEmail = normalizeGithubEmail(gitHubUser);
 
-        // 2) 이미 같은 이메일 계정 있는지 확인
+        // 2) 같은 이메일 계정 존재 시 반환
         Users existingByEmail = userMapper.findByEmail(normalizedEmail);
         if (existingByEmail != null) {
             return existingByEmail;
@@ -542,10 +542,19 @@ public class UserServiceImpl implements UserService {
 
         String randomPassword = UUID.randomUUID().toString();
 
+        // 🔥 핵심: USER_NAME null 방어
+        String userName = gitHubUser.getName();
+        if (userName == null || userName.isBlank()) {
+            userName = gitHubUser.getLogin(); // fallback
+        }
+
+        // (선택) nickname도 중복 방지
+        String nickname = gitHubUser.getLogin();
+
         Users newUser = new Users();
         newUser.setUserEmail(normalizedEmail);
-        newUser.setUserName(gitHubUser.getName());
-        newUser.setUserNickname(gitHubUser.getLogin());
+        newUser.setUserName(userName);
+        newUser.setUserNickname(nickname);
         newUser.setUserImage(gitHubUser.getAvatarUrl());
         newUser.setUserPw(passwordEncoder.encode(randomPassword));
         newUser.setUserRole("ROLE_USER");
