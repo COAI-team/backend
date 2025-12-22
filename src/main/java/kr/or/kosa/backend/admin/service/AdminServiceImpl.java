@@ -77,11 +77,6 @@ public class AdminServiceImpl implements AdminUserService {
                         .endDate(now.plusMonths(1))
                         .status("ACTIVE")
                         .build());
-                    // 포인트 히스토리 확인
-//                    if(!adminMapper.checkUsedPoint(userId, resultMyDB.order_id(), resultMyDB.usedPoint())){ // 없을때만
-//                        // 이때 만들어야지 토스페이먼츠랑 내디비에있으니까
-//                        return true;
-//                    }
                     return true;
                 }
             }else { //여기는 토스페이먼츠에 데이터가 없으니까 결제가 잘못된거다. 그냥 잘못된 결제로 가자 결제 내역 삭제로해야겠지?

@@ -1,19 +1,27 @@
 package kr.or.kosa.backend.tutor.config;
 
+import java.util.concurrent.Executor;
+
+import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.messaging.simp.config.ChannelRegistration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
 
 @Configuration
 @EnableWebSocketMessageBroker
+@RequiredArgsConstructor
 public class TutorWebSocketConfig implements WebSocketMessageBrokerConfigurer {
+
+    private final TutorStompAuthInterceptor tutorStompAuthInterceptor;
 
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
-        // 운영 시에는 서비스 도메인 + localhost 정도만 Origin을 허용하고
-        // '*' 와일드카드는 사용하지 않는 것이 권장됨. (실제 보안 설정은 Security 쪽에서 관리)
+        // 로컬(https 포함) 개발 환경 허용
         registry.addEndpoint("/ws/tutor")
                 .setAllowedOriginPatterns(
                         "*",
@@ -27,7 +35,24 @@ public class TutorWebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     @Override
     public void configureMessageBroker(MessageBrokerRegistry registry) {
-        registry.enableSimpleBroker("/topic/tutor");
+        registry.enableSimpleBroker("/topic", "/queue");
         registry.setApplicationDestinationPrefixes("/app");
+        registry.setUserDestinationPrefix("/user");
+    }
+
+    @Override
+    public void configureClientInboundChannel(ChannelRegistration registration) {
+        registration.interceptors(tutorStompAuthInterceptor);
+    }
+
+    @Bean(name = "tutorWsExecutor")
+    public Executor tutorWsExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(2);
+        executor.setMaxPoolSize(8);
+        executor.setQueueCapacity(100);
+        executor.setThreadNamePrefix("tutor-ws-");
+        executor.initialize();
+        return executor;
     }
 }

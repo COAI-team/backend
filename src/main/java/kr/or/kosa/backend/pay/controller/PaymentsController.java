@@ -1,25 +1,27 @@
 package kr.or.kosa.backend.pay.controller;
 
+import java.time.LocalDate;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 import kr.or.kosa.backend.pay.dto.UpgradeQuoteResponse;
 import kr.or.kosa.backend.pay.entity.Payments;
 import kr.or.kosa.backend.pay.entity.Subscription;
 import kr.or.kosa.backend.pay.service.PaymentsService;
 import kr.or.kosa.backend.security.jwt.JwtUserDetails;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.time.LocalDate;
-
 @RestController
 @RequestMapping("/payments")
-//@CrossOrigin(origins = {"http://localhost:5173", "https://localhost:5173"})
+@CrossOrigin(origins = {"http://localhost:5173", "https://localhost:5173"})
+@Slf4j
 public class PaymentsController {
 
     private final PaymentsService paymentsService;
@@ -54,22 +56,22 @@ public class PaymentsController {
             }
             payments.setUserId(user.id());
 
-            System.out.println("### [Ready] 요청 시작");
-            System.out.println(" - orderId          : " + payments.getOrderId());
-            System.out.println(" - userId           : " + payments.getUserId());
-            System.out.println(" - planCode         : " + payments.getPlanCode());
-            System.out.println(" - originalAmount   : " + payments.getOriginalAmount());
-            System.out.println(" - usedPoint        : " + payments.getUsedPoint());
-            System.out.println(" - final amount     : " + payments.getAmount());
+            log.info("### [Ready] 요청 시작");
+            log.info(" - orderId          : {}", payments.getOrderId());
+            log.info(" - userId           : {}", payments.getUserId());
+            log.info(" - planCode         : {}", payments.getPlanCode());
+            log.info(" - originalAmount   : {}", payments.getOriginalAmount());
+            log.info(" - usedPoint        : {}", payments.getUsedPoint());
+            log.info(" - final amount     : {}", payments.getAmount());
 
             Payments readyPayment = paymentsService.savePayment(payments);
 
-            System.out.println("### [Ready] DB 저장 성공.");
+            log.info("### [Ready] DB 저장 성공.");
             return ResponseEntity.status(HttpStatus.CREATED).body(readyPayment);
 
         } catch (IllegalArgumentException | IllegalStateException e) {
             // 포인트 부족, 잘못된 사용량 등 비즈니스 검증 실패
-            System.err.println("### [Ready] 요청 검증 실패: " + e.getMessage());
+            log.warn("### [Ready] 요청 검증 실패: {}", e.getMessage());
 
             Map<String, String> errorResponse = new HashMap<>();
             errorResponse.put("code", "PAYMENT_READY_VALIDATION_ERROR");
@@ -80,8 +82,8 @@ public class PaymentsController {
                     .body(errorResponse);
 
         } catch (Exception e) {
-            e.printStackTrace();
-            System.err.println("### [Ready] 요청 처리 중 심각한 오류 발생: " + e.getMessage());
+            log.error("PaymentsController error", e);
+            log.error("### [Ready] 요청 처리 중 심각한 오류 발생", e);
 
             Map<String, String> errorResponse = new HashMap<>();
             errorResponse.put("code", "DB_SAVE_ERROR");
@@ -133,7 +135,7 @@ public class PaymentsController {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
 
         } catch (RuntimeException e) {
-            e.printStackTrace();
+            log.error("PaymentsController error", e);
             Map<String, String> errorResponse = new HashMap<>();
             errorResponse.put("code", "INTERNAL_SERVER_ERROR");
             errorResponse.put("message", "결제 최종 승인 중 알 수 없는 서버 오류가 발생했습니다.");
@@ -162,7 +164,7 @@ public class PaymentsController {
             return ResponseEntity.ok(subscriptions);
 
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error("PaymentsController error", e);
 
             // 에러도 JSON으로 넘겨주면 프론트에서 처리하기 편함
             Map<String, String> error = new HashMap<>();
@@ -215,7 +217,7 @@ public class PaymentsController {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body(Map.of("code", "PAYMENT_INQUIRY_ERROR", "message", e.getMessage()));
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error("PaymentsController error", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("code", "PAYMENT_INQUIRY_INTERNAL_ERROR",
                             "message", "단건 조회 처리 중 서버 오류가 발생했습니다."));
@@ -248,7 +250,7 @@ public class PaymentsController {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
 
         } catch (RuntimeException e) {
-            e.printStackTrace();
+            log.error("PaymentsController error", e);
             Map<String, String> errorResponse = new HashMap<>();
             errorResponse.put("code", "INTERNAL_SERVER_ERROR");
             errorResponse.put("message", "환불 처리 중 알 수 없는 서버 오류가 발생했습니다.");
@@ -280,7 +282,7 @@ public class PaymentsController {
                             "message", e.getMessage()
                     ));
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error("PaymentsController error", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of(
                             "code", "UPGRADE_QUOTE_INTERNAL_ERROR",
@@ -289,3 +291,4 @@ public class PaymentsController {
         }
     }
 }
+

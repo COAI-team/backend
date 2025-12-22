@@ -9,7 +9,8 @@ public enum AdminErrorCode implements ErrorCode {
     ADMIN_BOARD_TYPE("AD004", "입력받은 게시판 종류의 값이 잘못되었습니다."),
     ADMIN_SEARCH_TYPE("AD005", "입력받은 검색 조건이 잘못되었습니다."),
     ADMIN_SORT_FIELD("AD006", "입력받은 정렬 필드 조건이 잘못되었습니다."),
-    ADMIN_SORT_ORDER("AD007", "입력받은 정렬 조건이 잘못되었습니다.")
+    ADMIN_SORT_ORDER("AD007", "입력받은 정렬 조건이 잘못되었습니다."),
+    ADMIN_BOARD_UPDATE("A008", "업데이트에 실패했습니다.")
     ;
 
 

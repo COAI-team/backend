@@ -17,7 +17,12 @@ public class PerformanceMonitoringAspect {
     private static final long BAD_METHOD = 3000L;
 
     // JSON 변환용 ObjectMapper 추가
-    private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
+    private final ObjectMapper objectMapper;
+
+    public PerformanceMonitoringAspect(ObjectMapper objectMapper) {
+        this.objectMapper = objectMapper;
+    }
+
 
     /**
      * 🔥 기존 포인트컷(잘못된 매칭):

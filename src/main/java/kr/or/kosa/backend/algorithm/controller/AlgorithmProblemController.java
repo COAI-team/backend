@@ -118,6 +118,7 @@ public class AlgorithmProblemController {
      *             해당 엔드포인트는 검증 파이프라인을 수행합니다.
      */
     @Deprecated(since = "2025-12", forRemoval = true)
+    @SuppressWarnings("removal")
     @GetMapping(value = "/generate/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<String> generateProblemStream(
             @RequestParam String difficulty,

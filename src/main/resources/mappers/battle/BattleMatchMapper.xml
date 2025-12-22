@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="kr.or.kosa.backend.battle.mapper.BattleMatchMapper">
+
+    <resultMap id="BattleMatchMap" type="kr.or.kosa.backend.battle.domain.BattleMatch">
+        <id column="MATCH_ID" property="matchId"/>
+        <result column="STATUS" property="status"/>
+        <result column="HOST_USER_ID" property="hostUserId"/>
+        <result column="GUEST_USER_ID" property="guestUserId"/>
+        <result column="ALGO_PROBLEM_ID" property="algoProblemId"/>
+        <result column="LANGUAGE_ID" property="languageId"/>
+        <result column="LEVEL_MODE" property="levelMode"/>
+        <result column="ROOM_TITLE" property="roomTitle"/>
+        <result column="BET_AMOUNT" property="betAmount"/>
+        <result column="MAX_DURATION_MINUTES" property="maxDurationMinutes"/>
+        <result column="STARTED_AT" property="startedAt"/>
+        <result column="FINISHED_AT" property="finishedAt"/>
+        <result column="WINNER_USER_ID" property="winnerUserId"/>
+        <result column="WIN_REASON" property="winReason"/>
+        <result column="SETTLEMENT_STATUS" property="settlementStatus"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="kr.or.kosa.backend.battle.domain.BattleMatch">
+        INSERT INTO BATTLE_MATCHES (
+        MATCH_ID,
+        STATUS,
+        HOST_USER_ID,
+        GUEST_USER_ID,
+        ALGO_PROBLEM_ID,
+        LANGUAGE_ID,
+        LEVEL_MODE,
+        ROOM_TITLE,
+        BET_AMOUNT,
+        MAX_DURATION_MINUTES,
+        STARTED_AT,
+        FINISHED_AT,
+        WINNER_USER_ID,
+        WIN_REASON,
+        SETTLEMENT_STATUS
+        ) VALUES (
+        #{matchId},
+        #{status},
+        #{hostUserId},
+        #{guestUserId},
+        #{algoProblemId},
+        #{languageId},
+        #{levelMode},
+        #{roomTitle},
+        #{betAmount},
+        #{maxDurationMinutes},
+        #{startedAt},
+        #{finishedAt},
+        #{winnerUserId},
+        #{winReason},
+        #{settlementStatus}
+        )
+    </insert>
+
+    <update id="updateParticipants">
+        UPDATE BATTLE_MATCHES
+        SET HOST_USER_ID = #{hostUserId},
+            GUEST_USER_ID = #{guestUserId}
+        WHERE MATCH_ID = #{matchId}
+    </update>
+
+    <update id="updateStatus">
+        UPDATE BATTLE_MATCHES
+        SET STATUS = #{status},
+            WINNER_USER_ID = #{winnerUserId},
+            WIN_REASON = #{winReason},
+            STARTED_AT = CASE WHEN #{status} IN ('COUNTDOWN','RUNNING') AND STARTED_AT IS NULL THEN NOW() ELSE STARTED_AT END,
+            FINISHED_AT = CASE WHEN #{status} IN ('FINISHED', 'CANCELED') THEN NOW() ELSE FINISHED_AT END
+        WHERE MATCH_ID = #{matchId}
+    </update>
+
+    <update id="updateSettlementStatus">
+        UPDATE BATTLE_MATCHES
+        SET SETTLEMENT_STATUS = #{settlementStatus}
+        WHERE MATCH_ID = #{matchId}
+    </update>
+
+    <update id="updateMaxDuration">
+        UPDATE BATTLE_MATCHES
+        SET MAX_DURATION_MINUTES = #{maxDurationMinutes}
+        WHERE MATCH_ID = #{matchId}
+    </update>
+
+    <select id="findById" resultMap="BattleMatchMap">
+        SELECT
+            MATCH_ID,
+            STATUS,
+            HOST_USER_ID,
+            GUEST_USER_ID,
+            ALGO_PROBLEM_ID,
+            LANGUAGE_ID,
+            LEVEL_MODE,
+            ROOM_TITLE,
+            BET_AMOUNT,
+            MAX_DURATION_MINUTES,
+            STARTED_AT,
+            FINISHED_AT,
+            WINNER_USER_ID,
+            WIN_REASON,
+            SETTLEMENT_STATUS
+        FROM BATTLE_MATCHES
+        WHERE MATCH_ID = #{matchId}
+    </select>
+
+    <select id="findActiveMatches" resultMap="BattleMatchMap">
+        SELECT
+            MATCH_ID,
+            STATUS,
+            HOST_USER_ID,
+            GUEST_USER_ID,
+            ALGO_PROBLEM_ID,
+            LANGUAGE_ID,
+            LEVEL_MODE,
+            ROOM_TITLE,
+            BET_AMOUNT,
+            MAX_DURATION_MINUTES,
+            STARTED_AT,
+            FINISHED_AT,
+            WINNER_USER_ID,
+            WIN_REASON,
+            SETTLEMENT_STATUS
+        FROM BATTLE_MATCHES
+        WHERE FINISHED_AT IS NULL
+          AND STATUS IN ('COUNTDOWN','RUNNING')
+    </select>
+</mapper>
