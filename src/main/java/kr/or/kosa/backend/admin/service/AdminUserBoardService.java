@@ -1,5 +1,6 @@
 package kr.or.kosa.backend.admin.service;
 
+import kr.or.kosa.backend.admin.dto.request.DeleteBoardRequestDto;
 import kr.or.kosa.backend.admin.dto.response.AlgoBoardDetailResponseDto;
 import kr.or.kosa.backend.admin.dto.BoardItems;
 import kr.or.kosa.backend.admin.dto.request.UserBoardSearchConditionRequestDto;
@@ -12,4 +13,5 @@ public interface AdminUserBoardService {
     AlgoBoardDetailResponseDto getAlgoBoard(long boardId);
     AdminCodeBoardDetailResponseDto getOneCodeBoard(long boardId);
     AdminFreeBoardDetailResponseDto getOneFreeBoard(long boardId);
+    int deleteBoard(DeleteBoardRequestDto  deleteBoardRequestDto);
 }

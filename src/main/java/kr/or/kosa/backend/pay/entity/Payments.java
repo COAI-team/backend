@@ -31,6 +31,9 @@ public class Payments {
     // 고객 이름 (표시용)
     private String customerName;
 
+    // 환불 사유 (취소 시)
+    private String cancelReason;
+
     // 원래 플랜 가격 (포인트 적용 전 금액)
     private BigDecimal originalAmount;
 

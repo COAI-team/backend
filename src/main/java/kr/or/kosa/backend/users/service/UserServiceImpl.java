@@ -67,6 +67,13 @@ public class UserServiceImpl implements UserService {
                 KEY_REFRESH_TOKEN, refreshToken);
     }
 
+    private String normalizeGithubEmail(GitHubUserResponse gitHubUser) {
+        if (gitHubUser.getEmail() != null && !gitHubUser.getEmail().isBlank()) {
+            return gitHubUser.getEmail();
+        }
+        return "github-" + gitHubUser.getId() + "@noemail.com";
+    }
+
     // ---------------------------------------------------------
     // 회원가입
     // ---------------------------------------------------------
@@ -231,7 +238,8 @@ public class UserServiceImpl implements UserService {
         }
 
         String token = passwordResetTokenService.createResetToken(users.getUserId());
-        String resetUrl = "https://localhost:5173/reset-password?token=" + token;
+        String resetUrl =
+                "https://code-nemsy-frontend.vercel.app/reset-password?token=" + token;
 
         boolean sent = emailVerificationService.send(
                 email,
@@ -434,7 +442,7 @@ public class UserServiceImpl implements UserService {
     public GithubLoginResult githubLogin(GitHubUserResponse gitHubUser, boolean linkMode) {
 
         String providerId = String.valueOf(gitHubUser.getId());
-        String email = normalizeEmail(gitHubUser.getEmail(), providerId);
+        String email = normalizeGithubEmail(gitHubUser);
 
         // Early return for link mode
         if (linkMode) {
@@ -456,14 +464,6 @@ public class UserServiceImpl implements UserService {
         // Create new GitHub account
         Users newUser = createNewGithubUser(gitHubUser);
         return buildLoginResult(newUser, false, null);
-    }
-
-    // Extracted helper methods
-    private String normalizeEmail(String email, String providerId) {
-        if (email == null || email.isBlank()) {
-            return "github-" + providerId + "@noemail.com";
-        }
-        return email;
     }
 
     private GithubLoginResult buildLinkModeResult() {
@@ -526,14 +526,10 @@ public class UserServiceImpl implements UserService {
     // ---------------------------------------------------------
     private Users createNewGithubUser(GitHubUserResponse gitHubUser) {
 
-        Long githubId = gitHubUser.getId();
-        String providerId = String.valueOf(githubId);
-        String email = gitHubUser.getEmail();
+        String providerId = String.valueOf(gitHubUser.getId());
 
         // 1) 이메일 정규화
-        String normalizedEmail = email != null
-                ? email
-                : "github-" + providerId + "@noemail.com";
+        String normalizedEmail = normalizeGithubEmail(gitHubUser);
 
         // 2) 이미 같은 이메일 계정 있는지 확인
         Users existingByEmail = userMapper.findByEmail(normalizedEmail);
@@ -561,7 +557,7 @@ public class UserServiceImpl implements UserService {
                 newUser.getUserId(),
                 PROVIDER_GITHUB,
                 providerId,
-                email
+                normalizedEmail
         );
         if (socialInserted != 1) {
             throw new CustomBusinessException(UserErrorCode.USER_UPDATE_FAILED);
@@ -589,10 +585,7 @@ public class UserServiceImpl implements UserService {
         }
 
         // 3) 이메일 체크 + 임시 이메일 생성
-        String email = gitHubUser.getEmail();
-        if (email == null || email.isBlank()) {
-            email = gitHubUser.getLogin() + "@github-user.com";
-        }
+        String email = normalizeGithubEmail(gitHubUser);
 
         // 4) 신규 연동 저장
         int socialInserted = userMapper.insertSocialAccount(

@@ -30,7 +30,10 @@ public interface PaymentsMapper {
 
     // 취소 시 상태/canceled_at 갱신
     int updatePaymentStatusToCanceled(@Param("orderId") String orderId,
-                                      @Param("status") String status);
+                                      @Param("status") String status,
+                                      @Param("canceledAt") java.time.LocalDateTime canceledAt,
+                                      @Param("cancelReason") String cancelReason,
+                                      @Param("pgRawResponse") String pgRawResponse);
 
     // READY 단계에서 기존 orderId 결제정보 덮어쓰기
     int updatePaymentForReady(Payments payments);

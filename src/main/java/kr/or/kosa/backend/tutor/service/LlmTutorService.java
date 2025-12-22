@@ -44,7 +44,7 @@ public class LlmTutorService implements TutorService {
 
     private static final Duration CACHE_TTL = Duration.ofMinutes(15);
     private static final int MAX_LLM_CALLS_PER_MINUTE = 60;
-    private static final int MAX_CONCURRENT_PER_USER = 3;
+    private static final int MAX_CONCURRENT_PER_USER = 1;
 
     private final LLMChatService llmChatService;
     private final AlgorithmProblemService algorithmProblemService;
@@ -66,7 +66,14 @@ public class LlmTutorService implements TutorService {
     private final AtomicLong llmTotalMillis = new AtomicLong(0);
     private final AtomicLong llmMaxMillis = new AtomicLong(0);
 
-    private final ExecutorService executor = Executors.newCachedThreadPool();
+    private final ExecutorService executor = new ThreadPoolExecutor(
+            2,
+            8,
+            60L,
+            TimeUnit.SECONDS,
+            new LinkedBlockingQueue<>(50),
+            new ThreadPoolExecutor.CallerRunsPolicy()
+    );
 
     @Override
     public TutorServerMessage handleMessage(TutorClientMessage clientMessage) {
@@ -79,13 +86,7 @@ public class LlmTutorService implements TutorService {
         // 1) SecurityContext에서 userId 시도
         String userId = resolveAuthenticatedUserId();
 
-        // 2) SecurityContext 비어 있으면, 메시지 안의 userId로 폴백
-        if (userId == null && clientMessage.getUserId() != null) {
-            userId = String.valueOf(clientMessage.getUserId());
-            log.info("[Tutor] SecurityContext 비어있어 clientMessage.userId={} 사용", userId);
-        }
-
-        // 3) 그래도 없으면 진짜 인증 실패
+        // 2) 그래도 없으면 인증 실패
         if (userId == null) {
             log.warn("Unauthenticated tutor request dropped - problemId={}, triggerType={}",
                     clientMessage.getProblemId(), clientMessage.getTriggerType());
@@ -104,6 +105,9 @@ public class LlmTutorService implements TutorService {
         SubscriptionTier tier = subscriptionTierResolver.resolveTier(userId);
 
         if (!isTriggerAllowed(trigger, tier)) {
+            if ("AUTO".equals(trigger)) {
+                return error(trigger, clientMessage, userId, "BASIC은 자동 힌트를 사용할 수 없습니다. PRO 플랜에서 이용해 주세요.");
+            }
             return error(trigger, clientMessage, userId, "해당 기능은 현재 구독 티어에서 사용할 수 없습니다.");
         }
 
@@ -120,8 +124,8 @@ public class LlmTutorService implements TutorService {
         // cache check
         if ("USER".equals(trigger)) {
             String cacheKey = buildAnswerCacheKey(userId, clientMessage, normalizedCode);
-            CacheEntry cached = userAnswerCache.get(cacheKey);
-            if (cached != null && !cached.isExpired()) {
+            CacheEntry cached = getValidCacheEntry(userAnswerCache, cacheKey);
+            if (cached != null) {
                 return TutorServerMessage.builder()
                         .type("HINT")
                         .triggerType(trigger)
@@ -132,8 +136,8 @@ public class LlmTutorService implements TutorService {
             }
         } else if ("AUTO".equals(trigger)) {
             String cacheKey = buildAutoCacheKey(userId, clientMessage, normalizedCode);
-            CacheEntry cached = autoHintCache.get(cacheKey);
-            if (cached != null && !cached.isExpired()) {
+            CacheEntry cached = getValidCacheEntry(autoHintCache, cacheKey);
+            if (cached != null) {
                 return TutorServerMessage.builder()
                         .type("HINT")
                         .triggerType(trigger)
@@ -175,9 +179,11 @@ public class LlmTutorService implements TutorService {
             if ("USER".equals(trigger)) {
                 userAnswerCache.put(buildAnswerCacheKey(userId, clientMessage, normalizedCode),
                         CacheEntry.of(answer, CACHE_TTL));
+                pruneCache(userAnswerCache, 500);
             } else if ("AUTO".equals(trigger)) {
                 autoHintCache.put(buildAutoCacheKey(userId, clientMessage, normalizedCode),
                         CacheEntry.of(answer, CACHE_TTL));
+                pruneCache(autoHintCache, 500);
             }
 
             markAutoCall(trigger, clientMessage, userId);
@@ -208,12 +214,15 @@ public class LlmTutorService implements TutorService {
 
     private String resolveAuthenticatedUserId() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        log.info("[TutorAuth] authentication={}", auth); // 디버깅용 로그
+        log.debug("[TutorAuth] authentication={}", auth); // 디버깅용 로그
 
         if (auth == null || !auth.isAuthenticated()) {
             return null;
         }
         Object principal = auth.getPrincipal();
+        if (principal instanceof kr.or.kosa.backend.security.jwt.JwtUserDetails details) {
+            return String.valueOf(details.id());
+        }
         if (principal instanceof String) {
             return (String) principal;
         }
@@ -528,11 +537,29 @@ public class LlmTutorService implements TutorService {
         Future<String> future = executor.submit(task);
         long start = System.currentTimeMillis();
         try {
-            String result = future.get(10, TimeUnit.SECONDS);
+            String result = future.get(25, TimeUnit.SECONDS);
             long elapsed = System.currentTimeMillis() - start;
             recordLlmMetrics(elapsed, false);
             return result;
+        } catch (InterruptedException ie) {
+            future.cancel(true);
+            llmErrorCount.incrementAndGet();
+            Thread.currentThread().interrupt();
+            throw ie;
+        } catch (TimeoutException te) {
+            future.cancel(true); // 타임아웃 시 백그라운드 작업 중단 시도
+            llmErrorCount.incrementAndGet();
+            throw te;
+        } catch (ExecutionException ee) {
+            future.cancel(true);
+            llmErrorCount.incrementAndGet();
+            Throwable cause = ee.getCause();
+            if (cause instanceof Exception) {
+                throw (Exception) cause;
+            }
+            throw new Exception(cause);
         } catch (Exception ex) {
+            future.cancel(true);
             llmErrorCount.incrementAndGet();
             throw ex;
         }
@@ -577,6 +604,26 @@ public class LlmTutorService implements TutorService {
                 .userId(userId)
                 .content(message)
                 .build();
+    }
+
+    private CacheEntry getValidCacheEntry(Map<String, CacheEntry> cache, String key) {
+        CacheEntry entry = cache.get(key);
+        if (entry == null) {
+            return null;
+        }
+        if (entry.isExpired()) {
+            cache.remove(key);
+            return null;
+        }
+        return entry;
+    }
+
+    private void pruneCache(Map<String, CacheEntry> cache, int maxSize) {
+        cache.entrySet().removeIf(e -> e.getValue().isExpired());
+        while (cache.size() > maxSize && !cache.isEmpty()) {
+            String firstKey = cache.keySet().iterator().next();
+            cache.remove(firstKey);
+        }
     }
 
     private static class CacheEntry {
