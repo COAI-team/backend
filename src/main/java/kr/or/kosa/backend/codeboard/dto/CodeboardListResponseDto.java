@@ -15,6 +15,7 @@ public class CodeboardListResponseDto {
     private Long codeboardId;
     private Long userId;
     private String userNickname;
+    private String userImage;
     private String analysisId;
     private String codeboardTitle;
     private String codeboardSummary;

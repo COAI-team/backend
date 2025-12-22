@@ -42,6 +42,7 @@ public class AdminController {
         @PathVariable("userId") Long userId
     ) {
         boolean result = adminService.subscribeCheck(userId);
+
         return ResponseEntity.ok(ApiResponse.success(result));
     }
 

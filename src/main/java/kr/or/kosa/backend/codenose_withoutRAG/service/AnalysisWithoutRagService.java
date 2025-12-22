@@ -2,6 +2,7 @@ package kr.or.kosa.backend.codenose_withoutRAG.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import kr.or.kosa.backend.codenose.aop.LangfuseObserve;
 import kr.or.kosa.backend.codenose.dto.AnalysisRequestDTO;
 import kr.or.kosa.backend.codenose.dto.CodeResultDTO;
 import kr.or.kosa.backend.codenose.dto.GithubFileDTO;
@@ -65,7 +66,7 @@ public class AnalysisWithoutRagService {
     /**
      * 코드 분석 수행 (간단 버전) - RAG 제외
      */
-    @kr.or.kosa.backend.codenose.aop.LangfuseObserve(name = "analyzeCode_NoRAG")
+    @LangfuseObserve(name = "analyzeCode_NoRAG")
     public String analyzeCode(String userId, String userMessage, AnalysisRequestDTO requestDto) {
         // 워크플로우 시작: Website-NoRAG-Analysis Trace 생성
         langfuseService.startNamedTrace("Website-NoRAG-Analysis",
@@ -99,7 +100,7 @@ public class AnalysisWithoutRagService {
     /**
      * 저장된 GitHub 파일을 조회하여 AI 분석 수행 - RAG 제외
      */
-    @kr.or.kosa.backend.codenose.aop.LangfuseObserve(name = "analyzeStoredFile_NoRAG")
+    @LangfuseObserve(name = "analyzeStoredFile_NoRAG")
     public String analyzeStoredFile(AnalysisRequestDTO requestDto) {
         // 워크플로우 시작: Website-NoRAG-Analysis Trace 생성
         langfuseService.startNamedTrace("Website-NoRAG-Analysis",
@@ -129,7 +130,8 @@ public class AnalysisWithoutRagService {
                     requestDto.getAnalysisTypes(),
                     requestDto.getToneLevel(),
                     requestDto.getCustomRequirements(),
-                    userContext);
+                    userContext,
+                    null);
 
             // 4. Agentic Workflow 실행
             String aiResponseContent = agenticWorkflowService.executeWorkflow(storedFile.getFileContent(),

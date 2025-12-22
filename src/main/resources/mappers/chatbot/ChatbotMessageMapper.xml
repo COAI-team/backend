@@ -17,15 +17,42 @@
         <result property="updatedAt"        column="UPDATED_AT"/>
     </resultMap>
 
-    <insert id="insertMessage" parameterType="kr.or.kosa.backend.chatbot.domain.ChatbotMessage">
+    <insert id="insertMessage"
+            parameterType="kr.or.kosa.backend.chatbot.domain.ChatbotMessage"
+            useGeneratedKeys="true"
+            keyProperty="chatbotMessageId"
+            keyColumn="CHATBOT_MESSAGE_ID">
         INSERT INTO CHATBOT_MESSAGE
             (SESSION_ID, USER_ID, ROLE, CONTENT)
         VALUES
             (#{sessionId}, #{userId}, #{role}, #{content})
     </insert>
 
+    <insert id="insertMessages"
+            parameterType="java.util.List"
+            useGeneratedKeys="true"
+            keyProperty="chatbotMessageId"
+            keyColumn="CHATBOT_MESSAGE_ID">
+        INSERT INTO CHATBOT_MESSAGE (SESSION_ID, USER_ID, ROLE, CONTENT)
+        VALUES
+        <foreach collection="messages" item="msg" separator=",">
+            (#{msg.sessionId}, #{msg.userId}, #{msg.role}, #{msg.content})
+        </foreach>
+    </insert>
+
+    <sql id="BaseColumns">
+        CHATBOT_MESSAGE_ID,
+        SESSION_ID,
+        USER_ID,
+        ROLE,
+        CONTENT,
+        CREATED_AT,
+        UPDATED_AT
+    </sql>
+
     <select id="selectMessages" resultMap="ChatbotMessageMap">
-        SELECT *
+        SELECT
+        <include refid="BaseColumns"/>
         FROM CHATBOT_MESSAGE
         WHERE SESSION_ID = #{sessionId}
         ORDER BY CREATED_AT DESC
@@ -33,7 +60,8 @@
     </select>
 
         <select id="selectMessagesByUser" resultMap="ChatbotMessageMap">
-        SELECT *
+        SELECT
+        <include refid="BaseColumns"/>
         FROM CHATBOT_MESSAGE
         WHERE SESSION_ID = #{sessionId}
           AND (USER_ID = #{userId} OR USER_ID IS NULL)

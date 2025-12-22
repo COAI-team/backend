@@ -33,6 +33,7 @@ public class GitHubLoginController {
 
     private static final long REFRESH_TOKEN_EXPIRE_DAYS = 14;
     private static final String REFRESH_KEY_PREFIX = "auth:refresh:";
+    private static final String BEARER_PREFIX = "Bearer ";
 
     private static final String KEY_SUCCESS = "success";
     private static final String KEY_MESSAGE = "message";
@@ -70,17 +71,7 @@ public class GitHubLoginController {
         // 🔥 3) 기존 이메일 계정 존재 → 계정 통합 필요
         if (result.isNeedLink()) {
 
-            // 기존 일반 계정 기준으로 토큰 발급
-            String accessToken = jwtProvider.createAccessToken(user.getUserId(), user.getUserEmail());
-            String refreshToken = jwtProvider.createRefreshToken(user.getUserId(), user.getUserEmail());
-
-            // refreshToken 저장
-            redisTemplate.opsForValue().set(
-                    REFRESH_KEY_PREFIX + user.getUserId(),
-                    refreshToken,
-                    REFRESH_TOKEN_EXPIRE_DAYS,
-                    TimeUnit.DAYS
-            );
+            Tokens tokens = issueTokens(user);
 
             return ResponseEntity.ok(
                     GitHubCallbackResponse.builder()
@@ -89,29 +80,19 @@ public class GitHubLoginController {
                             .userId(user.getUserId())
                             .message("기존 일반 계정이 존재합니다. GitHub 계정을 연동하시겠습니까?")
                             .gitHubUser(gitHubUser)
-
-                            // FE가 인증 상태를 유지할 수 있도록 토큰 전달
-                            .accessToken(accessToken)
-                            .refreshToken(refreshToken)
+                            .accessToken(tokens.accessToken())
+                            .refreshToken(tokens.refreshToken())
 
                             .build()
             );
         }
 
         // 🔥 4) 평소처럼 GitHub 로그인 처리
-        String accessToken = jwtProvider.createAccessToken(user.getUserId(), user.getUserEmail());
-        String refreshToken = jwtProvider.createRefreshToken(user.getUserId(), user.getUserEmail());
-
-        redisTemplate.opsForValue().set(
-                REFRESH_KEY_PREFIX + user.getUserId(),
-                refreshToken,
-                REFRESH_TOKEN_EXPIRE_DAYS,
-                TimeUnit.DAYS
-        );
+        Tokens tokens = issueTokens(user);
 
         UserLoginResponseDto loginDto = UserLoginResponseDto.builder()
-                .accessToken(accessToken)
-                .refreshToken(refreshToken)
+                .accessToken(tokens.accessToken())
+                .refreshToken(tokens.refreshToken())
                 .user(user.toDto())
                 .build();
 
@@ -131,28 +112,24 @@ public class GitHubLoginController {
     public ResponseEntity<Map<String, Object>> getGithubUserInfo(
             @RequestHeader("Authorization") String token
     ) {
-        String accessToken = token.replace("Bearer ", "");
+        String accessToken = token.replace(BEARER_PREFIX, "");
         Long userId = jwtProvider.getUserIdFromToken(accessToken);
 
         boolean linked = userService.isGithubLinked(userId);
 
-        if (!linked) {
-            Map<String, Object> body = new HashMap<>();
+        Map<String, Object> body = new HashMap<>(4);
+        if (linked) {
+            Map<String, Object> githubInfo = userService.getGithubUserInfo(userId);
+            body.put("linked", true);
+            body.put(KEY_GITHUB_ID, githubInfo.get(KEY_GITHUB_ID));
+            body.put(KEY_GITHUB_LOGIN, githubInfo.get(KEY_GITHUB_LOGIN));
+            body.put(KEY_AVATAR_URL, githubInfo.get(KEY_AVATAR_URL));
+        } else {
             body.put("linked", false);
             body.put(KEY_GITHUB_ID, null);
             body.put(KEY_GITHUB_LOGIN, null);
             body.put(KEY_AVATAR_URL, null);
-
-            return ResponseEntity.ok(body);
         }
-
-        Map<String, Object> githubInfo = userService.getGithubUserInfo(userId);
-
-        Map<String, Object> body = new HashMap<>();
-        body.put("linked", true);
-        body.put(KEY_GITHUB_ID, githubInfo.get(KEY_GITHUB_ID));
-        body.put(KEY_GITHUB_LOGIN, githubInfo.get(KEY_GITHUB_LOGIN));
-        body.put(KEY_AVATAR_URL, githubInfo.get(KEY_AVATAR_URL));
 
         return ResponseEntity.ok(body);
     }
@@ -164,7 +141,7 @@ public class GitHubLoginController {
     public ResponseEntity<Map<String, Object>> disconnectGithub(
             @RequestHeader("Authorization") String token
     ) {
-        String accessToken = token.replace("Bearer ", "");
+        String accessToken = token.replace(BEARER_PREFIX, "");
         Long userId = jwtProvider.getUserIdFromToken(accessToken);
 
         boolean result = userService.disconnectGithub(userId);
@@ -177,5 +154,22 @@ public class GitHubLoginController {
                                 : "GitHub 연결 해제에 실패했습니다."
                 )
         );
+    }
+
+    private Tokens issueTokens(Users user) {
+        String accessToken = jwtProvider.createAccessToken(user.getUserId(), user.getUserEmail());
+        String refreshToken = jwtProvider.createRefreshToken(user.getUserId(), user.getUserEmail());
+
+        redisTemplate.opsForValue().set(
+                REFRESH_KEY_PREFIX + user.getUserId(),
+                refreshToken,
+                REFRESH_TOKEN_EXPIRE_DAYS,
+                TimeUnit.DAYS
+        );
+
+        return new Tokens(accessToken, refreshToken);
+    }
+
+    private record Tokens(String accessToken, String refreshToken) {
     }
 }

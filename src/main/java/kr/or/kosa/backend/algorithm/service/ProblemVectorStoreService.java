@@ -1,5 +1,6 @@
 package kr.or.kosa.backend.algorithm.service;
 
+import kr.or.kosa.backend.algorithm.dto.SimilarityThresholds;
 import kr.or.kosa.backend.algorithm.dto.external.ProblemDocumentDto;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -13,6 +14,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -255,6 +257,119 @@ public class ProblemVectorStoreService {
         } catch (Exception e) {
             log.error("유사도 검사 중 오류 발생", e);
             result.setPassed(true);  // 오류 시 일단 통과 (검사 실패로 인한 블로킹 방지)
+            result.setError(e.getMessage());
+        }
+
+        return result;
+    }
+
+    // ===== Phase 3: 다단계 유사도 검사 =====
+
+    /**
+     * 소스별 다단계 유사도 검사 (Phase 3)
+     *
+     * 수집 데이터, 생성 데이터, 동일 테마별로 다른 임계값 적용
+     *
+     * @param title       문제 제목
+     * @param description 문제 설명
+     * @param theme       스토리 테마 (nullable)
+     * @param thresholds  소스별 임계값
+     * @return 소스별 유사도 검사 결과 Map (키: COLLECTED, GENERATED, SAME_THEME)
+     */
+    public Map<String, SimilarityCheckResult> checkSimilarityBySource(
+            String title, String description, String theme, SimilarityThresholds thresholds) {
+
+        log.info("🔍 다단계 유사도 검사 시작 - 제목: {}, 테마: {}", title, theme);
+
+        Map<String, SimilarityCheckResult> results = new HashMap<>();
+        String query = String.format("%s %s", title, description);
+
+        // 1. 수집 데이터 검사 (BOJ, LeetCode 등)
+        SimilarityCheckResult collectedResult = checkSimilarityWithFilter(
+                query, "source != 'AI_GENERATED'", thresholds.getCollectedThreshold(), "COLLECTED");
+        results.put("COLLECTED", collectedResult);
+
+        // 2. AI 생성 데이터 검사
+        SimilarityCheckResult generatedResult = checkSimilarityWithFilter(
+                query, "source == 'AI_GENERATED'", thresholds.getGeneratedThreshold(), "GENERATED");
+        results.put("GENERATED", generatedResult);
+
+        // 3. 동일 테마 내 생성 데이터 검사 (테마가 있는 경우만)
+        if (theme != null && !theme.isBlank()) {
+            String sameThemeFilter = String.format("source == 'AI_GENERATED' && theme == '%s'", theme);
+            SimilarityCheckResult sameThemeResult = checkSimilarityWithFilter(
+                    query, sameThemeFilter, thresholds.getSameThemeThreshold(), "SAME_THEME");
+            results.put("SAME_THEME", sameThemeResult);
+        }
+
+        log.info("✅ 다단계 유사도 검사 완료 - 수집: {}, 생성: {}, 동일테마: {}",
+                collectedResult.isPassed() ? "통과" : "실패",
+                generatedResult.isPassed() ? "통과" : "실패",
+                results.containsKey("SAME_THEME") ? (results.get("SAME_THEME").isPassed() ? "통과" : "실패") : "N/A");
+
+        return results;
+    }
+
+    /**
+     * 필터 조건을 적용한 유사도 검사
+     */
+    private SimilarityCheckResult checkSimilarityWithFilter(
+            String query, String filterExpression, double threshold, String checkType) {
+
+        SimilarityCheckResult result = new SimilarityCheckResult();
+        result.setThreshold(threshold);
+
+        try {
+            SearchRequest request = SearchRequest.builder()
+                    .query(query)
+                    .topK(5)
+                    .similarityThreshold(0.5)
+                    .filterExpression(filterExpression)
+                    .build();
+
+            List<Document> similarDocs = vectorStore.similaritySearch(request);
+
+            if (similarDocs.isEmpty()) {
+                result.setPassed(true);
+                result.setMaxSimilarity(0.0);
+                log.debug("[{}] 유사 문제 없음 - 통과", checkType);
+                return result;
+            }
+
+            double maxSimilarity = 0.0;
+            Document mostSimilar = null;
+
+            for (Document doc : similarDocs) {
+                String docContent = doc.getText();
+                double similarity = calculateContentSimilarity(query, docContent);
+
+                if (similarity > maxSimilarity) {
+                    maxSimilarity = similarity;
+                    mostSimilar = doc;
+                }
+            }
+
+            result.setMaxSimilarity(maxSimilarity);
+            result.setSimilarDocuments(similarDocs);
+
+            if (mostSimilar != null) {
+                result.setMostSimilarTitle((String) mostSimilar.getMetadata().get("title"));
+                result.setMostSimilarId((String) mostSimilar.getMetadata().get("externalId"));
+            }
+
+            if (maxSimilarity >= threshold) {
+                result.setPassed(false);
+                log.warn("[{}] 유사도 검사 실패 - 최대: {:.2f} >= 임계값: {:.2f}, 유사문제: {}",
+                        checkType, maxSimilarity, threshold, result.getMostSimilarTitle());
+            } else {
+                result.setPassed(true);
+                log.debug("[{}] 유사도 검사 통과 - 최대: {:.2f} < 임계값: {:.2f}",
+                        checkType, maxSimilarity, threshold);
+            }
+
+        } catch (Exception e) {
+            log.error("[{}] 유사도 검사 중 오류: {}", checkType, e.getMessage());
+            result.setPassed(true);  // 오류 시 통과 처리 (블로킹 방지)
             result.setError(e.getMessage());
         }
 
@@ -801,7 +916,7 @@ public class ProblemVectorStoreService {
 
         public void incrementCombination(String difficulty, String topic) {
             byCombination.computeIfAbsent(difficulty, k -> new java.util.HashMap<>())
-                    .merge(topic, 1, Integer::sum);
+                    .merge(topic, 1, (a, b) -> a + b);
         }
 
         public void setTotalDocuments(int total) { this.totalDocuments = total; }

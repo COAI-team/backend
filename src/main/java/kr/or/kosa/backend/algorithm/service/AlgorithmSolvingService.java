@@ -1,13 +1,11 @@
 package kr.or.kosa.backend.algorithm.service;
 
-import kr.or.kosa.backend.algorithm.dto.AlgoProblemDto;
-import kr.or.kosa.backend.algorithm.dto.AlgoSubmissionDto;
-import kr.or.kosa.backend.algorithm.dto.AlgoTestcaseDto;
-import kr.or.kosa.backend.algorithm.dto.LanguageDto;
+import kr.or.kosa.backend.algorithm.dto.*;
 import kr.or.kosa.backend.algorithm.dto.enums.AiFeedbackStatus;
 import kr.or.kosa.backend.algorithm.dto.enums.AiFeedbackType;
 import kr.or.kosa.backend.algorithm.dto.enums.JudgeResult;
 import kr.or.kosa.backend.algorithm.dto.enums.LanguageType;
+import kr.or.kosa.backend.algorithm.dto.enums.ProblemDifficulty;
 import kr.or.kosa.backend.algorithm.dto.enums.ProblemType;
 import kr.or.kosa.backend.algorithm.dto.enums.SolveMode;
 import kr.or.kosa.backend.algorithm.dto.request.SubmissionRequestDto;
@@ -15,10 +13,12 @@ import kr.or.kosa.backend.algorithm.dto.request.TestRunRequestDto;
 import kr.or.kosa.backend.algorithm.dto.response.ProblemSolveResponseDto;
 import kr.or.kosa.backend.algorithm.dto.response.SubmissionResponseDto;
 import kr.or.kosa.backend.algorithm.dto.response.TestRunResponseDto;
+import kr.or.kosa.backend.algorithm.exception.AlgoErrorCode;
 import kr.or.kosa.backend.algorithm.mapper.AlgorithmProblemMapper;
 import kr.or.kosa.backend.algorithm.mapper.AlgorithmSubmissionMapper;
+import kr.or.kosa.backend.algorithm.mapper.DailyMissionMapper;
 import kr.or.kosa.backend.algorithm.mapper.MonitoringMapper;
-import kr.or.kosa.backend.algorithm.dto.MonitoringSessionDto;
+import kr.or.kosa.backend.commons.exception.custom.CustomBusinessException;
 import kr.or.kosa.backend.commons.pagination.PageRequest;
 import kr.or.kosa.backend.commons.pagination.PageResponse;
 import lombok.RequiredArgsConstructor;
@@ -54,6 +54,7 @@ public class AlgorithmSolvingService {
     private final AlgorithmProblemMapper problemMapper;
     private final AlgorithmSubmissionMapper submissionMapper;
     private final MonitoringMapper monitoringMapper;  // 모니터링 세션 데이터 조회용
+    private final DailyMissionMapper missionMapper;   // XP 동적 계산용 (첫정답 여부, 사용자 레벨)
     private final CodeExecutorService codeExecutorService;  // Judge0 또는 Piston 선택
     private final AlgorithmJudgingService judgingService;
     private final LanguageService languageService;  // 언어 정보 조회 (DB 기반)
@@ -116,6 +117,10 @@ public class AlgorithmSolvingService {
                 .difficulty(problem.getAlgoProblemDifficulty().name())
                 .timeLimit(problem.getTimelimit())
                 .memoryLimit(problem.getMemorylimit())
+                .algoProblemTags(problem.getAlgoProblemTags())
+                .inputFormat(problem.getInputFormat())
+                .outputFormat(problem.getOutputFormat())
+                .constraints(problem.getConstraints())
                 .totalAttempts(totalAttempts)
                 .successCount(successCount)
                 .problemType(problemType != null ? problemType.name() : "ALGORITHM")
@@ -250,37 +255,40 @@ public class AlgorithmSolvingService {
         AlgoProblemDto problem = problemMapper.selectProblemById(submission.getAlgoProblemId());
         return convertToSubmissionResponse(submission, problem, null);
     }
-
+    
     /**
-     * 문제별 공유된 제출 목록 조회 (다른 사람의 풀이)
+     * 문제별 공유된 제출 목록 조회 (다른 사람의 풀이) + 풀이 유저 정보 포함
+     * 본인이 해당 문제를 AC(Accept) 처리한 적이 있어야만 조회 가능
      */
     @Transactional(readOnly = true)
-    public PageResponse<SubmissionResponseDto> getSharedSubmissions(Long problemId, int page, int size) {
-        log.info("공유된 제출 목록 조회 - problemId: {}, page: {}, size: {}", problemId, page, size);
+    public PageResponse<AlgoSubmissionShareDto> getSharedSubmissions(Long problemId, Long currentUserId, int page, int size) {
+        log.info("공유된 제출 목록 조회 - problemId: {}, userId: {}, page: {}, size: {}",
+                problemId, currentUserId, page, size);
 
-        // 1. 페이지 요청 객체 생성
+        // 1. 로그인 체크
+        if (currentUserId == null) {
+            throw new CustomBusinessException(AlgoErrorCode.UNAUTHORIZED);
+        }
+
+        // 2. 사용자가 이 문제를 정답 처리한 적이 있는지 확인
+        boolean hasSolved = submissionMapper.hasUserSolvedProblem(currentUserId, problemId);
+
+        if (!hasSolved) {
+            throw new CustomBusinessException(AlgoErrorCode.FORBIDDEN);
+        }
+
+        // 3. 권한 확인 완료 - 공유 풀이 조회
         PageRequest pageRequest = new PageRequest(page, size);
-
-        // 2. 총 개수 조회
         int totalCount = submissionMapper.countPublicSubmissionsByProblemId(problemId);
 
-        // 3. 제출 목록 조회
-        List<AlgoSubmissionDto> submissions = submissionMapper.selectPublicSubmissionsByProblemId(
+        List<AlgoSubmissionShareDto> submissions = submissionMapper.selectSharedSubmissionsWithUser(
                 problemId,
-                pageRequest.getOffset(),
-                pageRequest.getSize()
+                currentUserId,
+                pageRequest.getSize(),
+                pageRequest.getOffset()
         );
 
-        // 4. DTO 변환
-        List<SubmissionResponseDto> content = submissions.stream()
-                .map(submission -> {
-                    AlgoProblemDto problem = problemMapper.selectProblemById(submission.getAlgoProblemId());
-                    return convertToSubmissionResponse(submission, problem, null);
-                })
-                .collect(Collectors.toList());
-
-        // 5. PageResponse 반환
-        return new PageResponse<>(content, pageRequest, totalCount);
+        return new PageResponse<>(submissions, pageRequest, totalCount);
     }
 
     /**
@@ -395,11 +403,41 @@ public class AlgorithmSolvingService {
             languageName = (language != null) ? language.getLanguageName() : "Unknown";
         }
 
+        // XP 동적 계산 (AC 제출인 경우에만)
+        Integer earnedXp = null;
+        Boolean isFirstSolve = null;
+        if (submission.getJudgeResult() == JudgeResult.AC && problem != null) {
+            try {
+                Long userId = submission.getUserId();
+                Long problemId = submission.getAlgoProblemId();
+                ProblemDifficulty difficulty = problem.getAlgoProblemDifficulty();
+
+                if (difficulty != null && userId != null && problemId != null) {
+                    // 첫 정답 여부 확인 (현재 AC 제출이 유일한 AC인지)
+                    isFirstSolve = missionMapper.isFirstSolve(userId, problemId);
+
+                    // 사용자 레벨 정보로 스트릭 조회
+                    UserAlgoLevelDto userLevel = missionMapper.findUserLevel(userId);
+                    int currentStreak = (userLevel != null && userLevel.getCurrentStreak() != 0)
+                            ? userLevel.getCurrentStreak() : 0;
+
+                    // XP 계산 (난이도 기반 + 첫정답 보너스 + 스트릭 보너스)
+                    earnedXp = difficulty.calculateXpWithBonus(currentStreak, isFirstSolve);
+                }
+            } catch (Exception e) {
+                log.warn("XP 동적 계산 실패 (무시) - submissionId: {}, error: {}",
+                        submission.getAlgosubmissionId(), e.getMessage());
+            }
+        }
+
         return SubmissionResponseDto.builder()
                 .submissionId(submission.getAlgosubmissionId())
                 .problemId(submission.getAlgoProblemId())
                 .problemTitle(problem != null ? problem.getAlgoProblemTitle() : "Unknown")
                 .problemDescription(problem != null ? problem.getAlgoProblemDescription() : null)
+                .inputFormat(problem != null ? problem.getInputFormat() : null)
+                .outputFormat(problem != null ? problem.getOutputFormat() : null)
+                .constraints(problem != null ? problem.getConstraints() : null)
                 .difficulty(problem != null && problem.getAlgoProblemDifficulty() != null
                         ? problem.getAlgoProblemDifficulty().name() : null)
                 .timeLimit(problem != null ? problem.getTimelimit() : null)
@@ -431,6 +469,9 @@ public class AlgorithmSolvingService {
                 .solvingDurationMinutes(submission.getSolvingDurationMinutes())
                 .isShared(submission.getIsShared())
                 .githubCommitUrl(submission.getGithubCommitUrl())
+                // XP 관련 (동적 계산)
+                .earnedXp(earnedXp)
+                .isFirstSolve(isFirstSolve)
                 .submittedAt(submission.getSubmittedAt())
                 .build();
     }
