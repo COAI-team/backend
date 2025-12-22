@@ -12,6 +12,7 @@ import kr.or.kosa.backend.users.mapper.UserMapper;
 import kr.or.kosa.backend.tutor.subscription.SubscriptionTier;
 import kr.or.kosa.backend.tutor.subscription.SubscriptionTierResolver;
 import kr.or.kosa.backend.auth.github.dto.GitHubUserResponse;
+import org.springframework.beans.factory.annotation.Value;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,6 +32,9 @@ import java.util.concurrent.TimeUnit;
 @Service
 @RequiredArgsConstructor
 public class UserServiceImpl implements UserService {
+
+    @Value("${app.frontend.base-url}")
+    private String frontendBaseUrl;
 
     private final UserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
@@ -238,8 +242,7 @@ public class UserServiceImpl implements UserService {
         }
 
         String token = passwordResetTokenService.createResetToken(users.getUserId());
-        String resetUrl =
-                "https://code-nemsy-frontend.vercel.app/reset-password?token=" + token;
+        String resetUrl = frontendBaseUrl + "/reset-password?token=" + token;
 
         boolean sent = emailVerificationService.send(
                 email,
