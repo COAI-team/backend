@@ -13,6 +13,7 @@
         <result column="USER_NICKNAME"      property="userNickName"/>
         <result column="USER_GRADE"         property="userGrade"/>
         <result column="USER_ROLE"          property="userRole"/>
+        <result column="USER_ISDELETED"     property="isDeleted" />
     </resultMap>
 
     <select id="findCondition" resultMap="findConditionMap">
@@ -21,7 +22,8 @@
         USER_EMAIL,
         USER_NICKNAME,
         USER_GRADE,
-        USER_ROLE
+        USER_ROLE,
+        USER_ISDELETED
         FROM USERS
         <where>
             <if test="statusFilter != null and statusFilter != ''">
