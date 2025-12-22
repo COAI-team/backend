@@ -20,7 +20,8 @@ public record AdminUserDetailResponseDto(
     LocalDateTime userSubscribeStart,
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd HH:mm:ss")
     LocalDateTime userSubscribeEnd,
-    String subscriptionStatus
+    String subscriptionStatus,
+    String subscriptionType
 ) {
     // 💡 커스텀 생성자 (null 처리 및 변환용)
     public AdminUserDetailResponseDto(
@@ -35,7 +36,8 @@ public record AdminUserDetailResponseDto(
         Integer userPoint,
         LocalDateTime userSubscribeStart,
         LocalDateTime userSubscribeEnd,
-        String subscriptionStatus
+        String subscriptionStatus,
+        String subscriptionType
     ) {
         this(
             userId,
@@ -49,7 +51,8 @@ public record AdminUserDetailResponseDto(
             userPoint != null ? userPoint : 0, // null이면 0포인트
             userSubscribeStart,
             userSubscribeEnd,
-            subscriptionStatus
+            subscriptionStatus,
+            subscriptionType
         );
     }
 }

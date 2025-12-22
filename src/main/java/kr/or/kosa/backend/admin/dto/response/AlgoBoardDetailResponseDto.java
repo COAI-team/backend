@@ -15,6 +15,5 @@ public record AlgoBoardDetailResponseDto(
     String aiFeedback,
     String aiFeedbackType,
     String solveMode,
-    int solvingDurationSeconds,
     LocalDateTime submittedAt
 ) {}
