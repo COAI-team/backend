@@ -15,9 +15,13 @@
         <result column="USER_ROLE"          property="userRole"/>
     </resultMap>
 
-    <select id="findCondition"
-            resultMap="findConditionMap">
-        SELECT USER_ID, USER_EMAIL, USER_NICKNAME, USER_GRADE, USER_ROLE
+    <select id="findCondition" resultMap="findConditionMap">
+        SELECT
+        USER_ID,
+        USER_EMAIL,
+        USER_NICKNAME,
+        USER_GRADE,
+        USER_ROLE
         FROM USERS
         <where>
             <if test="statusFilter != null and statusFilter != ''">
@@ -32,9 +36,26 @@
                 AND USER_EMAIL LIKE CONCAT('%', #{userEmail}, '%')
             </if>
         </where>
-        ORDER BY ${sortField} ${sortOrder}
+
+        ORDER BY
+        <choose>
+            <when test="sortField != null and sortField != ''">
+                ${sortField}
+                <if test="sortOrder != null and sortOrder != ''">
+                    ${sortOrder}
+                </if>
+                <if test="sortOrder == null or sortOrder == ''">
+                    ASC
+                </if>
+            </when>
+            <otherwise>
+                USER_ID DESC
+            </otherwise>
+        </choose>
+
         LIMIT #{offset}, #{limit}
     </select>
+
 
 
     <select id="totalCount" resultType="int"
