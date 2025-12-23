@@ -21,6 +21,7 @@ public class CommentResponse implements Identifiable {
     private Long parentCommentId;
     private Long userId;
     private String userNickname;
+    private String userImage;
     private String content;
     private Integer likeCount;
     private Boolean isLiked;
