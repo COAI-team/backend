@@ -50,9 +50,11 @@ public class SecurityConfig {
                                 "/ws/**",
                                 "/chat/messages"
                         ).permitAll()
+                        .requestMatchers(HttpMethod.POST, "/popular/*/batch").permitAll()
                         .requestMatchers(HttpMethod.GET,
                                 "/freeboard/**",
                                 "/codeboard/**",
+                                "/popular/**",
                                 "/comment",
                                 "/admin/**",
                                 "/comment/**",
