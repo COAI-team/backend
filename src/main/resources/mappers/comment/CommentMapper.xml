@@ -11,6 +11,7 @@
         <result property="parentCommentId" column="PARENT_COMMENT_ID"/>
         <result property="userId" column="USER_ID"/>
         <result property="userNickname" column="USER_NICKNAME"/>
+        <result property="userImage" column="USER_IMAGE"/>
         <result property="content" column="CONTENT"/>
         <result property="likeCount" column="LIKE_COUNT"/>
         <result property="isLiked" column="IS_LIKED"/>
@@ -81,6 +82,7 @@
         c.PARENT_COMMENT_ID,
         c.USER_ID,
         u.USER_NICKNAME,
+        u.USER_IMAGE,
         c.CONTENT,
         c.IS_DELETED,
         c.CREATED_AT,

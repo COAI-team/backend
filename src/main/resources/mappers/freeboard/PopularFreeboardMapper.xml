@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="kr.or.kosa.backend.freeboard.mapper.PopularFreeboardMapper">
+
+    <select id="findWeeklyPopularPosts" resultType="kr.or.kosa.backend.freeboard.dto.PopularFreeboardResponseDto">
+        SELECT
+        f.FREEBOARD_ID as freeboardId,
+        f.USER_ID as userId,
+        u.USER_NICKNAME as userNickname,
+        u.USER_IMAGE as userImage,
+        f.FREEBOARD_TITLE as freeboardTitle,
+        f.FREEBOARD_PLAIN_TEXT as freeboardPlainText,
+        f.FREEBOARD_CLICK as freeboardClick,
+        f.FREEBOARD_CREATED_AT as freeboardCreatedAt,
+        f.FREEBOARD_REPRESENT_IMAGE as freeboardRepresentImage,
+        p.LIKE_COUNT as likeCount,
+        p.COMMENT_COUNT as commentCount,
+        p.POPULARITY_SCORE as popularityScore,
+        p.RANKING as ranking
+        FROM WEEKLY_POPULAR_FREEBOARD p
+        INNER JOIN FREEBOARD f ON p.FREEBOARD_ID = f.FREEBOARD_ID
+        INNER JOIN USERS u ON f.USER_ID = u.USER_ID
+        WHERE p.WEEK_START_DATE = #{weekStartDate}
+        AND f.FREEBOARD_DELETED_YN = 'N'
+        ORDER BY p.RANKING ASC
+        LIMIT 10
+    </select>
+
+    <insert id="insertWeeklyPopularPosts">
+        INSERT INTO WEEKLY_POPULAR_FREEBOARD (
+        FREEBOARD_ID,
+        WEEK_START_DATE,
+        WEEK_END_DATE,
+        VIEW_COUNT,
+        LIKE_COUNT,
+        COMMENT_COUNT,
+        POPULARITY_SCORE,
+        RANKING
+        )
+        SELECT
+        f.FREEBOARD_ID,
+        #{weekStartDate},
+        #{weekEndDate},
+        f.FREEBOARD_CLICK as view_count,
+        COALESCE(like_counts.like_count, 0) as like_count,
+        COALESCE(comment_counts.comment_count, 0) as comment_count,
+        (f.FREEBOARD_CLICK * 1) +
+        (COALESCE(like_counts.like_count, 0) * 5) +
+        (COALESCE(comment_counts.comment_count, 0) * 3) as popularity_score,
+        ROW_NUMBER() OVER (ORDER BY
+        (f.FREEBOARD_CLICK * 1) +
+        (COALESCE(like_counts.like_count, 0) * 5) +
+        (COALESCE(comment_counts.comment_count, 0) * 3) DESC
+        ) as ranking
+        FROM FREEBOARD f
+        LEFT JOIN (
+        SELECT FREEBOARD_ID, COUNT(*) as like_count
+        FROM FREEBOARD_LIKE
+        WHERE FREEBOARD_LIKE_DELETED_YN = 'N'
+        GROUP BY FREEBOARD_ID
+        ) like_counts ON f.FREEBOARD_ID = like_counts.FREEBOARD_ID
+        LEFT JOIN (
+        SELECT FREEBOARD_ID, COUNT(*) as comment_count
+        FROM FREEBOARD_COMMENT
+        WHERE FREEBOARD_COMMENT_DELETED_YN = 'N'
+        GROUP BY FREEBOARD_ID
+        ) comment_counts ON f.FREEBOARD_ID = comment_counts.FREEBOARD_ID
+        WHERE f.FREEBOARD_DELETED_YN = 'N'
+        AND f.FREEBOARD_CREATED_AT BETWEEN #{weekStartDate} AND #{weekEndDate}
+        ORDER BY popularity_score DESC
+        LIMIT 10
+    </insert>
+
+    <delete id="deleteOldPopularPosts">
+        DELETE FROM WEEKLY_POPULAR_FREEBOARD
+        WHERE WEEK_START_DATE &lt; #{cutoffDate}
+    </delete>
+
+</mapper>
