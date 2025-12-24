@@ -49,14 +49,17 @@ public class CodeboardService {
         List<CodeboardListResponseDto> boards =
                 mapper.findPosts(pageRequest, searchCondition, sortCondition);
 
+        // 게시글 ID 목록 추출
         List<Long> boardIds = boards.stream()
                 .map(CodeboardListResponseDto::getCodeboardId)
                 .collect(Collectors.toList());
 
+        // 태그 일괄 조회 (N+1 방지)
         List<CodeboardListResponseDto> boardsWithTags = boards;
         if (!boardIds.isEmpty()) {
             Map<Long, List<String>> tagsMap = tagService.getCodeboardTagsMap(boardIds);
 
+            // 불변 객체 유지하면서 태그 추가된 새 객체 생성
             boardsWithTags = boards.stream()
                     .map(board -> {
                         List<String> tags = tagsMap.getOrDefault(board.getCodeboardId(), new ArrayList<>());
@@ -150,6 +153,7 @@ public class CodeboardService {
 
     @Transactional
     public void edit(Long id, CodeboardDto dto, Long userId) {
+        // 수정/삭제 시에는 userId 필요 없음 (권한 체크만 하면 됨)
         CodeboardDetailResponseDto existing = mapper.selectById(id, null);
         if (existing == null) {
             throw new CustomBusinessException(CodeboardErrorCode.NOT_FOUND);
@@ -188,6 +192,7 @@ public class CodeboardService {
 
     @Transactional
     public void delete(Long id, Long userId) {
+        // 삭제 시에는 userId 필요 없음 (권한 체크만 하면 됨)
         CodeboardDetailResponseDto existing = mapper.selectById(id, null);
         if (existing == null) {
             throw new CustomBusinessException(CodeboardErrorCode.NOT_FOUND);
