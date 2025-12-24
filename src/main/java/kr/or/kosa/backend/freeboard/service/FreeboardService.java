@@ -102,18 +102,22 @@ public class FreeboardService {
             throw new CustomBusinessException(FreeboardErrorCode.NOT_FOUND);
         }
 
-        log.info("조회된 좋아요 수: {}", freeboard.getLikeCount());  // 디버깅 로그
+        log.info("조회된 좋아요 수: {}", freeboard.getLikeCount());
 
+        // 태그 조회 전 로그
+        log.info("=== 태그 조회 시작: freeboardId={} ===", id);
         List<String> tags = tagService.getFreeboardTags(id);
+        log.info("=== TagService에서 반환된 태그: {} ===", tags);
+        log.info("=== 태그 개수: {} ===", tags != null ? tags.size() : 0);
 
         boolean isLiked = false;
         if (userId != null) {
             Like existingLike = likeMapper.selectLike(userId, ReferenceType.POST_FREEBOARD, id);
             isLiked = existingLike != null;
-            log.info("사용자 {}의 좋아요 여부: {}", userId, isLiked);  // 디버깅 로그
+            log.info("사용자 {}의 좋아요 여부: {}", userId, isLiked);
         }
 
-        return FreeboardDetailResponseDto.builder()
+        FreeboardDetailResponseDto result = FreeboardDetailResponseDto.builder()
                 .freeboardId(freeboard.getFreeboardId())
                 .userId(freeboard.getUserId())
                 .userNickname(freeboard.getUserNickname())
@@ -128,6 +132,10 @@ public class FreeboardService {
                 .tags(tags)
                 .isLiked(isLiked)
                 .build();
+
+        log.info("=== 최종 반환 DTO의 태그: {} ===", result.getTags());
+
+        return result;
     }
 
     @Transactional
