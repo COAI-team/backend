@@ -23,7 +23,7 @@
 
     <!-- 댓글 생성 -->
     <insert id="insertComment" parameterType="kr.or.kosa.backend.comment.domain.Comment"
-            useGeneratedKeys="true" keyProperty="commentId">
+            useGeneratedKeys="true" keyProperty="commentId" keyColumn="COMMENT_ID">
         INSERT INTO COMMENT (
         BOARD_ID,
         BOARD_TYPE,

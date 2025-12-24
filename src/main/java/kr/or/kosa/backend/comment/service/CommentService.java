@@ -60,19 +60,23 @@ public class CommentService {
             }
 
             // 부모 댓글 작성자에게 알림 발송
-            if (!parentComment.getUserId().equals(userId)) {
-                notificationService.sendNotification(
-                        parentComment.getUserId(),
-                        userId,
-                        NotificationType.COMMENT_REPLY,
-                        ReferenceType.COMMENT,
-                        parentComment.getCommentId()
-                );
+            if (parentComment.getUserId() != null && !parentComment.getUserId().equals(userId)) {
+                try {
+                    notificationService.sendNotification(
+                            parentComment.getUserId(),
+                            userId,
+                            NotificationType.COMMENT_REPLY,
+                            ReferenceType.COMMENT,
+                            parentComment.getCommentId()
+                    );
+                } catch (Exception e) {
+                    log.warn("알림 발송 실패 (댓글 작성은 계속 진행): {}", e.getMessage());
+                }
             }
         }
         // 댓글인 경우 게시글 작성자에게 알림
         else {
-            if (!boardAuthorId.equals(userId)) {
+            if (boardAuthorId != null && !boardAuthorId.equals(userId)) {
                 ReferenceType referenceType = switch (request.boardType()) {
                     case "CODEBOARD" -> ReferenceType.POST_CODEBOARD;
                     case "FREEBOARD" -> ReferenceType.POST_FREEBOARD;
@@ -80,13 +84,17 @@ public class CommentService {
                     default -> throw new CustomBusinessException(CommentErrorCode.INVALID_BOARD_TYPE);
                 };
 
-                notificationService.sendNotification(
-                        boardAuthorId,
-                        userId,
-                        NotificationType.POST_COMMENT,
-                        referenceType,
-                        request.boardId()
-                );
+                try {
+                    notificationService.sendNotification(
+                            boardAuthorId,
+                            userId,
+                            NotificationType.POST_COMMENT,
+                            referenceType,
+                            request.boardId()
+                    );
+                } catch (Exception e) {
+                    log.warn("알림 발송 실패 (댓글 작성은 계속 진행): {}", e.getMessage());
+                }
             }
         }
 
@@ -122,7 +130,7 @@ public class CommentService {
                 .content(savedComment.getContent())
                 .likeCount(savedComment.getLikeCount())
                 .isLiked(false)
-                .isAuthor(savedComment.getUserId().equals(boardAuthorId))
+                .isAuthor(savedComment.getUserId() != null && boardAuthorId != null && savedComment.getUserId().equals(boardAuthorId))
                 .isDeleted(savedComment.getIsDeleted())
                 .createdAt(savedComment.getCreatedAt())
                 .updatedAt(savedComment.getUpdatedAt())
