@@ -20,7 +20,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -46,9 +49,39 @@ public class CodeboardService {
         List<CodeboardListResponseDto> boards =
                 mapper.findPosts(pageRequest, searchCondition, sortCondition);
 
+        List<Long> boardIds = boards.stream()
+                .map(CodeboardListResponseDto::getCodeboardId)
+                .collect(Collectors.toList());
+
+        List<CodeboardListResponseDto> boardsWithTags = boards;
+        if (!boardIds.isEmpty()) {
+            Map<Long, List<String>> tagsMap = tagService.getCodeboardTagsMap(boardIds);
+
+            boardsWithTags = boards.stream()
+                    .map(board -> {
+                        List<String> tags = tagsMap.getOrDefault(board.getCodeboardId(), new ArrayList<>());
+                        return CodeboardListResponseDto.builder()
+                                .codeboardId(board.getCodeboardId())
+                                .userId(board.getUserId())
+                                .userNickname(board.getUserNickname())
+                                .userImage(board.getUserImage())
+                                .analysisId(board.getAnalysisId())
+                                .codeboardTitle(board.getCodeboardTitle())
+                                .codeboardSummary(board.getCodeboardSummary())
+                                .codeboardClick(board.getCodeboardClick())
+                                .codeboardCreatedAt(board.getCodeboardCreatedAt())
+                                .likeCount(board.getLikeCount())
+                                .commentCount(board.getCommentCount())
+                                .aiScore(board.getAiScore())
+                                .tags(tags)
+                                .build();
+                    })
+                    .collect(Collectors.toList());
+        }
+
         long totalCount = mapper.countPosts(searchCondition);
 
-        return new PageResponse<>(boards, pageRequest, totalCount);
+        return new PageResponse<>(boardsWithTags, pageRequest, totalCount);
     }
 
     @Transactional
@@ -96,9 +129,6 @@ public class CodeboardService {
             throw new CustomBusinessException(CodeboardErrorCode.NOT_FOUND);
         }
 
-        log.info("조회된 좋아요 수: {}", codeboard.getLikeCount());
-        log.info("사용자 {}의 좋아요 여부: {}", userId, codeboard.getIsLiked());
-
         List<String> tags = tagService.getCodeboardTags(id);
 
         return CodeboardDetailResponseDto.builder()
@@ -120,7 +150,6 @@ public class CodeboardService {
 
     @Transactional
     public void edit(Long id, CodeboardDto dto, Long userId) {
-        // 수정/삭제 시에는 userId 필요 없음 (권한 체크만 하면 됨)
         CodeboardDetailResponseDto existing = mapper.selectById(id, null);
         if (existing == null) {
             throw new CustomBusinessException(CodeboardErrorCode.NOT_FOUND);
@@ -159,7 +188,6 @@ public class CodeboardService {
 
     @Transactional
     public void delete(Long id, Long userId) {
-        // 삭제 시에는 userId 필요 없음 (권한 체크만 하면 됨)
         CodeboardDetailResponseDto existing = mapper.selectById(id, null);
         if (existing == null) {
             throw new CustomBusinessException(CodeboardErrorCode.NOT_FOUND);
