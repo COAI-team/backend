@@ -49,14 +49,13 @@ public class GitHubLoginController {
     @GetMapping("/callback")
     public ResponseEntity<GitHubCallbackResponse> callback(
             @RequestParam("code") String code,
-            @RequestParam(value = "mode", required = false) String mode
+            @RequestParam(value = "state", required = false) String state
     ) {
+        // 1️⃣ GitHub 사용자 정보 조회
         GitHubUserResponse gitHubUser = gitHubOAuthService.getUserInfo(code);
 
-        boolean linkMode = "link".equals(mode);  // 링크 모드 여부
-
-        // 🔥 1) 프론트가 연동 모드 요청했을 때 → GitHub 정보만 반환
-        if (linkMode) {
+        // 2️⃣ 🔥 연동(link) 모드면 여기서 즉시 종료 (USER 생성 절대 금지)
+        if ("link".equals(state)) {
             return ResponseEntity.ok(
                     GitHubCallbackResponse.builder()
                             .linkMode(true)
@@ -65,13 +64,12 @@ public class GitHubLoginController {
             );
         }
 
-        // 🔥 2) 일반 GitHub 로그인 처리
+        // 3️⃣ ⬇️ 이 아래는 "로그인 / 회원가입 전용" 로직
         GithubLoginResult result = userService.githubLogin(gitHubUser, false);
         Users user = result.getUser();
 
-        // 🔥 3) 기존 이메일 계정 존재 → 계정 통합 필요
+        // 4️⃣ 기존 일반 계정 존재 → 연동 유도
         if (result.isNeedLink()) {
-
             Tokens tokens = issueTokens(user);
 
             return ResponseEntity.ok(
@@ -83,12 +81,11 @@ public class GitHubLoginController {
                             .gitHubUser(gitHubUser)
                             .accessToken(tokens.accessToken())
                             .refreshToken(tokens.refreshToken())
-
                             .build()
             );
         }
 
-        // 🔥 4) 평소처럼 GitHub 로그인 처리
+        // 5️⃣ 정상 GitHub 로그인 처리
         Tokens tokens = issueTokens(user);
 
         UserLoginResponseDto loginDto = UserLoginResponseDto.builder()

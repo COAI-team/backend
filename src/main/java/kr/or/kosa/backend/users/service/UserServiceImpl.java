@@ -444,27 +444,23 @@ public class UserServiceImpl implements UserService {
     @Override
     public GithubLoginResult githubLogin(GitHubUserResponse gitHubUser, boolean linkMode) {
 
+        if (linkMode) {
+            throw new IllegalStateException("githubLogin must not be called in link mode");
+        }
+
         String providerId = String.valueOf(gitHubUser.getId());
         String email = normalizeGithubEmail(gitHubUser);
 
-        // Early return for link mode
-        if (linkMode) {
-            return buildLinkModeResult();
-        }
-
-        // Check for existing GitHub-linked account
         Users linkedUser = userMapper.findBySocialProvider(PROVIDER_GITHUB, providerId);
         if (linkedUser != null) {
             return buildLoginResult(linkedUser, false, null);
         }
 
-        // Check for existing email account
         Users existingUser = userMapper.findByEmail(email);
         if (existingUser != null) {
             return buildLoginResult(existingUser, true, gitHubUser);
         }
 
-        // Create new GitHub account
         Users newUser = createNewGithubUser(gitHubUser);
         return buildLoginResult(newUser, false, null);
     }
