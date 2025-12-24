@@ -94,12 +94,6 @@ public class SecurityConfig {
                 "https://www.co-ai.run",
                 "https://co-ai.run",
                 "https://code-nemsy-frontend.vercel.app"
-//                "http://localhost:*",
-//                "https://localhost:*",
-//                "http://127.0.0.1:*",
-//                "https://127.0.0.1:*",
-//                "https://*.vercel.app",  // Vercel 프론트엔드 추가
-//                "https://code-nemsy-frontend-*.vercel.app"  // 현재 프로젝트
         ));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         configuration.setAllowedHeaders(List.of("*"));
