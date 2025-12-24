@@ -74,9 +74,12 @@ public class PromptBuilder {
     }
 
     // 2️⃣ 완전한 프롬프트 생성 (페이지 컨텍스트 추가)
-    public String buildCompleteGuidePrompt(String projectName, String pageContext, String userQuery) {
+    public String buildCompleteGuidePrompt(String projectName, String pageContext,
+                                           String userQuery, String language) {
         String systemPrompt = createGuideSystemPrompt(projectName, pageContext);
+        String languageInstruction = language.equals("ko") ?
+                "\n\n답변 언어: 한국어로만 답변해주세요." : "";
         String userPrompt = userPromptTemplate.render(Map.of("query", userQuery));
-        return systemPrompt + "\n\n" + userPrompt;
+        return systemPrompt + languageInstruction + "\n\n" + userPrompt;
     }
 }
