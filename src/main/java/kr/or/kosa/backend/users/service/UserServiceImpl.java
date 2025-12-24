@@ -64,14 +64,14 @@ public class UserServiceImpl implements UserService {
 
         // Redis 저장
         redisTemplate.opsForValue().set(
-                REFRESH_KEY_PREFIX + user.getUserId(),
-                refreshToken,
-                REFRESH_TOKEN_EXPIRE_DAYS,
-                TimeUnit.DAYS);
+            REFRESH_KEY_PREFIX + user.getUserId(),
+            refreshToken,
+            REFRESH_TOKEN_EXPIRE_DAYS,
+            TimeUnit.DAYS);
 
         return Map.of(
-                KEY_ACCESS_TOKEN, accessToken,
-                KEY_REFRESH_TOKEN, refreshToken);
+            KEY_ACCESS_TOKEN, accessToken,
+            KEY_REFRESH_TOKEN, refreshToken);
     }
 
     private String normalizeGithubEmail(GitHubUserResponse gitHubUser) {
@@ -154,24 +154,24 @@ public class UserServiceImpl implements UserService {
         SubscriptionTier tier = subscriptionTierResolver.resolveTier(String.valueOf(users.getUserId()));
 
         UserResponseDto userDto = UserResponseDto.builder()
-                .userId(users.getUserId())
-                .userEmail(users.getUserEmail())
-                .userName(users.getUserName())
-                .userNickname(users.getUserNickname())
-                .userImage(users.getUserImage())
-                .userGrade(users.getUserGrade())
-                .userRole(users.getUserRole())
-                .userEnabled(users.getUserEnabled())
-                .githubId(users.getGithubId())
-                .hasGithubToken(users.getGithubToken() != null && !users.getGithubToken().isBlank())
-                .subscriptionTier(tier.name())
-                .build();
+            .userId(users.getUserId())
+            .userEmail(users.getUserEmail())
+            .userName(users.getUserName())
+            .userNickname(users.getUserNickname())
+            .userImage(users.getUserImage())
+            .userGrade(users.getUserGrade())
+            .userRole(users.getUserRole())
+            .userEnabled(users.getUserEnabled())
+            .githubId(users.getGithubId())
+            .hasGithubToken(users.getGithubToken() != null && !users.getGithubToken().isBlank())
+            .subscriptionTier(tier.name())
+            .build();
 
         return UserLoginResponseDto.builder()
-                .accessToken(tokens.get(KEY_ACCESS_TOKEN))
-                .refreshToken(tokens.get(KEY_REFRESH_TOKEN))
-                .user(userDto)
-                .build();
+            .accessToken(tokens.get(KEY_ACCESS_TOKEN))
+            .refreshToken(tokens.get(KEY_REFRESH_TOKEN))
+            .user(userDto)
+            .build();
     }
 
     // ---------------------------------------------------------
@@ -219,10 +219,10 @@ public class UserServiceImpl implements UserService {
 
             if (expireAt > 0) {
                 redisTemplate.opsForValue().set(
-                        BLACKLIST_KEY_PREFIX + token,
-                        "logout",
-                        expireAt,
-                        TimeUnit.MILLISECONDS);
+                    BLACKLIST_KEY_PREFIX + token,
+                    "logout",
+                    expireAt,
+                    TimeUnit.MILLISECONDS);
             }
 
             return true;
@@ -248,11 +248,11 @@ public class UserServiceImpl implements UserService {
         String resetUrl = frontendBaseUrl + "/reset-password?token=" + token;
 
         boolean sent = emailVerificationService.send(
-                email,
-                "[서비스명] 비밀번호 재설정 안내",
-                "아래 링크를 클릭하여 비밀번호를 재설정하세요.\n\n" +
-                        resetUrl + "\n\n" +
-                        "본 링크는 15분 동안 유효합니다.");
+            email,
+            "[서비스명] 비밀번호 재설정 안내",
+            "아래 링크를 클릭하여 비밀번호를 재설정하세요.\n\n" +
+                resetUrl + "\n\n" +
+                "본 링크는 15분 동안 유효합니다.");
 
         if (!sent) {
             throw new CustomBusinessException(UserErrorCode.EMAIL_SEND_FAIL);
@@ -364,18 +364,18 @@ public class UserServiceImpl implements UserService {
         SubscriptionTier tier = subscriptionTierResolver.resolveTier(String.valueOf(updated.getUserId()));
 
         return UserResponseDto.builder()
-                .userId(updated.getUserId())
-                .userEmail(updated.getUserEmail())
-                .userName(updated.getUserName())
-                .userNickname(updated.getUserNickname())
-                .userImage(updated.getUserImage())
-                .userGrade(updated.getUserGrade())
-                .userRole(updated.getUserRole())
-                .userEnabled(updated.getUserEnabled())
-                .githubId(updated.getGithubId())
-                .hasGithubToken(updated.getGithubToken() != null && !updated.getGithubToken().isBlank())
-                .subscriptionTier(tier.name())
-                .build();
+            .userId(updated.getUserId())
+            .userEmail(updated.getUserEmail())
+            .userName(updated.getUserName())
+            .userNickname(updated.getUserNickname())
+            .userImage(updated.getUserImage())
+            .userGrade(updated.getUserGrade())
+            .userRole(updated.getUserRole())
+            .userEnabled(updated.getUserEnabled())
+            .githubId(updated.getGithubId())
+            .hasGithubToken(updated.getGithubToken() != null && !updated.getGithubToken().isBlank())
+            .subscriptionTier(tier.name())
+            .build();
     }
 
     // ---------------------------------------------------------
@@ -472,12 +472,12 @@ public class UserServiceImpl implements UserService {
         Map<String, String> tokens = issueTokens(user);
 
         return GithubLoginResult.builder()
-                .user(user)
-                .needLink(needLink)
-                .accessToken(tokens.get(KEY_ACCESS_TOKEN))
-                .refreshToken(tokens.get(KEY_REFRESH_TOKEN))
-                .gitHubUser(gitHubUser)
-                .build();
+            .user(user)
+            .needLink(needLink)
+            .accessToken(tokens.get(KEY_ACCESS_TOKEN))
+            .refreshToken(tokens.get(KEY_REFRESH_TOKEN))
+            .gitHubUser(gitHubUser)
+            .build();
     }
 
     // ---------------------------------------------------------
@@ -556,10 +556,10 @@ public class UserServiceImpl implements UserService {
         }
 
         int socialInserted = userMapper.insertSocialAccount(
-                newUser.getUserId(),
-                PROVIDER_GITHUB,
-                providerId,
-                normalizedEmail
+            newUser.getUserId(),
+            PROVIDER_GITHUB,
+            providerId,
+            normalizedEmail
         );
         if (socialInserted != 1) {
             throw new CustomBusinessException(UserErrorCode.USER_UPDATE_FAILED);
@@ -581,7 +581,6 @@ public class UserServiceImpl implements UserService {
         System.out.println("=======request.getId().toString(): " + request.getId().toString());
         // 1) 이미 다른 사용자와 연결된 경우
         Users existingLinkedUser = userMapper.findBySocialProvider(PROVIDER_GITHUB, request.getId().toString());
-        System.out.println("이거거거거거거거거썅: " + existingLinkedUser);
 //        if (existingLinkedUser != null && !existingLinkedUser.getUserId().equals(currentUserId)) {
 //            throw new CustomBusinessException(UserErrorCode.SOCIAL_ALREADY_LINKED);
 //        }
@@ -614,11 +613,11 @@ public class UserServiceImpl implements UserService {
      */
     private GitHubUserResponse toGitHubUserResponse(GithubLinkRequest request) {
         return GitHubUserResponse.builder()
-                .id(request.getId())
-                .login(request.getLogin())
-                .email(request.getEmail())
-                .avatarUrl(request.getAvatarUrl())
-                .build();
+            .id(request.getId())
+            .login(request.getLogin())
+            .email(request.getEmail())
+            .avatarUrl(request.getAvatarUrl())
+            .build();
     }
 
     private String stripBearer(String bearerToken) {
@@ -628,3 +627,5 @@ public class UserServiceImpl implements UserService {
         return bearerToken;
     }
 }
+
+
