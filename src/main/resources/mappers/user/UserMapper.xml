@@ -224,4 +224,32 @@
         WHERE USER_ID = #{userId}
     </update>
 
+
+    <select id="findByIds" resultType="kr.or.kosa.backend.users.domain.Users">
+        SELECT
+        USER_ID,
+        USER_NICKNAME
+        FROM USERS
+        WHERE USER_ID IN
+        <foreach collection="userIds"
+                 item="id"
+                 open="("
+                 separator=","
+                 close=")">
+            #{id}
+        </foreach>
+    </select>
+
+    <select id="findNicknamesByIds" resultType="kr.or.kosa.backend.users.domain.Users">
+        SELECT USER_ID as userId, USER_NICKNAME as userNickname
+        FROM USERS
+        WHERE USER_ID IN
+        <foreach collection="userIds" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
+
+
+
 </mapper>

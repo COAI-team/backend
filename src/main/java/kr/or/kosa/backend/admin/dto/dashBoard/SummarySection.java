@@ -7,6 +7,10 @@ public record SummarySection(
     int totalUsers,
     int newUsers,
     int paymentCount,
-    long revenue
+    long revenue,
+    int freeBoardPostCount,
+    int codeBoardPostCunt,
+    int algoBoardPostCount,
+    int totalBoardPostCount
 ) {
 }

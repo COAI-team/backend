@@ -94,6 +94,7 @@
         <result column="balance"          property="userPoint"/>
         <result column="start_date" property="userSubscribeStart"/>
         <result column="end_date"   property="userSubscribeEnd"/>
+        <result column="subscription_type" property="subscriptionType"/>
     </resultMap>
 
     <select id="findOneUserByUserId" resultType="kr.or.kosa.backend.admin.dto.response.AdminUserDetailResponseDto">
