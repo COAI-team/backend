@@ -1,9 +1,6 @@
 package kr.or.kosa.backend.auth.github.controller;
 
-import kr.or.kosa.backend.auth.github.dto.GitHubCallbackResponse;
-import kr.or.kosa.backend.auth.github.dto.GitHubUserResponse;
-import kr.or.kosa.backend.auth.github.dto.GithubLinkResponse;
-import kr.or.kosa.backend.auth.github.dto.GithubLoginResult;
+import kr.or.kosa.backend.auth.github.dto.*;
 import kr.or.kosa.backend.auth.github.service.GitHubOAuthService;
 import kr.or.kosa.backend.security.jwt.JwtProvider;
 import kr.or.kosa.backend.users.domain.Users;
@@ -174,12 +171,12 @@ public class GitHubLoginController {
     @PostMapping("/link")
     public ResponseEntity<GithubLinkResponse> linkGithub(
             @RequestHeader("Authorization") String token,
-            @RequestBody GitHubUserResponse gitHubUser
+            @RequestBody GithubLinkRequest request
     ) {
         String accessToken = token.replace(BEARER_PREFIX, "");
         Long userId = jwtProvider.getUserIdFromToken(accessToken);
 
-        userService.linkGithubAccount(userId, gitHubUser);
+        userService.linkGithubAccount(userId, request);
 
         return ResponseEntity.ok(
                 new GithubLinkResponse(true, "GitHub 계정이 연동되었습니다.")

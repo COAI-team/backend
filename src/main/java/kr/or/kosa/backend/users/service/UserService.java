@@ -38,5 +38,7 @@ public interface UserService {
 
     Map<String, Object> getGithubUserInfo(Long userId);
 
-    boolean linkGithubAccount(Long currentUserId, GitHubUserResponse gitHubUser);
+    boolean linkGithubAccount(Long currentUserId, GithubLinkRequest request);
+
+    boolean linkGithubInternal(Long currentUserId, GitHubUserResponse gitHubUser);
 }
