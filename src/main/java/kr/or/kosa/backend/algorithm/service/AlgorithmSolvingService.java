@@ -162,9 +162,9 @@ public class AlgorithmSolvingService {
         AlgoSubmissionDto submission = createSubmission(request, userId, problem);
         int result = submissionMapper.insertSubmission(submission);
 
-        if(result == 1) {
-            redisService.setAlgoRank(userId, problem.getAlgoProblemDifficulty().getDisplayName(), submission.getFinalScore().doubleValue());
-        }
+        // if(result == 1) {
+        //     redisService.setAlgoRank(userId, problem.getAlgoProblemDifficulty().getDisplayName(), submission.getFinalScore().doubleValue());
+        // }
 
         log.info("제출 저장 완료 - submissionId: {}", submission.getAlgosubmissionId());
 
