@@ -54,6 +54,7 @@ public class CommentService {
                 throw new CustomBusinessException(CommentErrorCode.PARENT_NOT_FOUND);
             }
 
+            // 대댓글의 대댓글 방지
             if (parentComment.getParentCommentId() != null) {
                 throw new CustomBusinessException(CommentErrorCode.DEPTH_LIMIT_EXCEEDED);
             }
@@ -69,13 +70,13 @@ public class CommentService {
                             parentComment.getCommentId()
                     );
                 } catch (Exception e) {
-                    log.error("알림 발송 실패: {}", e.getMessage());
+                    log.warn("알림 발송 실패 (댓글 작성은 계속 진행): {}", e.getMessage());
                 }
             }
         }
         // 댓글인 경우 게시글 작성자에게 알림
         else {
-            if (!boardAuthorId.equals(userId)) {
+            if (boardAuthorId != null && !boardAuthorId.equals(userId)) {
                 ReferenceType referenceType = switch (request.boardType()) {
                     case "CODEBOARD" -> ReferenceType.POST_CODEBOARD;
                     case "FREEBOARD" -> ReferenceType.POST_FREEBOARD;
@@ -83,7 +84,6 @@ public class CommentService {
                     default -> throw new CustomBusinessException(CommentErrorCode.INVALID_BOARD_TYPE);
                 };
 
-                // 알림 발송 (에러 발생해도 댓글 작성은 성공)
                 try {
                     notificationService.sendNotification(
                             boardAuthorId,
@@ -93,7 +93,7 @@ public class CommentService {
                             request.boardId()
                     );
                 } catch (Exception e) {
-                    log.error("알림 발송 실패 (댓글 작성은 계속 진행): {}", e.getMessage());
+                    log.warn("알림 발송 실패 (댓글 작성은 계속 진행): {}", e.getMessage());
                 }
             }
         }
@@ -111,7 +111,10 @@ public class CommentService {
             throw new CustomBusinessException(CommentErrorCode.INSERT_ERROR);
         }
 
+        // DB에서 다시 조회하여 자동 생성된 필드 값 가져오기
         Comment savedComment = commentMapper.selectCommentById(comment.getCommentId());
+
+        // 사용자 정보 조회
         Users user = userMapper.findById(userId);
         String userNickname = user != null ? user.getUserNickname() : null;
         String userImage = user != null ? user.getUserImage() : null;
