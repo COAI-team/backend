@@ -58,8 +58,8 @@ public class CommentService {
                 throw new CustomBusinessException(CommentErrorCode.DEPTH_LIMIT_EXCEEDED);
             }
 
-            // 부모 댓글 작성자에게 알림 발송 (에러 발생해도 댓글 작성은 성공)
-            if (!parentComment.getUserId().equals(userId)) {
+            // 부모 댓글 작성자에게 알림 발송
+            if (parentComment.getUserId() != null && !parentComment.getUserId().equals(userId)) {
                 try {
                     notificationService.sendNotification(
                             parentComment.getUserId(),
@@ -69,7 +69,7 @@ public class CommentService {
                             parentComment.getCommentId()
                     );
                 } catch (Exception e) {
-                    log.error("알림 발송 실패 (댓글 작성은 계속 진행): {}", e.getMessage());
+                    log.error("알림 발송 실패: {}", e.getMessage());
                 }
             }
         }
