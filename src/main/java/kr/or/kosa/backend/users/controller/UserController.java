@@ -183,6 +183,8 @@ public class UserController {
             @AuthenticationPrincipal JwtUserDetails user,
             @RequestBody GitHubUserResponse gitHubUser
     ) {
+        System.out.println("깃 허브 링크 컨트롤러 111  ====>> "  + user.getUsername()+ "=====" + user.getDetails().id() + "====="+ user.getDetails().toString());
+        System.out.println("깃 허브 링크 컨트롤러 2222  ====>> "  + gitHubUser.getEmail()+ "=====" + gitHubUser.getEmail());
         boolean result = userService.linkGithubAccount(user.id(), gitHubUser);
         return ResponseEntity.ok(MessageResponse.builder()
                 .success(result)
