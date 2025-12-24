@@ -1,0 +1,497 @@
+# ===== Phase 1: 알고리즘 프로필 시스템 =====
+# 알고리즘 특성에 맞는 난이도별 입력 크기, 시간/메모리 제한, 시간복잡도 정의
+
+profiles:
+  # === 자료구조 ===
+  HASH:
+    displayName: "해시"
+    difficultySpecs:
+      BRONZE:
+        inputSize: "N <= 1,000"
+        timeLimit: 1000
+        memoryLimit: 256
+        timeComplexity: "O(N)"
+        description: "기본 해시맵 사용, 빈도수 카운팅"
+      SILVER:
+        inputSize: "N <= 100,000"
+        timeLimit: 1000
+        memoryLimit: 256
+        timeComplexity: "O(N)"
+        description: "해시셋/맵 활용, 중복 제거, 그룹핑"
+      GOLD:
+        inputSize: "N <= 500,000"
+        timeLimit: 2000
+        memoryLimit: 512
+        timeComplexity: "O(N) ~ O(N log N)"
+        description: "해시 충돌 처리, 롤링 해시"
+      PLATINUM:
+        inputSize: "N <= 1,000,000"
+        timeLimit: 3000
+        memoryLimit: 1024
+        timeComplexity: "O(N)"
+        description: "복잡한 해시 기법, 문자열 해싱"
+    promptAdditions: |
+      - 문제에 '중복', '빈도', '그룹' 키워드를 자연스럽게 포함
+      - 해시맵/셋 자료구조를 활용해야 효율적으로 풀리는 문제 설계
+      - naive는 O(N^2) 이중 반복문으로 작성
+
+  STACK_QUEUE:
+    displayName: "스택/큐"
+    difficultySpecs:
+      BRONZE:
+        inputSize: "N <= 1,000"
+        timeLimit: 1000
+        memoryLimit: 256
+        timeComplexity: "O(N)"
+        description: "기본 스택/큐 연산, 괄호 검사"
+      SILVER:
+        inputSize: "N <= 100,000"
+        timeLimit: 1000
+        memoryLimit: 256
+        timeComplexity: "O(N)"
+        description: "스택 활용 문제, 후위 표기법"
+      GOLD:
+        inputSize: "N <= 500,000"
+        timeLimit: 2000
+        memoryLimit: 512
+        timeComplexity: "O(N)"
+        description: "모노톤 스택, 히스토그램 최대 영역"
+      PLATINUM:
+        inputSize: "N <= 1,000,000"
+        timeLimit: 3000
+        memoryLimit: 1024
+        timeComplexity: "O(N)"
+        description: "복잡한 스택 응용, 다중 스택"
+    promptAdditions: |
+      - 순서대로 처리하거나 역순 처리가 필요한 상황 설계
+      - LIFO/FIFO 특성이 핵심이 되는 문제 구성
+      - naive는 매번 전체 순회하는 방식으로 작성
+
+  PRIORITY_QUEUE:
+    displayName: "힙/우선순위 큐"
+    difficultySpecs:
+      BRONZE:
+        inputSize: "N <= 1,000"
+        timeLimit: 1000
+        memoryLimit: 256
+        timeComplexity: "O(N log N)"
+        description: "기본 힙 연산, 최대/최소값 반복 추출"
+      SILVER:
+        inputSize: "N <= 100,000"
+        timeLimit: 1000
+        memoryLimit: 256
+        timeComplexity: "O(N log N)"
+        description: "우선순위 큐 활용, K번째 원소"
+      GOLD:
+        inputSize: "N <= 500,000"
+        timeLimit: 2000
+        memoryLimit: 512
+        timeComplexity: "O(N log N)"
+        description: "이중 힙, 중앙값 유지"
+      PLATINUM:
+        inputSize: "N <= 1,000,000"
+        timeLimit: 3000
+        memoryLimit: 1024
+        timeComplexity: "O(N log N)"
+        description: "복잡한 힙 응용, 힙 병합"
+    promptAdditions: |
+      - '최대', '최소', 'K번째' 등의 키워드 활용
+      - 우선순위에 따른 처리 순서가 핵심인 문제 설계
+      - naive는 매번 정렬하는 O(N^2 log N) 방식으로 작성
+
+  TREE:
+    displayName: "트리"
+    difficultySpecs:
+      BRONZE:
+        inputSize: "N <= 1,000"
+        timeLimit: 1000
+        memoryLimit: 256
+        timeComplexity: "O(N)"
+        description: "이진 트리 순회, 기본 트리 구조"
+      SILVER:
+        inputSize: "N <= 10,000"
+        timeLimit: 1000
+        memoryLimit: 256
+        timeComplexity: "O(N)"
+        description: "트리 순회, 부모-자식 관계 처리"
+      GOLD:
+        inputSize: "N <= 100,000"
+        timeLimit: 2000
+        memoryLimit: 512
+        timeComplexity: "O(N) ~ O(N log N)"
+        description: "LCA, 트리 DP 기초"
+      PLATINUM:
+        inputSize: "N <= 500,000"
+        timeLimit: 3000
+        memoryLimit: 1024
+        timeComplexity: "O(N log N)"
+        description: "HLD, 센트로이드 분할"
+    promptAdditions: |
+      - 계층 구조, 부모-자식 관계가 핵심인 문제 설계
+      - 트리 순회나 트리 DP가 필요한 상황 구성
+      - naive는 모든 경로를 탐색하는 방식으로 작성
+
+  # === 탐색 ===
+  DFS_BFS:
+    displayName: "DFS/BFS"
+    difficultySpecs:
+      BRONZE:
+        inputSize: "N <= 100, M <= 100"
+        timeLimit: 1000
+        memoryLimit: 256
+        timeComplexity: "O(N*M)"
+        description: "기본 그래프 탐색, 연결 요소 찾기"
+      SILVER:
+        inputSize: "N <= 1,000, M <= 1,000"
+        timeLimit: 1000
+        memoryLimit: 256
+        timeComplexity: "O(N*M)"
+        description: "2차원 격자 탐색, 영역 카운팅"
+      GOLD:
+        inputSize: "N <= 10,000, M <= 10,000"
+        timeLimit: 2000
+        memoryLimit: 512
+        timeComplexity: "O(N*M)"
+        description: "최단 거리 BFS, 다중 시작점"
+      PLATINUM:
+        inputSize: "N <= 100,000, M <= 100,000"
+        timeLimit: 3000
+        memoryLimit: 1024
+        timeComplexity: "O(N+M)"
+        description: "0-1 BFS, 다익스트라 대체"
+    promptAdditions: |
+      - 격자나 그래프에서 탐색/이동이 핵심인 문제 설계
+      - 연결 요소, 최단 거리, 도달 가능 여부 등의 상황
+      - naive는 완전 탐색이나 비효율적 재귀로 작성
+
+  BRUTEFORCE:
+    displayName: "완전탐색"
+    difficultySpecs:
+      BRONZE:
+        inputSize: "N <= 10"
+        timeLimit: 1000
+        memoryLimit: 256
+        timeComplexity: "O(2^N) or O(N!)"
+        description: "간단한 경우의 수 열거"
+      SILVER:
+        inputSize: "N <= 15"
+        timeLimit: 1000
+        memoryLimit: 256
+        timeComplexity: "O(2^N) or O(N!)"
+        description: "순열/조합 생성, 비트마스킹"
+      GOLD:
+        inputSize: "N <= 20"
+        timeLimit: 2000
+        memoryLimit: 512
+        timeComplexity: "O(2^N) or O(N!)"
+        description: "meet in the middle, 최적화된 완탐"
+      PLATINUM:
+        inputSize: "N <= 25"
+        timeLimit: 3000
+        memoryLimit: 1024
+        timeComplexity: "O(2^(N/2))"
+        description: "MITM 분할, 양방향 탐색"
+    promptAdditions: |
+      - 모든 경우를 확인해야 하는 상황 설계
+      - 입력 크기가 작아 완전 탐색이 가능한 범위 유지
+      - optimal은 가지치기/MITM, naive는 순수 완탐으로 작성
+
+  BACKTRACKING:
+    displayName: "백트래킹"
+    difficultySpecs:
+      BRONZE:
+        inputSize: "N <= 8"
+        timeLimit: 1000
+        memoryLimit: 256
+        timeComplexity: "O(N!)"
+        description: "기본 순열/조합 생성"
+      SILVER:
+        inputSize: "N <= 12"
+        timeLimit: 1000
+        memoryLimit: 256
+        timeComplexity: "O(N!)"
+        description: "N-Queen 변형, 조건부 탐색"
+      GOLD:
+        inputSize: "N <= 15"
+        timeLimit: 2000
+        memoryLimit: 512
+        timeComplexity: "O(N!)"
+        description: "복잡한 조건의 백트래킹"
+      PLATINUM:
+        inputSize: "N <= 20"
+        timeLimit: 3000
+        memoryLimit: 1024
+        timeComplexity: "O(2^N)"
+        description: "최적화된 가지치기"
+    promptAdditions: |
+      - ���건을 만족하는 모든 해를 찾거나 최적해를 구하는 문제
+      - 가지치기로 탐색 공간을 줄일 수 있는 구조 설계
+      - naive는 가지치기 없이 모든 경우 탐색으로 작성
+
+  BINARY_SEARCH:
+    displayName: "이분탐색"
+    difficultySpecs:
+      BRONZE:
+        inputSize: "N <= 10,000"
+        timeLimit: 1000
+        memoryLimit: 256
+        timeComplexity: "O(N log N)"
+        description: "정렬 후 이분탐색"
+      SILVER:
+        inputSize: "N <= 100,000"
+        timeLimit: 1000
+        memoryLimit: 256
+        timeComplexity: "O(N log N)"
+        description: "lower/upper bound, 결정 문제"
+      GOLD:
+        inputSize: "N <= 1,000,000"
+        timeLimit: 2000
+        memoryLimit: 512
+        timeComplexity: "O(N log N)"
+        description: "파라메트릭 서치"
+      PLATINUM:
+        inputSize: "N <= 10,000,000"
+        timeLimit: 3000
+        memoryLimit: 1024
+        timeComplexity: "O(N log N)"
+        description: "복잡한 파라메트릭 서치"
+    promptAdditions: |
+      - '최소', '최대', '~이상', '~이하' 등 경계값 관련 키워드
+      - 결정 문제로 변환 가능한 최적화 문제 설계
+      - naive는 O(N^2) 선형 탐색으로 작성
+
+  SHORTEST_PATH:
+    displayName: "그래프/최단경로"
+    difficultySpecs:
+      BRONZE:
+        inputSize: "N <= 100, M <= 1,000"
+        timeLimit: 1000
+        memoryLimit: 256
+        timeComplexity: "O(N^2)"
+        description: "간단한 그래프, 플로이드 워셜"
+      SILVER:
+        inputSize: "N <= 1,000, M <= 10,000"
+        timeLimit: 1000
+        memoryLimit: 256
+        timeComplexity: "O(N^2) ~ O(M log N)"
+        description: "다익스트라 기초"
+      GOLD:
+        inputSize: "N <= 10,000, M <= 100,000"
+        timeLimit: 2000
+        memoryLimit: 512
+        timeComplexity: "O(M log N)"
+        description: "다익스트라, 벨만-포드"
+      PLATINUM:
+        inputSize: "N <= 100,000, M <= 500,000"
+        timeLimit: 3000
+        memoryLimit: 1024
+        timeComplexity: "O(M log N)"
+        description: "복잡한 최단 경로, 상태 공간 그래프"
+    promptAdditions: |
+      - 출발지에서 목적지까지의 최단 거리/시간/비용 문제
+      - 가중치가 있는 그래프 상황 설계
+      - naive는 BFS나 플로이드 워셜로 작성
+
+  # === 최적화 ===
+  GREEDY:
+    displayName: "그리디"
+    difficultySpecs:
+      BRONZE:
+        inputSize: "N <= 1,000"
+        timeLimit: 1000
+        memoryLimit: 256
+        timeComplexity: "O(N log N)"
+        description: "간단한 정렬 후 선택"
+      SILVER:
+        inputSize: "N <= 100,000"
+        timeLimit: 1000
+        memoryLimit: 256
+        timeComplexity: "O(N log N)"
+        description: "활동 선택, 회의실 배정"
+      GOLD:
+        inputSize: "N <= 500,000"
+        timeLimit: 2000
+        memoryLimit: 512
+        timeComplexity: "O(N log N)"
+        description: "복잡한 그리디 + 자료구조"
+      PLATINUM:
+        inputSize: "N <= 1,000,000"
+        timeLimit: 3000
+        memoryLimit: 1024
+        timeComplexity: "O(N log N)"
+        description: "그리디 정당성 증명 필요"
+    promptAdditions: |
+      - 매 단계 최선의 선택이 전체 최적해로 이어지는 문제
+      - 정렬 후 순차 처리로 해결되는 상황 설계
+      - naive는 모든 경우를 비교하는 완전탐색으로 작성
+
+  DP:
+    displayName: "동적 프로그래밍"
+    difficultySpecs:
+      BRONZE:
+        inputSize: "N <= 1,000"
+        timeLimit: 1000
+        memoryLimit: 256
+        timeComplexity: "O(N)"
+        description: "피보나치 변형, 간단한 점화식"
+      SILVER:
+        inputSize: "N <= 10,000"
+        timeLimit: 1000
+        memoryLimit: 256
+        timeComplexity: "O(N) ~ O(N^2)"
+        description: "1차원 DP, 계단 오르기 유형"
+      GOLD:
+        inputSize: "N <= 2,000 또는 N*M <= 1,000,000"
+        timeLimit: 2000
+        memoryLimit: 512
+        timeComplexity: "O(N^2) ~ O(N^3)"
+        description: "2차원 DP, LCS, 배낭 문제"
+      PLATINUM:
+        inputSize: "N <= 100,000"
+        timeLimit: 3000
+        memoryLimit: 1024
+        timeComplexity: "O(N log N)"
+        description: "DP 최적화, 분할정복 DP, CHT"
+    promptAdditions: |
+      - 문제에 '최소', '최대', '경우의 수' 키워드를 자연스럽게 포함
+      - greedy로 풀리지 않도록 반례가 존재하게 설계
+      - naive 코드는 완전탐색으로 작성하여 명확한 대조 생성
+
+  # === 구현 ===
+  IMPLEMENTATION:
+    displayName: "구현/시뮬레이션"
+    difficultySpecs:
+      BRONZE:
+        inputSize: "N <= 100"
+        timeLimit: 1000
+        memoryLimit: 256
+        timeComplexity: "O(N^2)"
+        description: "간단한 시뮬레이션"
+      SILVER:
+        inputSize: "N <= 1,000"
+        timeLimit: 1000
+        memoryLimit: 256
+        timeComplexity: "O(N^2)"
+        description: "2차원 배열 조작, 방향 이동"
+      GOLD:
+        inputSize: "N <= 5,000"
+        timeLimit: 2000
+        memoryLimit: 512
+        timeComplexity: "O(N^2)"
+        description: "복잡한 시뮬레이션, 상태 관리"
+      PLATINUM:
+        inputSize: "N <= 10,000"
+        timeLimit: 3000
+        memoryLimit: 1024
+        timeComplexity: "O(N^2)"
+        description: "최적화된 시뮬레이션"
+    promptAdditions: |
+      - 문제 조건을 그대로 구현하는 시뮬레이션 설계
+      - 복잡한 조건과 예외 처리가 필요한 상황
+      - naive와 optimal 모두 시뮬레이션이지만 구현 효율성 차이
+
+  SORTING:
+    displayName: "정렬"
+    difficultySpecs:
+      BRONZE:
+        inputSize: "N <= 1,000"
+        timeLimit: 1000
+        memoryLimit: 256
+        timeComplexity: "O(N log N)"
+        description: "기본 정렬, 비교 기준 설정"
+      SILVER:
+        inputSize: "N <= 100,000"
+        timeLimit: 1000
+        memoryLimit: 256
+        timeComplexity: "O(N log N)"
+        description: "커스텀 정렬, 다중 키 정렬"
+      GOLD:
+        inputSize: "N <= 500,000"
+        timeLimit: 2000
+        memoryLimit: 512
+        timeComplexity: "O(N log N)"
+        description: "정렬 + 이분탐색 조합"
+      PLATINUM:
+        inputSize: "N <= 1,000,000"
+        timeLimit: 3000
+        memoryLimit: 1024
+        timeComplexity: "O(N log N)"
+        description: "좌표 압축, 정렬 응용"
+    promptAdditions: |
+      - 순서 재배치, 우선순위 결정이 핵심인 문제
+      - 정렬 후 처리하면 효율적인 상황 설계
+      - naive는 O(N^2) 정렬 또는 매번 최소/최대 탐색으로 작성
+
+  STRING:
+    displayName: "문자열 처리"
+    difficultySpecs:
+      BRONZE:
+        inputSize: "문자열 길이 <= 100"
+        timeLimit: 1000
+        memoryLimit: 256
+        timeComplexity: "O(N)"
+        description: "기본 문자열 조작"
+      SILVER:
+        inputSize: "문자열 길이 <= 10,000"
+        timeLimit: 1000
+        memoryLimit: 256
+        timeComplexity: "O(N)"
+        description: "패턴 매칭 기초, 부분 문자열"
+      GOLD:
+        inputSize: "문자열 길이 <= 100,000"
+        timeLimit: 2000
+        memoryLimit: 512
+        timeComplexity: "O(N) ~ O(N log N)"
+        description: "KMP, 해싱"
+      PLATINUM:
+        inputSize: "문자열 길이 <= 1,000,000"
+        timeLimit: 3000
+        memoryLimit: 1024
+        timeComplexity: "O(N log N)"
+        description: "접미사 배열, 매내처"
+    promptAdditions: |
+      - 문자열 패턴, 부분 문자열, 변환이 핵심인 문제
+      - 문자열 특성을 활용해야 효율적인 상황 설계
+      - naive는 O(N^2) 또는 O(N*M) 단순 비교로 작성
+
+  TWO_POINTER:
+    displayName: "투포인터/슬라이딩 윈도우"
+    difficultySpecs:
+      BRONZE:
+        inputSize: "N <= 1,000"
+        timeLimit: 1000
+        memoryLimit: 256
+        timeComplexity: "O(N)"
+        description: "기본 투포인터"
+      SILVER:
+        inputSize: "N <= 100,000"
+        timeLimit: 1000
+        memoryLimit: 256
+        timeComplexity: "O(N)"
+        description: "두 수의 합, 부분합"
+      GOLD:
+        inputSize: "N <= 500,000"
+        timeLimit: 2000
+        memoryLimit: 512
+        timeComplexity: "O(N) ~ O(N log N)"
+        description: "슬라이딩 윈도우 + 자료구조"
+      PLATINUM:
+        inputSize: "N <= 1,000,000"
+        timeLimit: 3000
+        memoryLimit: 1024
+        timeComplexity: "O(N log N)"
+        description: "복잡한 윈도우 관리"
+    promptAdditions: |
+      - 연속 부분 배열, 구간 합, 조건 만족 구간 문제
+      - 두 포인터의 이동으로 효율적으로 해결되는 상황
+      - naive는 O(N^2) 모든 구간 확인으로 작성
+
+# ===== 토큰 설정 =====
+tokenConfig:
+  default: 4096
+  overrides:
+    STRING: 2500
+    IMPLEMENTATION: 2500
+    DP: 4500
+    SHORTEST_PATH: 4000
+    TREE: 4000
