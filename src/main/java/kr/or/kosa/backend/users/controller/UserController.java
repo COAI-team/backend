@@ -132,10 +132,13 @@ public class UserController {
      */
     @PutMapping(value = "/me", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<UserUpdateResponse> updateMyInfo(
-            @AuthenticationPrincipal JwtUserDetails user,
+            @AuthenticationPrincipal(expression = "details") JwtUserDetails user,
             @ModelAttribute UserUpdateRequestDto dto,
             @RequestPart(value = "image", required = false) MultipartFile image
     ) {
+        if (user == null) {
+            return ResponseEntity.status(401).build();
+        }
         UserResponseDto updated = userService.updateUserInfo(user.id(), dto, image);
         return ResponseEntity.ok(UserUpdateResponse.builder()
                 .success(true)
