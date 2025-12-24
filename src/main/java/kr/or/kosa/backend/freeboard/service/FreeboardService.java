@@ -21,6 +21,7 @@ import kr.or.kosa.backend.tag.service.TagService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
@@ -93,7 +94,7 @@ public class FreeboardService {
     }
 
     // 상세 조회
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public FreeboardDetailResponseDto detail(Long id, Long userId) {
         mapper.increaseClick(id);
 
