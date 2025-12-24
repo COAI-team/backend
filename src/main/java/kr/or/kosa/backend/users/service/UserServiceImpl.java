@@ -571,8 +571,6 @@ public class UserServiceImpl implements UserService {
     @Override
     public boolean linkGithubAccount(Long currentUserId, GithubLinkRequest request) {
         GitHubUserResponse gitHubUser = toGitHubUserResponse(request);
-        System.out.println("?? ==>> . " + currentUserId);
-        System.out.println("?? ==>> . " + gitHubUser);
         return githubLinkService.linkGithubInternal(currentUserId, gitHubUser);
     }
 

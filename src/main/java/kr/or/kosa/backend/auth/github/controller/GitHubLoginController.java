@@ -48,6 +48,9 @@ public class GitHubLoginController {
             @RequestParam("code") String code,
             @RequestParam(value = "state", required = false) String state
     ) {
+
+        System.out.println("code ==>> 깃 로그인 코드 ===>> " + code);
+        System.out.println("state ==>> 깃 로그인 state ===>> " + state);
         // 1️⃣ GitHub 사용자 정보 조회
         GitHubUserResponse gitHubUser = gitHubOAuthService.getUserInfo(code);
 
