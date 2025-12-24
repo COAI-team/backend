@@ -64,7 +64,7 @@ public class SecurityConfig {
                                 "/like/**",
                                 "/analysis/**",
                                 "/battle/**",
-                                "/algo/**"
+                                "/algo/**",
                                 "/api/**"
 //                            "/payments/**",
 //                            "/redis/**"
