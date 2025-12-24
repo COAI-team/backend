@@ -28,6 +28,36 @@
         LIMIT 10
     </select>
 
+    <select id="calculateWeeklyPopularPosts" resultType="kr.or.kosa.backend.codeboard.domain.PopularCodeboard">
+        SELECT
+        c.CODEBOARD_ID as codeboardId,
+        c.CODEBOARD_CLICK as viewCount,
+        COALESCE(like_counts.like_count, 0) as likeCount,
+        COALESCE(comment_counts.comment_count, 0) as commentCount,
+        (c.CODEBOARD_CLICK * 1) +
+        (COALESCE(like_counts.like_count, 0) * 5) +
+        (COALESCE(comment_counts.comment_count, 0) * 3) as popularityScore
+        FROM CODEBOARD c
+        LEFT JOIN (
+        SELECT REFERENCE_ID, COUNT(*) as like_count
+        FROM `LIKE`
+        WHERE REFERENCE_TYPE = 'POST_CODEBOARD'
+        GROUP BY REFERENCE_ID
+        ) like_counts ON c.CODEBOARD_ID = like_counts.REFERENCE_ID
+        LEFT JOIN (
+        SELECT BOARD_ID, COUNT(*) as comment_count
+        FROM `COMMENT`
+        WHERE BOARD_TYPE = 'CODEBOARD'
+        AND IS_DELETED = FALSE
+        GROUP BY BOARD_ID
+        ) comment_counts ON c.CODEBOARD_ID = comment_counts.BOARD_ID
+        WHERE c.CODEBOARD_DELETED_YN = 'N'
+        AND c.CODEBOARD_CREATED_AT BETWEEN #{startDate} AND #{endDate}
+        HAVING popularityScore > 0
+        ORDER BY popularityScore DESC
+        LIMIT #{limit}
+    </select>
+
     <insert id="insertWeeklyPopularPosts">
         INSERT INTO WEEKLY_POPULAR_CODEBOARD (
         CODEBOARD_ID,
@@ -39,43 +69,29 @@
         POPULARITY_SCORE,
         RANKING
         )
-        SELECT
-        c.CODEBOARD_ID,
-        #{weekStartDate},
-        #{weekEndDate},
-        c.CODEBOARD_CLICK as view_count,
-        COALESCE(like_counts.like_count, 0) as like_count,
-        COALESCE(comment_counts.comment_count, 0) as comment_count,
-        (c.CODEBOARD_CLICK * 1) +
-        (COALESCE(like_counts.like_count, 0) * 5) +
-        (COALESCE(comment_counts.comment_count, 0) * 3) as popularity_score,
-        ROW_NUMBER() OVER (ORDER BY
-        (c.CODEBOARD_CLICK * 1) +
-        (COALESCE(like_counts.like_count, 0) * 5) +
-        (COALESCE(comment_counts.comment_count, 0) * 3) DESC
-        ) as ranking
-        FROM CODEBOARD c
-        LEFT JOIN (
-        SELECT CODEBOARD_ID, COUNT(*) as like_count
-        FROM CODEBOARD_LIKE
-        WHERE CODEBOARD_LIKE_DELETED_YN = 'N'
-        GROUP BY CODEBOARD_ID
-        ) like_counts ON c.CODEBOARD_ID = like_counts.CODEBOARD_ID
-        LEFT JOIN (
-        SELECT CODEBOARD_ID, COUNT(*) as comment_count
-        FROM CODEBOARD_COMMENT
-        WHERE CODEBOARD_COMMENT_DELETED_YN = 'N'
-        GROUP BY CODEBOARD_ID
-        ) comment_counts ON c.CODEBOARD_ID = comment_counts.CODEBOARD_ID
-        WHERE c.CODEBOARD_DELETED_YN = 'N'
-        AND c.CODEBOARD_CREATED_AT BETWEEN #{weekStartDate} AND #{weekEndDate}
-        ORDER BY popularity_score DESC
-        LIMIT 10
+        VALUES
+        <foreach collection="posts" item="post" separator=",">
+            (
+            #{post.codeboardId},
+            #{post.weekStartDate},
+            #{post.weekEndDate},
+            #{post.viewCount},
+            #{post.likeCount},
+            #{post.commentCount},
+            #{post.popularityScore},
+            #{post.ranking}
+            )
+        </foreach>
     </insert>
 
     <delete id="deleteOldPopularPosts">
         DELETE FROM WEEKLY_POPULAR_CODEBOARD
         WHERE WEEK_START_DATE &lt; #{cutoffDate}
+    </delete>
+
+    <delete id="deleteWeeklyPopularPosts">
+        DELETE FROM WEEKLY_POPULAR_CODEBOARD
+        WHERE WEEK_START_DATE = #{weekStartDate}
     </delete>
 
 </mapper>
