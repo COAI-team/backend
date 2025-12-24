@@ -28,18 +28,15 @@ public class TagService {
     private final CodeboardTagMapper codeboardTagMapper;
     private final FreeboardTagMapper freeboardTagMapper;
 
-    // 태그 조회 또는 생성 (Validation은 이미 Request에서 완료됨)
     @Transactional
     public Tag getOrCreateTag(String tagInput) {
         String normalizedName = tagInput.toLowerCase().trim();
 
-        // 기존 태그 조회
         Optional<Tag> existingTag = tagMapper.findByTagName(normalizedName);
         if (existingTag.isPresent()) {
             return existingTag.get();
         }
 
-        // 새 태그 생성
         try {
             Tag newTag = Tag.builder()
                     .tagName(normalizedName)
@@ -54,13 +51,11 @@ public class TagService {
             return newTag;
 
         } catch (DataIntegrityViolationException e) {
-            // 동시성 문제로 UNIQUE 제약 위반 시 재조회
             return tagMapper.findByTagName(normalizedName)
                     .orElseThrow(() -> new CustomBusinessException(TagErrorCode.TAG_SAVE_FAILED));
         }
     }
 
-    // 코드게시판 게시글에 태그 저장
     @Transactional
     public void attachTagsToCodeboard(Long codeboardId, List<String> tagInputs) {
         if (tagInputs == null || tagInputs.isEmpty()) {
@@ -85,21 +80,14 @@ public class TagService {
         log.info("코드게시판 태그 저장 완료: codeboardId={}, 태그 수={}", codeboardId, tagInputs.size());
     }
 
-    // 자유게시판 게시글에 태그 저장
     @Transactional
     public void attachTagsToFreeboard(Long freeboardId, List<String> tagInputs) {
-        log.info("=== attachTagsToFreeboard 시작 ===");
-
         if (tagInputs == null || tagInputs.isEmpty()) {
-            log.warn("tagInputs가 null이거나 비어있음");
             return;
         }
 
-        log.info("태그 개수: {}", tagInputs.size());
         for (String tagInput : tagInputs) {
-            log.info("태그 처리 중: {}", tagInput);
             Tag tag = getOrCreateTag(tagInput.trim());
-            log.info("태그 ID: {}", tag.getTagId());
 
             FreeboardTag freeboardTag = FreeboardTag.builder()
                     .freeboardId(freeboardId)
@@ -108,10 +96,7 @@ public class TagService {
                     .build();
 
             int result = freeboardTagMapper.insert(freeboardTag);
-            log.info("삽입 결과: {}", result);
-
             if (result == 0) {
-                log.error("태그 삽입 실패!");
                 throw new CustomBusinessException(TagErrorCode.TAG_SAVE_FAILED);
             }
         }
@@ -119,7 +104,6 @@ public class TagService {
         log.info("자유게시판 태그 저장 완료: freeboardId={}, 태그 수={}", freeboardId, tagInputs.size());
     }
 
-    // 여러 자유게시판 게시글의 태그를 한번에 조회 (N+1 방지)
     public Map<Long, List<String>> getFreeboardTagsMap(List<Long> freeboardIds) {
         if (freeboardIds == null || freeboardIds.isEmpty()) {
             return new HashMap<>();
@@ -127,30 +111,79 @@ public class TagService {
 
         List<FreeboardTag> freeboardTags = freeboardTagMapper.findByFreeboardIdIn(freeboardIds);
 
+        if (freeboardTags == null || freeboardTags.isEmpty()) {
+            return new HashMap<>();
+        }
+
         return freeboardTags.stream()
+                .filter(tag -> tag != null && tag.getTagDisplayName() != null)
                 .collect(Collectors.groupingBy(
                         FreeboardTag::getFreeboardId,
                         Collectors.mapping(FreeboardTag::getTagDisplayName, Collectors.toList())
                 ));
     }
 
-    // 코드게시판 게시글의 태그 조회
+    public Map<Long, List<String>> getCodeboardTagsMap(List<Long> codeboardIds) {
+        if (codeboardIds == null || codeboardIds.isEmpty()) {
+            return new HashMap<>();
+        }
+
+        List<CodeboardTag> codeboardTags = codeboardTagMapper.findByCodeboardIdIn(codeboardIds);
+
+        if (codeboardTags == null || codeboardTags.isEmpty()) {
+            return new HashMap<>();
+        }
+
+        return codeboardTags.stream()
+                .filter(tag -> tag != null && tag.getTagDisplayName() != null)
+                .collect(Collectors.groupingBy(
+                        CodeboardTag::getCodeboardId,
+                        Collectors.mapping(CodeboardTag::getTagDisplayName, Collectors.toList())
+                ));
+    }
+
     public List<String> getCodeboardTags(Long codeboardId) {
-        return codeboardTagMapper.findByCodeboardId(codeboardId)
-                .stream()
+        List<CodeboardTag> tags = codeboardTagMapper.findByCodeboardId(codeboardId);
+
+        if (tags == null || tags.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        return tags.stream()
+                .filter(tag -> tag != null && tag.getTagDisplayName() != null)
                 .map(CodeboardTag::getTagDisplayName)
                 .toList();
     }
 
-    // 자유게시판 게시글의 태그 조회
     public List<String> getFreeboardTags(Long freeboardId) {
-        return freeboardTagMapper.findByFreeboardId(freeboardId)
-                .stream()
+        log.info(">>> getFreeboardTags 호출: freeboardId={}", freeboardId);
+
+        List<FreeboardTag> tags = freeboardTagMapper.findByFreeboardId(freeboardId);
+
+        log.info(">>> Mapper 조회 결과 - null 여부: {}", tags == null);
+        log.info(">>> Mapper 조회 결과 - 크기: {}", tags != null ? tags.size() : "null");
+        log.info(">>> Mapper 조회 결과 - 내용: {}", tags);
+
+        if (tags == null || tags.isEmpty()) {
+            log.warn(">>> 조회된 태그가 없음: freeboardId={}", freeboardId);
+            return Collections.emptyList();
+        }
+
+        for (FreeboardTag tag : tags) {
+            log.info(">>> 개별 태그: freeboardId={}, tagId={}, displayName={}",
+                    tag.getFreeboardId(), tag.getTagId(), tag.getTagDisplayName());
+        }
+
+        List<String> result = tags.stream()
+                .filter(tag -> tag != null && tag.getTagDisplayName() != null)
                 .map(FreeboardTag::getTagDisplayName)
                 .toList();
+
+        log.info(">>> 최종 반환할 태그 목록: {}", result);
+
+        return result;
     }
 
-    // 코드게시판 게시글 태그 수정
     @Transactional
     public void updateCodeboardTags(Long codeboardId, List<String> tagInputs) {
         codeboardTagMapper.deleteByCodeboardId(codeboardId);
@@ -160,29 +193,15 @@ public class TagService {
         }
     }
 
-    // 자유게시판 게시글 태그 수정
     @Transactional
     public void updateFreeboardTags(Long freeboardId, List<String> tagInputs) {
-        log.info("=== updateFreeboardTags 시작 ===");
-        log.info("freeboardId: {}", freeboardId);
-        log.info("tagInputs: {}", tagInputs);
-
-        log.info("기존 태그 삭제 시작");
-        int deleted = freeboardTagMapper.deleteByFreeboardId(freeboardId);
-        log.info("삭제된 태그 수: {}", deleted);
+        freeboardTagMapper.deleteByFreeboardId(freeboardId);
 
         if (tagInputs != null && !tagInputs.isEmpty()) {
-            log.info("새로운 태그 저장 시작: {} 개", tagInputs.size());
             attachTagsToFreeboard(freeboardId, tagInputs);
-            log.info("태그 저장 완료");
-        } else {
-            log.warn("저장할 태그가 없음 (null 또는 empty)");
         }
-
-        log.info("=== updateFreeboardTags 완료 ===");
     }
 
-    // 자동완성 검색
     public List<TagAutocompleteDto> searchTagsForAutocomplete(String keyword, int limit) {
         if (keyword == null || keyword.trim().isEmpty()) {
             return new ArrayList<>();
@@ -215,7 +234,6 @@ public class TagService {
                 .toList();
     }
 
-    // 태그로 코드게시판 게시글 검색
     public List<Long> searchCodeboardByTag(String tagDisplay) {
         if (tagDisplay == null || tagDisplay.trim().isEmpty()) {
             return new ArrayList<>();
@@ -234,7 +252,6 @@ public class TagService {
                 .toList();
     }
 
-    // 태그로 자유게시판 게시글 검색
     public List<Long> searchFreeboardByTag(String tagDisplay) {
         if (tagDisplay == null || tagDisplay.trim().isEmpty()) {
             return new ArrayList<>();

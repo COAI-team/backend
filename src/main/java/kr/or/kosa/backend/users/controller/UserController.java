@@ -2,6 +2,7 @@ package kr.or.kosa.backend.users.controller;
 
 import jakarta.validation.Valid;
 import kr.or.kosa.backend.auth.github.dto.GitHubUserResponse;
+import kr.or.kosa.backend.auth.github.dto.GithubLinkRequest;
 import kr.or.kosa.backend.security.jwt.JwtUserDetails;
 import kr.or.kosa.backend.users.dto.*;
 import kr.or.kosa.backend.users.service.UserService;
@@ -131,10 +132,13 @@ public class UserController {
      */
     @PutMapping(value = "/me", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<UserUpdateResponse> updateMyInfo(
-            @AuthenticationPrincipal JwtUserDetails user,
+            @AuthenticationPrincipal(expression = "details") JwtUserDetails user,
             @ModelAttribute UserUpdateRequestDto dto,
             @RequestPart(value = "image", required = false) MultipartFile image
     ) {
+        if (user == null) {
+            return ResponseEntity.status(401).build();
+        }
         UserResponseDto updated = userService.updateUserInfo(user.id(), dto, image);
         return ResponseEntity.ok(UserUpdateResponse.builder()
                 .success(true)
@@ -181,7 +185,7 @@ public class UserController {
     @PostMapping("/github/link")
     public ResponseEntity<MessageResponse> linkGithub(
             @AuthenticationPrincipal JwtUserDetails user,
-            @RequestBody GitHubUserResponse gitHubUser
+            @RequestBody GithubLinkRequest request
     ) {
         System.out.println("깃 허브 링크 컨트롤러 111  ====>> "  + user.getUsername()+ "=====" + user.getDetails().id() + "====="+ user.getDetails().toString());
         System.out.println("깃 허브 링크 컨트롤러 2222  ====>> "  + gitHubUser.getEmail()+ "=====" + gitHubUser.getEmail());

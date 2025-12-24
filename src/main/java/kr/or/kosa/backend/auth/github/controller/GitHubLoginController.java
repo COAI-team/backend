@@ -1,8 +1,6 @@
 package kr.or.kosa.backend.auth.github.controller;
 
-import kr.or.kosa.backend.auth.github.dto.GitHubCallbackResponse;
-import kr.or.kosa.backend.auth.github.dto.GitHubUserResponse;
-import kr.or.kosa.backend.auth.github.dto.GithubLoginResult;
+import kr.or.kosa.backend.auth.github.dto.*;
 import kr.or.kosa.backend.auth.github.service.GitHubOAuthService;
 import kr.or.kosa.backend.security.jwt.JwtProvider;
 import kr.or.kosa.backend.users.domain.Users;
@@ -48,14 +46,13 @@ public class GitHubLoginController {
     @GetMapping("/callback")
     public ResponseEntity<GitHubCallbackResponse> callback(
             @RequestParam("code") String code,
-            @RequestParam(value = "mode", required = false) String mode
+            @RequestParam(value = "state", required = false) String state
     ) {
+        // 1️⃣ GitHub 사용자 정보 조회
         GitHubUserResponse gitHubUser = gitHubOAuthService.getUserInfo(code);
 
-        boolean linkMode = "link".equals(mode);  // 링크 모드 여부
-
-        // 🔥 1) 프론트가 연동 모드 요청했을 때 → GitHub 정보만 반환
-        if (linkMode) {
+        // 2️⃣ 🔥 연동(link) 모드면 여기서 즉시 종료 (USER 생성 절대 금지)
+        if ("link".equals(state)) {
             return ResponseEntity.ok(
                     GitHubCallbackResponse.builder()
                             .linkMode(true)
@@ -64,13 +61,12 @@ public class GitHubLoginController {
             );
         }
 
-        // 🔥 2) 일반 GitHub 로그인 처리
+        // 3️⃣ ⬇️ 이 아래는 "로그인 / 회원가입 전용" 로직
         GithubLoginResult result = userService.githubLogin(gitHubUser, false);
         Users user = result.getUser();
 
-        // 🔥 3) 기존 이메일 계정 존재 → 계정 통합 필요
+        // 4️⃣ 기존 일반 계정 존재 → 연동 유도
         if (result.isNeedLink()) {
-
             Tokens tokens = issueTokens(user);
 
             return ResponseEntity.ok(
@@ -82,12 +78,11 @@ public class GitHubLoginController {
                             .gitHubUser(gitHubUser)
                             .accessToken(tokens.accessToken())
                             .refreshToken(tokens.refreshToken())
-
                             .build()
             );
         }
 
-        // 🔥 4) 평소처럼 GitHub 로그인 처리
+        // 5️⃣ 정상 GitHub 로그인 처리
         Tokens tokens = issueTokens(user);
 
         UserLoginResponseDto loginDto = UserLoginResponseDto.builder()
@@ -171,5 +166,20 @@ public class GitHubLoginController {
     }
 
     private record Tokens(String accessToken, String refreshToken) {
+    }
+
+    @PostMapping(value = "/link", consumes = "application/json")  // ✅ consumes 추가!
+    public ResponseEntity<GithubLinkResponse> linkGithub(
+            @RequestHeader("Authorization") String token,
+            @RequestBody GithubLinkRequest request
+    ) {
+        String accessToken = token.replace(BEARER_PREFIX, "");
+        Long userId = jwtProvider.getUserIdFromToken(accessToken);
+
+        boolean success = userService.linkGithubAccount(userId, request);  // ✅ boolean 반환 수정
+
+        return ResponseEntity.ok(
+                new GithubLinkResponse(success, "GitHub 계정이 연동되었습니다.")  // ✅ success 사용
+        );
     }
 }

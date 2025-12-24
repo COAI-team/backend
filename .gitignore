@@ -33,6 +33,9 @@ application-*.yaml
 application-*.properties
 **.yml
 
+# 예외: config 폴더의 YAML 파일은 포함
+!**/src/main/resources/config/algorithm-profiles.yml
+
 # STS 관련 파일 무시
 .apt_generated
 .classpath

@@ -106,9 +106,10 @@ public class CommentService {
         // DB에서 다시 조회하여 자동 생성된 필드 값 가져오기
         Comment savedComment = commentMapper.selectCommentById(comment.getCommentId());
 
-        // 사용자 닉네임 조회
+        // 사용자 정보 조회
         Users user = userMapper.findById(userId);
         String userNickname = user != null ? user.getUserNickname() : null;
+        String userImage = user != null ? user.getUserImage() : null;
 
         return CommentResponse.builder()
                 .commentId(savedComment.getCommentId())
@@ -117,6 +118,7 @@ public class CommentService {
                 .parentCommentId(savedComment.getParentCommentId())
                 .userId(savedComment.getUserId())
                 .userNickname(userNickname)
+                .userImage(userImage)
                 .content(savedComment.getContent())
                 .likeCount(savedComment.getLikeCount())
                 .isLiked(false)

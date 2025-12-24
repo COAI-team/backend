@@ -10,6 +10,7 @@ import kr.or.kosa.backend.chatbot.mapper.ChatbotMessageMapper;
 import kr.or.kosa.backend.commons.exception.custom.CustomBusinessException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.Prompt;
@@ -156,7 +157,8 @@ public class ChatMessageServiceImpl implements ChatMessageService {
         String fullPrompt = promptBuilder.buildCompleteGuidePrompt(
                 "KOSA 백엔드 프로젝트",
                 "MAIN",
-                userMessage
+                userMessage,
+                "ko"
         );
 
         UserMessage userPrompt = new UserMessage(fullPrompt);

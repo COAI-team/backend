@@ -1,6 +1,8 @@
 package kr.or.kosa.backend.users.service;
 
+import kr.or.kosa.backend.auth.github.dto.GithubLinkRequest;
 import kr.or.kosa.backend.auth.github.dto.GithubLoginResult;
+import kr.or.kosa.backend.auth.github.service.GithubLinkService;
 import kr.or.kosa.backend.commons.exception.custom.CustomBusinessException;
 import kr.or.kosa.backend.commons.util.EncryptionUtil; // Import added
 import kr.or.kosa.backend.infra.s3.S3Uploader;
@@ -36,6 +38,7 @@ public class UserServiceImpl implements UserService {
     @Value("${app.frontend.base-url}")
     private String frontendBaseUrl;
 
+    private final GithubLinkService githubLinkService;
     private final UserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
     private final EmailVerificationService emailVerificationService;
@@ -444,38 +447,25 @@ public class UserServiceImpl implements UserService {
     @Override
     public GithubLoginResult githubLogin(GitHubUserResponse gitHubUser, boolean linkMode) {
 
+        if (linkMode) {
+            throw new IllegalStateException("githubLogin must not be called in link mode");
+        }
+
         String providerId = String.valueOf(gitHubUser.getId());
         String email = normalizeGithubEmail(gitHubUser);
 
-        // Early return for link mode
-        if (linkMode) {
-            return buildLinkModeResult();
-        }
-
-        // Check for existing GitHub-linked account
         Users linkedUser = userMapper.findBySocialProvider(PROVIDER_GITHUB, providerId);
         if (linkedUser != null) {
             return buildLoginResult(linkedUser, false, null);
         }
 
-        // Check for existing email account
         Users existingUser = userMapper.findByEmail(email);
         if (existingUser != null) {
             return buildLoginResult(existingUser, true, gitHubUser);
         }
 
-        // Create new GitHub account
         Users newUser = createNewGithubUser(gitHubUser);
         return buildLoginResult(newUser, false, null);
-    }
-
-    private GithubLoginResult buildLinkModeResult() {
-        return GithubLoginResult.builder()
-                .user(null)
-                .needLink(false)
-                .accessToken(null)
-                .refreshToken(null)
-                .build();
     }
 
     private GithubLoginResult buildLoginResult(Users user, boolean needLink, GitHubUserResponse gitHubUser) {
@@ -612,7 +602,16 @@ public class UserServiceImpl implements UserService {
             throw new CustomBusinessException(UserErrorCode.USER_UPDATE_FAILED);
         }
 
-        return true;
+    /**
+     * GithubLinkRequest → GitHubUserResponse 변환
+     */
+    private GitHubUserResponse toGitHubUserResponse(GithubLinkRequest request) {
+        return GitHubUserResponse.builder()
+                .id(request.getId())
+                .login(request.getLogin())
+                .email(request.getEmail())
+                .avatarUrl(request.getAvatarUrl())
+                .build();
     }
 
     private String stripBearer(String bearerToken) {

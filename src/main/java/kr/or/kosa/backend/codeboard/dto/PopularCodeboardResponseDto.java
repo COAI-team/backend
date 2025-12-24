@@ -1,29 +1,25 @@
 package kr.or.kosa.backend.codeboard.dto;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 import java.time.LocalDateTime;
-import java.util.List;
 
 @Getter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class CodeboardListResponseDto {
+public class PopularCodeboardResponseDto {
     private Long codeboardId;
     private Long userId;
     private String userNickname;
     private String userImage;
-    private String analysisId;
     private String codeboardTitle;
-    private String codeboardSummary;
+    private String codeboardPlainText;
     private Long codeboardClick;
+    private LocalDateTime codeboardCreatedAt;
+    private Integer aiScore;  // 코드 스멜 점수
     private Integer likeCount;
     private Integer commentCount;
-    private LocalDateTime codeboardCreatedAt;
-    private List<String> tags;
-    private Integer aiScore; // 냄새 태그
+    private Integer popularityScore;
+    private Integer ranking;
 }

@@ -1,3 +1,3 @@
-            - 사용자가 글을 작성·수정·삭제하고 다른 사람의 글을 조회·댓글·피드백하는 흐름을 화면 기준으로 단계별로 안내합니다.
-            - 서비스 이용규칙을 벗어나는 불건전한 게시물이나 개인정보·민감한 내용 노출을 막도록 주의시키고,
-              신고/숨김 등 안전한 이용 방법만 안내합니다.
+Guide users step by step, based on the interface flow, on how to create, edit, and delete posts, as well as how to view, comment on, and provide feedback on other users’ posts.
+
+Encourage safe and responsible usage by reminding users to avoid posting inappropriate content or exposing personal or sensitive information, and provide guidance only on safe features such as reporting or hiding content when violations occur.
