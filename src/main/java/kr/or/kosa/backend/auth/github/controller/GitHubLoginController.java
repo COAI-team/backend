@@ -46,16 +46,16 @@ public class GitHubLoginController {
     @GetMapping("/callback")
     public ResponseEntity<GitHubCallbackResponse> callback(
             @RequestParam("code") String code,
-            @RequestParam(value = "state", required = false) String state
+            @RequestParam(value = "state", required = false) String mode
     ) {
-
-        System.out.println("code ==>> 깃 로그인 코드 ===>> " + code);
-        System.out.println("state ==>> 깃 로그인 state ===>> " + state);
+        System.out.println("code: " + code);
+        System.out.println("state: " + mode);
         // 1️⃣ GitHub 사용자 정보 조회
         GitHubUserResponse gitHubUser = gitHubOAuthService.getUserInfo(code);
-
+        System.out.println("이거봐ㅏㅏㅏㅏㅏㅏ: " + gitHubUser.toString());
+//        gitHubUser.setId(17L);
         // 2️⃣ 🔥 연동(link) 모드면 여기서 즉시 종료 (USER 생성 절대 금지)
-        if ("link".equals(state)) {
+        if ("link".equals(mode)) {
             return ResponseEntity.ok(
                     GitHubCallbackResponse.builder()
                             .linkMode(true)
@@ -178,7 +178,7 @@ public class GitHubLoginController {
     ) {
         String accessToken = token.replace(BEARER_PREFIX, "");
         Long userId = jwtProvider.getUserIdFromToken(accessToken);
-
+        System.out.println("---------모냐" + request.toString());
         boolean success = userService.linkGithubAccount(userId, request);  // ✅ boolean 반환 수정
 
         return ResponseEntity.ok(

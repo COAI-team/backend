@@ -89,6 +89,47 @@ public class GitHubOAuthServiceImpl implements GitHubOAuthService {
             throw new CustomBusinessException(GithubErrorCode.TOKEN_RESPONSE_NULL);
         }
 
+        // 이메일이 비공개인 경우 /user/emails API로 조회
+        if (body.getEmail() == null || body.getEmail().isBlank()) {
+            String primaryEmail = requestPrimaryEmail(accessToken);
+            if (primaryEmail != null) {
+                return GitHubUserResponse.builder()
+                        .id(body.getId())
+                        .login(body.getLogin())
+                        .email(primaryEmail)
+                        .avatarUrl(body.getAvatarUrl())
+                        .name(body.getName())
+                        .build();
+            }
+        }
+
         return body;
+    }
+
+    /**
+     * 🔥 3) 비공개 이메일 조회 (/user/emails API)
+     */
+    private String requestPrimaryEmail(String accessToken) {
+        try {
+            JsonNode emails = webClient.get()
+                    .uri("/user/emails")
+                    .headers(headers -> headers.setBearerAuth(accessToken))
+                    .retrieve()
+                    .bodyToMono(JsonNode.class)
+                    .block();
+
+            if (emails != null && emails.isArray()) {
+                for (JsonNode email : emails) {
+                    boolean isPrimary = email.has("primary") && email.get("primary").asBoolean();
+                    boolean isVerified = email.has("verified") && email.get("verified").asBoolean();
+                    if (isPrimary && isVerified) {
+                        return email.get("email").asText();
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Failed to fetch user emails: {}", e.getMessage());
+        }
+        return null;
     }
 }
