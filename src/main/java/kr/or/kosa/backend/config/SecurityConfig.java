@@ -94,7 +94,8 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOriginPatterns(List.of(
-                "*",
+                "http://localhost:5173",
+                "https://localhost:5173",
                 "https://api.co-ai.run",
                 "https://www.co-ai.run",
                 "https://co-ai.run",

@@ -569,18 +569,22 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public boolean linkGithubAccount(Long currentUserId, GitHubUserResponse gitHubUser) {
+    public boolean linkGithubAccount(Long currentUserId, GithubLinkRequest request) {
+        GitHubUserResponse gitHubUser = toGitHubUserResponse(request);
+
         System.out.println("?? ==>> . " +  currentUserId);
         System.out.println("?? ==>> . " +  gitHubUser);
         log.info("[GitHub 연동] gitHubUser 전체: {}", gitHubUser);
 
         String providerId = String.valueOf(gitHubUser.getId());
-
+        System.out.println("=======pi: " + providerId);
+        System.out.println("=======request.getId().toString(): " + request.getId().toString());
         // 1) 이미 다른 사용자와 연결된 경우
-        Users existingLinkedUser = userMapper.findBySocialProvider(PROVIDER_GITHUB, providerId);
-        if (existingLinkedUser != null && !existingLinkedUser.getUserId().equals(currentUserId)) {
-            throw new CustomBusinessException(UserErrorCode.SOCIAL_ALREADY_LINKED);
-        }
+        Users existingLinkedUser = userMapper.findBySocialProvider(PROVIDER_GITHUB, request.getId().toString());
+        System.out.println("이거거거거거거거거썅: " + existingLinkedUser);
+//        if (existingLinkedUser != null && !existingLinkedUser.getUserId().equals(currentUserId)) {
+//            throw new CustomBusinessException(UserErrorCode.SOCIAL_ALREADY_LINKED);
+//        }
 
         // 2) 이미 본인 계정에 연결된 경우 → true 반환
         if (existingLinkedUser != null) {
@@ -601,6 +605,9 @@ public class UserServiceImpl implements UserService {
         if (socialInserted != 1) {
             throw new CustomBusinessException(UserErrorCode.USER_UPDATE_FAILED);
         }
+
+        return true;
+    }
 
     /**
      * GithubLinkRequest → GitHubUserResponse 변환
