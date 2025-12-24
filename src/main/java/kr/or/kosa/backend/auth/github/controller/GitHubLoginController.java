@@ -168,7 +168,7 @@ public class GitHubLoginController {
     private record Tokens(String accessToken, String refreshToken) {
     }
 
-    @PostMapping("/link")
+    @PostMapping(value = "/link", consumes = "application/json")  // ✅ consumes 추가!
     public ResponseEntity<GithubLinkResponse> linkGithub(
             @RequestHeader("Authorization") String token,
             @RequestBody GithubLinkRequest request
@@ -176,10 +176,10 @@ public class GitHubLoginController {
         String accessToken = token.replace(BEARER_PREFIX, "");
         Long userId = jwtProvider.getUserIdFromToken(accessToken);
 
-        userService.linkGithubAccount(userId, request);
+        boolean success = userService.linkGithubAccount(userId, request);  // ✅ boolean 반환 수정
 
         return ResponseEntity.ok(
-                new GithubLinkResponse(true, "GitHub 계정이 연동되었습니다.")
+                new GithubLinkResponse(success, "GitHub 계정이 연동되었습니다.")  // ✅ success 사용
         );
     }
 }

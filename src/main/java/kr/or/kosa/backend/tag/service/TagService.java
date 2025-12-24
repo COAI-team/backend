@@ -156,16 +156,32 @@ public class TagService {
     }
 
     public List<String> getFreeboardTags(Long freeboardId) {
+        log.info(">>> getFreeboardTags 호출: freeboardId={}", freeboardId);
+
         List<FreeboardTag> tags = freeboardTagMapper.findByFreeboardId(freeboardId);
 
+        log.info(">>> Mapper 조회 결과 - null 여부: {}", tags == null);
+        log.info(">>> Mapper 조회 결과 - 크기: {}", tags != null ? tags.size() : "null");
+        log.info(">>> Mapper 조회 결과 - 내용: {}", tags);
+
         if (tags == null || tags.isEmpty()) {
+            log.warn(">>> 조회된 태그가 없음: freeboardId={}", freeboardId);
             return Collections.emptyList();
         }
 
-        return tags.stream()
+        for (FreeboardTag tag : tags) {
+            log.info(">>> 개별 태그: freeboardId={}, tagId={}, displayName={}",
+                    tag.getFreeboardId(), tag.getTagId(), tag.getTagDisplayName());
+        }
+
+        List<String> result = tags.stream()
                 .filter(tag -> tag != null && tag.getTagDisplayName() != null)
                 .map(FreeboardTag::getTagDisplayName)
                 .toList();
+
+        log.info(">>> 최종 반환할 태그 목록: {}", result);
+
+        return result;
     }
 
     @Transactional
