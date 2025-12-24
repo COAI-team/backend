@@ -8,7 +8,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.stream.IntStream;
@@ -21,36 +20,36 @@ public class PopularCodeboardService {
     private final PopularCodeboardMapper popularCodeboardMapper;
 
     public List<PopularCodeboardResponseDto> getWeeklyPopularPosts() {
-        LocalDate thisWeekMonday = getThisWeekMonday();
-        log.info("코드게시판 인기글 조회 - 기준 날짜: {}", thisWeekMonday);
-        return popularCodeboardMapper.findWeeklyPopularPosts(thisWeekMonday);
+        LocalDate weekAgo = LocalDate.now().minusDays(7);
+        log.info("코드게시판 인기글 조회 - 기준 날짜: {}", weekAgo);
+        return popularCodeboardMapper.findWeeklyPopularPosts(weekAgo);
     }
 
     public boolean isPopularPostsEmpty() {
-        LocalDate thisWeekMonday = getThisWeekMonday();
-        List<PopularCodeboardResponseDto> posts = popularCodeboardMapper.findWeeklyPopularPosts(thisWeekMonday);
+        LocalDate weekAgo = LocalDate.now().minusDays(7);
+        List<PopularCodeboardResponseDto> posts = popularCodeboardMapper.findWeeklyPopularPosts(weekAgo);
         return posts == null || posts.isEmpty();
     }
 
     @Transactional
     public void processWeeklyPopularPosts() {
-        LocalDate thisWeekMonday = getThisWeekMonday();
         LocalDate today = LocalDate.now();
+        LocalDate weekAgo = today.minusDays(7);
 
-        log.info("코드게시판 주간 인기글 배치 시작 - 기간: {} ~ {}", thisWeekMonday, today);
+        log.info("코드게시판 주간 인기글 배치 시작 - 기간: {} ~ {}", weekAgo, today.minusDays(1));
 
-        popularCodeboardMapper.deleteWeeklyPopularPosts(thisWeekMonday);
+        popularCodeboardMapper.deleteWeeklyPopularPosts(weekAgo);
 
         List<PopularCodeboard> calculatedPosts = popularCodeboardMapper.calculateWeeklyPopularPosts(
-                thisWeekMonday,
-                today,
+                weekAgo,
+                today.minusDays(1),
                 3
         );
 
         log.info("계산된 코드게시판 인기글 수: {}", calculatedPosts.size());
 
         if (calculatedPosts.isEmpty()) {
-            log.warn("코드게시판 주간 인기글이 없습니다. 기간: {} ~ {}", thisWeekMonday, today);
+            log.warn("코드게시판 주간 인기글이 없습니다. 기간: {} ~ {}", weekAgo, today.minusDays(1));
             return;
         }
 
@@ -59,8 +58,8 @@ public class PopularCodeboardService {
                     PopularCodeboard post = calculatedPosts.get(i);
                     return PopularCodeboard.builder()
                             .codeboardId(post.getCodeboardId())
-                            .weekStartDate(thisWeekMonday)
-                            .weekEndDate(today)
+                            .weekStartDate(weekAgo)
+                            .weekEndDate(today.minusDays(1))
                             .viewCount(post.getViewCount())
                             .likeCount(post.getLikeCount())
                             .commentCount(post.getCommentCount())
@@ -73,14 +72,5 @@ public class PopularCodeboardService {
         popularCodeboardMapper.insertWeeklyPopularPosts(postsWithRanking);
 
         log.info("코드게시판 주간 인기글 배치 완료 - {} 건 저장", postsWithRanking.size());
-    }
-
-    private LocalDate getThisWeekMonday() {
-        LocalDate today = LocalDate.now();
-        return today.with(DayOfWeek.MONDAY);
-    }
-
-    private LocalDate getLastWeekMonday() {
-        return getThisWeekMonday().minusWeeks(1);
     }
 }
