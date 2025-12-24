@@ -38,7 +38,7 @@
         #{parentCommentId},
         #{userId},
         #{content},
-        FALSE,
+        0,
         NOW()
         )
     </insert>
@@ -132,7 +132,7 @@
     <!-- 댓글 소프트 삭제 -->
     <update id="deleteComment">
         UPDATE COMMENT
-        SET IS_DELETED = TRUE,
+        SET IS_DELETED = 1,
         UPDATED_AT = NOW()
         WHERE COMMENT_ID = #{commentId}
     </update>
