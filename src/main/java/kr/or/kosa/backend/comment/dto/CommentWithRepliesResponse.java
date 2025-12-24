@@ -20,6 +20,7 @@ public class CommentWithRepliesResponse {
     private String boardType;
     private Long userId;
     private String userNickname;
+    private String userImage;
     private String content;
     private Integer likeCount;
     private Boolean isLiked;

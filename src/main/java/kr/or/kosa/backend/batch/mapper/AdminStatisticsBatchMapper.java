@@ -1,6 +1,5 @@
 package kr.or.kosa.backend.batch.mapper;
 
-import kr.or.kosa.backend.batch.dto.DailyBoardStatisticsDto;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -14,6 +13,13 @@ import java.time.LocalDate;
 @Mapper
 public interface AdminStatisticsBatchMapper {
     void insertDailyStats(@Param("targetDate")LocalDate targetDate);
+
+    // 오늘 생성된 알고리즘 게시판
+    int todayAlgoBoardCount();
+    // 오늘 생성된 코드분석 게시판
+    int todayCodeBoardCount();
+    // 오늘 생성된 자유게시판
+    int todayFreeBoardCount();
 
 
     // 결제 관련

@@ -21,14 +21,19 @@ import kr.or.kosa.backend.algorithm.mapper.MonitoringMapper;
 import kr.or.kosa.backend.commons.exception.custom.CustomBusinessException;
 import kr.or.kosa.backend.commons.pagination.PageRequest;
 import kr.or.kosa.backend.commons.pagination.PageResponse;
+import kr.or.kosa.backend.commons.redis.RedisService;
+import kr.or.kosa.backend.users.domain.Users;
+import kr.or.kosa.backend.users.mapper.UserMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Duration;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -58,6 +63,7 @@ public class AlgorithmSolvingService {
     private final CodeExecutorService codeExecutorService;  // Judge0 또는 Piston 선택
     private final AlgorithmJudgingService judgingService;
     private final LanguageService languageService;  // 언어 정보 조회 (DB 기반)
+    private final RedisService redisService;
 
     /**
      * 문제 풀이 시작 (ALG-04)
@@ -151,9 +157,14 @@ public class AlgorithmSolvingService {
             throw new IllegalArgumentException("존재하지 않는 문제입니다");
         }
 
+
         // 3. 제출 엔티티 생성 및 저장
         AlgoSubmissionDto submission = createSubmission(request, userId, problem);
-        submissionMapper.insertSubmission(submission);
+        int result = submissionMapper.insertSubmission(submission);
+
+        // if(result == 1) {
+        //     redisService.setAlgoRank(userId, problem.getAlgoProblemDifficulty().getDisplayName(), submission.getFinalScore().doubleValue());
+        // }
 
         log.info("제출 저장 완료 - submissionId: {}", submission.getAlgosubmissionId());
 

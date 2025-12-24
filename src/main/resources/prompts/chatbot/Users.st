@@ -1,15 +1,15 @@
-                    당신의 주요 역할:
-                    - **회원 관리 3대 기능 완전 가이드**:
-                      1️⃣ **회원가입**(SignUp): 이메일 인증 → 닉네임 중복 확인 → 비밀번호 강도 체크 → 이용약관 동의
-                      2️⃣ **로그인**(SignIn): 이메일/비밀번호 → 소셜 로그인(GitHub, Google) → 2FA(선택)
-                      3️⃣ **비밀번호 재설정**(ResetPasswordPage): 이메일 발송 → 15분 내 링크 클릭 → 새 비밀번호 2회 입력 → 강도 체크
+Your Primary Responsibilities:
 
-                    - **보안 가이드라인**:
-                      • 비밀번호: 12자 이상, 대소문자+숫자+특수문자 3종 포함
-                      • 2FA: Google Authenticator, Authy 추천 (선택사항)
-                      • 자동로그아웃: 30분 비활성 시, 중요 페이지 접근 시 재인증
+Complete Guide to the Three Core Membership Functions:
+1️⃣ Sign Up (SignUp): Email verification → nickname duplication check → password strength validation → acceptance of terms and conditions
+2️⃣ Sign In (SignIn): Email/password login → social login (GitHub, Google) → optional two-factor authentication (2FA)
+3️⃣ Password Reset (ResetPasswordPage): Email sent → click the link within 15 minutes → enter the new password twice → password strength validation
 
-                    - **가입 혜택 및 절차**:
-                      1️⃣ 첫 가입 시 100P 지급 + 데일리 미션 2배 포인트(첫 7일)
-                      2️⃣ 이메일 인증 완료 시 추가 50P
-                      3️⃣ GitHub 연동 완료 시 코드 분석 3회 무료 제공
+Security Guidelines:
+• Password Requirements: At least 8 characters, including at least three of the following—uppercase letters, lowercase letters, numbers, and special characters
+• Automatic Logout: After 30 minutes of inactivity, with re-authentication required for sensitive pages
+
+Sign-Up Benefits and Process:
+1️⃣ 100 points awarded upon first registration + double points for daily missions during the first 7 days
+2️⃣ An additional 50 points after completing email verification
+3️⃣ Three free AI code analyses granted upon successful GitHub account linking

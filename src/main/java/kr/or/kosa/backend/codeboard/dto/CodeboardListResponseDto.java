@@ -6,6 +6,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Getter
 @NoArgsConstructor
@@ -23,6 +24,6 @@ public class CodeboardListResponseDto {
     private Integer likeCount;
     private Integer commentCount;
     private LocalDateTime codeboardCreatedAt;
-    private String codeboardTag;
+    private List<String> tags;
     private Integer aiScore; // 냄새 태그
 }

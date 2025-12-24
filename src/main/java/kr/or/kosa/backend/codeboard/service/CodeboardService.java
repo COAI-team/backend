@@ -20,7 +20,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -46,9 +49,42 @@ public class CodeboardService {
         List<CodeboardListResponseDto> boards =
                 mapper.findPosts(pageRequest, searchCondition, sortCondition);
 
+        // 게시글 ID 목록 추출
+        List<Long> boardIds = boards.stream()
+                .map(CodeboardListResponseDto::getCodeboardId)
+                .collect(Collectors.toList());
+
+        // 태그 일괄 조회 (N+1 방지)
+        List<CodeboardListResponseDto> boardsWithTags = boards;
+        if (!boardIds.isEmpty()) {
+            Map<Long, List<String>> tagsMap = tagService.getCodeboardTagsMap(boardIds);
+
+            // 불변 객체 유지하면서 태그 추가된 새 객체 생성
+            boardsWithTags = boards.stream()
+                    .map(board -> {
+                        List<String> tags = tagsMap.getOrDefault(board.getCodeboardId(), new ArrayList<>());
+                        return CodeboardListResponseDto.builder()
+                                .codeboardId(board.getCodeboardId())
+                                .userId(board.getUserId())
+                                .userNickname(board.getUserNickname())
+                                .userImage(board.getUserImage())
+                                .analysisId(board.getAnalysisId())
+                                .codeboardTitle(board.getCodeboardTitle())
+                                .codeboardSummary(board.getCodeboardSummary())
+                                .codeboardClick(board.getCodeboardClick())
+                                .codeboardCreatedAt(board.getCodeboardCreatedAt())
+                                .likeCount(board.getLikeCount())
+                                .commentCount(board.getCommentCount())
+                                .aiScore(board.getAiScore())
+                                .tags(tags)
+                                .build();
+                    })
+                    .collect(Collectors.toList());
+        }
+
         long totalCount = mapper.countPosts(searchCondition);
 
-        return new PageResponse<>(boards, pageRequest, totalCount);
+        return new PageResponse<>(boardsWithTags, pageRequest, totalCount);
     }
 
     @Transactional
@@ -95,9 +131,6 @@ public class CodeboardService {
         if (codeboard == null) {
             throw new CustomBusinessException(CodeboardErrorCode.NOT_FOUND);
         }
-
-        log.info("조회된 좋아요 수: {}", codeboard.getLikeCount());
-        log.info("사용자 {}의 좋아요 여부: {}", userId, codeboard.getIsLiked());
 
         List<String> tags = tagService.getCodeboardTags(id);
 

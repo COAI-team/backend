@@ -28,22 +28,22 @@ public class S3Uploader {
 
         // 파일명 생성
         String timestamp = LocalDateTime.now()
-                .format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"));
+            .format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"));
         String original = file.getOriginalFilename();
         String key = folder + "/" + timestamp + "_" + original;
 
         // 업로드 요청 생성
         PutObjectRequest putObjectRequest = PutObjectRequest.builder()
-                .bucket(bucketName)
-                .key(key)
-                .contentType(file.getContentType())
-                .acl("public-read")
-                .build();
+            .bucket(bucketName)
+            .key(key)
+            .contentType(file.getContentType())
+            .acl("public-read")
+            .build();
 
         // S3 업로드 실행
         s3Client.putObject(
-                putObjectRequest,
-                RequestBody.fromInputStream(file.getInputStream(), file.getSize())
+            putObjectRequest,
+            RequestBody.fromInputStream(file.getInputStream(), file.getSize())
         );
 
         return getFileUrl(key);

@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.Comparator;
+import java.util.List;
 
 @Slf4j
 @Service
@@ -18,8 +19,11 @@ public class SubscriptionTierResolverImpl implements SubscriptionTierResolver {
 
     @Override
     public SubscriptionTier resolveTier(String userId) {
+        log.debug("🔍 Resolving subscription tier for userId={}", userId);
+
         Long userIdLong = parseUserId(userId);
         if (userIdLong == null) {
+            log.warn("❌ Invalid userId format: {}", userId);
             return SubscriptionTier.FREE;
         }
 
@@ -30,13 +34,14 @@ public class SubscriptionTierResolverImpl implements SubscriptionTierResolver {
                     .stream()
                     .filter(subscription -> subscription != null && isWithinActivePeriod(subscription, now))
                     .sorted(Comparator.comparing(
-                            (Subscription subscription) -> subscription.getEndDate(),
-                            Comparator.nullsLast(Comparator.naturalOrder()))
+                                    Subscription::getEndDate,
+                                    Comparator.nullsLast(Comparator.naturalOrder()))
                             .reversed())
                     .map(subscription -> SubscriptionTier.fromPlanCode(subscription.getSubscriptionType()))
                     .reduce(SubscriptionTier.FREE, this::preferHigherTier);
+
         } catch (Exception e) {
-            log.warn("Failed to resolve subscription tier for userId={}", userId, e);
+            log.error("❌ Failed to resolve subscription tier for userId={}", userId, e);
             return SubscriptionTier.FREE;
         }
     }
