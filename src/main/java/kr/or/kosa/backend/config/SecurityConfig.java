@@ -65,7 +65,7 @@ public class SecurityConfig {
                                 "/analysis/**",
                                 "/battle/**",
                                 "/algo/**"
-                                "/api/**",
+                                "/api/**"
 //                            "/payments/**",
 //                            "/redis/**"
                         ).permitAll()
