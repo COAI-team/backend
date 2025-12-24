@@ -16,7 +16,7 @@ public class S3ImageService {
 
     // 확장자 검증
     private final List<String> IMAGE_TYPES = List.of(
-            "image/png", "image/jpeg", "image/jpg", "image/webp", "image/gif"
+        "image/png", "image/jpeg", "image/jpg", "image/webp", "image/gif"
     );
 
     public String uploadImage(MultipartFile file) throws IOException {

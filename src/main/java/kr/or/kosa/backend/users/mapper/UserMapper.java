@@ -130,4 +130,8 @@ public interface UserMapper {
          * MCP 토큰으로 사용자 조회
          */
         Users findByMcpToken(@Param("mcpToken") String mcpToken);
+
+        List<Users> findByIds(@Param("userIds") List<Long> userIds);
+        List<Users> findNicknamesByIds(@Param("userIds") List<Long> userIds);
 }
+
