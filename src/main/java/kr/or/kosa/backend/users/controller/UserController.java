@@ -2,6 +2,7 @@ package kr.or.kosa.backend.users.controller;
 
 import jakarta.validation.Valid;
 import kr.or.kosa.backend.auth.github.dto.GitHubUserResponse;
+import kr.or.kosa.backend.auth.github.dto.GithubLinkRequest;
 import kr.or.kosa.backend.security.jwt.JwtUserDetails;
 import kr.or.kosa.backend.users.dto.*;
 import kr.or.kosa.backend.users.service.UserService;
@@ -181,12 +182,17 @@ public class UserController {
     @PostMapping("/github/link")
     public ResponseEntity<MessageResponse> linkGithub(
             @AuthenticationPrincipal JwtUserDetails user,
-            @RequestBody GitHubUserResponse gitHubUser
+            @RequestBody GithubLinkRequest request
     ) {
-        boolean result = userService.linkGithubAccount(user.id(), gitHubUser);
-        return ResponseEntity.ok(MessageResponse.builder()
-                .success(result)
-                .message(result ? "GitHub 계정이 연동되었습니다." : "GitHub 연동에 실패했습니다.")
-                .build());
+        boolean result = userService.linkGithubAccount(user.id(), request);
+
+        return ResponseEntity.ok(
+                MessageResponse.builder()
+                        .success(result)
+                        .message(result
+                                ? "GitHub 계정이 연동되었습니다."
+                                : "GitHub 연동에 실패했습니다.")
+                        .build()
+        );
     }
 }
