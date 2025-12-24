@@ -11,6 +11,7 @@ import kr.or.kosa.backend.algorithm.dto.response.TestRunResponseDto;
 import kr.or.kosa.backend.algorithm.dto.enums.AiFeedbackStatus;
 import kr.or.kosa.backend.algorithm.mapper.AlgorithmSubmissionMapper;
 
+import kr.or.kosa.backend.commons.redis.RedisService;
 import lombok.*;
 import lombok.extern.slf4j.Slf4j;
 
@@ -30,6 +31,7 @@ public class AlgorithmEvaluationService {
     private final ScoreCalculator scoreCalculator;
     private final AlgorithmSubmissionMapper submissionMapper;
     private final LanguageService languageService;  // 언어 정보 조회 (languageId → languageName)
+    private final RedisService redisService;
 
     /**
      * AI 평가 및 점수 계산 처리 (비동기 진입점)
@@ -116,6 +118,9 @@ public class AlgorithmEvaluationService {
                 .build();
 
         ScoreCalculationResult score = scoreCalculator.calculateFinalScore(params);
+
+            //redisService.setAlgoRank(userId, problem.getAlgoProblemDifficulty().getDisplayName(), submission.getFinalScore().doubleValue());
+
 
         // 5. 제출 정보 업데이트
         applyEvaluation(submission, aiResult, score);
