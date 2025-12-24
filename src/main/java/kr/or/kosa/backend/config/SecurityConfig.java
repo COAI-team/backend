@@ -49,6 +49,8 @@ public class SecurityConfig {
                                 "/api/**",
                                 "/ws/**",
                                 "/chat/messages"
+//                            "/payments/**",
+//                            "/redis/**"
                         ).permitAll()
                         .requestMatchers(HttpMethod.GET,
                                 "/freeboard/**",
@@ -60,7 +62,10 @@ public class SecurityConfig {
                                 "/like/**",
                                 "/analysis/**",
                                 "/battle/**",
-                                "/algo/**"         
+                                "/algo/**"
+//                            "/api/**",
+//                            "/payments/**",
+//                            "/redis/**"
                         ).permitAll()
                         .requestMatchers("/battle/**").authenticated()
                         .requestMatchers("/api/mcp/token").authenticated()

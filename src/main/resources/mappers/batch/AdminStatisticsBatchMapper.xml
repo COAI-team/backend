@@ -3,6 +3,7 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
 <mapper namespace="kr.or.kosa.backend.batch.mapper.AdminStatisticsBatchMapper">
+<!--    전날의 데이터 =>  총유저 수, 가입자 수, 총 매출, 그날 매출, 생성된 각각의 게시판 수 -->
     <insert id="insertDailyStats">
         <![CDATA[
         INSERT INTO ADMIN_DAILY_STATS (
@@ -10,35 +11,90 @@
             total_user_count,
             new_user_count,
             payment_count,
-            revenue
+            revenue,
+            free_board_post_count,
+            code_board_post_count,
+            algo_board_post_count,
+            total_board_post_count
         )
         SELECT
             #{targetDate},
+
+            /* 전체 회원 수 */
             (SELECT COUNT(*)
              FROM USERS
              WHERE USER_ROLE = 'ROLE_USER'
-             AND USER_DELETEDAT IS NULL),
+               AND USER_DELETEDAT IS NULL),
 
+            /* 신규 회원 수 */
             (SELECT COUNT(*)
              FROM USERS
              WHERE USER_ROLE = 'ROLE_USER'
-             AND USER_DELETEDAT IS NULL
-             AND USER_CREATEDAT >= #{targetDate}
-             AND USER_CREATEDAT < DATE_ADD(#{targetDate}, INTERVAL 1 DAY)),
+               AND USER_DELETEDAT IS NULL
+               AND USER_CREATEDAT >= #{targetDate}
+               AND USER_CREATEDAT < DATE_ADD(#{targetDate}, INTERVAL 1 DAY)),
 
+            /* 결제 건수 */
             (SELECT COUNT(*)
              FROM PAYMENTS
              WHERE STATUS = 'DONE'
-             AND APPROVED_AT >= #{targetDate}
-             AND APPROVED_AT < DATE_ADD(#{targetDate}, INTERVAL 1 DAY)),
+               AND APPROVED_AT >= #{targetDate}
+               AND APPROVED_AT < DATE_ADD(#{targetDate}, INTERVAL 1 DAY)),
 
+            /* 매출 */
             (SELECT IFNULL(SUM(amount), 0)
              FROM PAYMENTS
              WHERE STATUS = 'DONE'
-             AND APPROVED_AT >= #{targetDate}
-             AND APPROVED_AT < DATE_ADD(#{targetDate}, INTERVAL 1 DAY))
+               AND APPROVED_AT >= #{targetDate}
+               AND APPROVED_AT < DATE_ADD(#{targetDate}, INTERVAL 1 DAY)),
+
+            /* 자유 게시판 */
+            (SELECT COUNT(*)
+             FROM FREE_BOARD
+             WHERE CREATED_AT >= #{targetDate}
+               AND CREATED_AT < DATE_ADD(#{targetDate}, INTERVAL 1 DAY)
+               AND DELETED_YN = 'N'),
+
+            /* 코드 게시판 */
+            (SELECT COUNT(*)
+             FROM CODEBOARD
+             WHERE CODEBOARD_CREATED_AT >= #{targetDate}
+               AND CODEBOARD_CREATED_AT < DATE_ADD(#{targetDate}, INTERVAL 1 DAY)
+               AND CODEBOARD_DELETED_YN = 'N'),
+
+            /* 알고리즘 게시판 */
+            (SELECT COUNT(*)
+             FROM ALGO_BOARD
+             WHERE CREATED_AT >= #{targetDate}
+               AND CREATED_AT < DATE_ADD(#{targetDate}, INTERVAL 1 DAY)),
+
+            /* 전체 게시글 수 */
+            (
+                (SELECT COUNT(*) FROM FREE_BOARD
+                 WHERE CREATED_AT >= #{targetDate}
+                   AND CREATED_AT < DATE_ADD(#{targetDate}, INTERVAL 1 DAY)
+                   AND DELETED_YN = 'N')
+              + (SELECT COUNT(*) FROM CODEBOARD
+                 WHERE CODEBOARD_CREATED_AT >= #{targetDate}
+                   AND CODEBOARD_CREATED_AT < DATE_ADD(#{targetDate}, INTERVAL 1 DAY)
+                   AND CODEBOARD_DELETED_YN = 'N')
+              + (SELECT COUNT(*) FROM ALGO_BOARD
+                 WHERE CREATED_AT >= #{targetDate}
+                   AND CREATED_AT < DATE_ADD(#{targetDate}, INTERVAL 1 DAY))
+            )
+
+        ON DUPLICATE KEY UPDATE
+            total_user_count = VALUES(total_user_count),
+            new_user_count = VALUES(new_user_count),
+            payment_count = VALUES(payment_count),
+            revenue = VALUES(revenue),
+            free_board_post_count = VALUES(free_board_post_count),
+            code_board_post_count = VALUES(code_board_post_count),
+            algo_board_post_count = VALUES(algo_board_post_count),
+            total_board_post_count = VALUES(total_board_post_count);
         ]]>
     </insert>
+
 
     <select id="exists" resultType="int">
         SELECT COUNT(*)

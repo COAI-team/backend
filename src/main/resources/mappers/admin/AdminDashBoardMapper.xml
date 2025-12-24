@@ -96,12 +96,15 @@
         total_user_count,
         new_user_count,
         payment_count,
-        revenue
+        revenue,
+        free_board_post_count,
+        code_board_post_count,
+        algo_board_post_count,
+        total_board_post_count
         FROM ADMIN_DAILY_STATS
         WHERE stat_date BETWEEN #{startDate} AND #{endDate}
         ORDER BY stat_date
     </select>
-
 
 
 <!--    최근 한건 -->
@@ -112,7 +115,11 @@
         total_user_count,
         new_user_count,
         payment_count,
-        revenue
+        revenue,
+        free_board_post_count,
+        code_board_post_count,
+        algo_board_post_count,
+        total_board_post_count
         FROM ADMIN_DAILY_STATS
         ORDER BY stat_date DESC
         LIMIT 1
