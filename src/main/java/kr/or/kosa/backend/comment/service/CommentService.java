@@ -130,7 +130,7 @@ public class CommentService {
                 .content(savedComment.getContent())
                 .likeCount(savedComment.getLikeCount())
                 .isLiked(false)
-                .isAuthor(savedComment.getUserId().equals(boardAuthorId))
+                .isAuthor(savedComment.getUserId() != null && boardAuthorId != null && savedComment.getUserId().equals(boardAuthorId))
                 .isDeleted(savedComment.getIsDeleted())
                 .createdAt(savedComment.getCreatedAt())
                 .updatedAt(savedComment.getUpdatedAt())
