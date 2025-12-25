@@ -187,7 +187,9 @@ public class UserController {
             @AuthenticationPrincipal JwtUserDetails user,
             @RequestBody GithubLinkRequest request
     ) {
-        boolean result = userService.linkGithubAccount(user.id(), request);
+        System.out.println("깃 허브 링크 컨트롤러 111  ====>> "  + user.getUsername()+ "=====" + user.getDetails().id() + "====="+ user.getDetails().toString());
+        System.out.println("깃 허브 링크 컨트롤러 2222  ====>> "  + request.getEmail()+ "=====" + request.getEmail());
+        boolean result = userService.linkGithubAccount(user.getDetails().id(), request);
         return ResponseEntity.ok(MessageResponse.builder()
                 .success(result)
                 .message(result ? "GitHub 계정이 연동되었습니다." : "GitHub 연동에 실패했습니다.")
