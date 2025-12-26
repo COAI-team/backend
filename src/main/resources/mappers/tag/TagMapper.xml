@@ -5,14 +5,16 @@
 
 <mapper namespace="kr.or.kosa.backend.tag.mapper.TagMapper">
 
-    <!-- 태그명으로 조회 (대소문자 구분 없음) -->
-    <select id="findByTagName" resultType="kr.or.kosa.backend.tag.domain.Tag">
+    <!-- 태그명으로 조회 (대소문자 구분 없음, 캐시 비활성화) -->
+    <select id="findByTagName"
+            resultType="kr.or.kosa.backend.tag.domain.Tag"
+            useCache="false"
+            flushCache="true">
         SELECT TAG_ID, TAG_NAME
         FROM TAG
         WHERE LOWER(TAG_NAME) = LOWER(#{tagName})
         LIMIT 1
     </select>
-
     <!-- 태그 저장 -->
     <insert id="insertTag" useGeneratedKeys="true" keyProperty="tagId">
         INSERT INTO TAG (TAG_NAME)
