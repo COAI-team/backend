@@ -14,7 +14,8 @@ public interface TagMapper {
     @Options(useCache = false, flushCache = Options.FlushCachePolicy.TRUE)
     Optional<Tag> findByTagName(@Param("tagName") String tagName);
 
-    int insertTag(Tag tag);
+    // int insertTag(Tag tag);
+    void upsertTag(Tag tag);
 
     int deleteTag(@Param("tagId") Long tagId);
 
