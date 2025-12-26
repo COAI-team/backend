@@ -83,20 +83,44 @@ public class TagService {
     @Transactional
     public void attachTagsToFreeboard(Long freeboardId, List<String> tagInputs) {
         if (tagInputs == null || tagInputs.isEmpty()) {
+            log.info(">>> attachTagsToFreeboard: 태그 입력이 없음");
             return;
         }
 
-        for (String tagInput : tagInputs) {
-            Tag tag = getOrCreateTag(tagInput.trim());
+        log.info(">>> attachTagsToFreeboard 시작: freeboardId={}, tagInputs={}", freeboardId, tagInputs);
 
-            FreeboardTag freeboardTag = FreeboardTag.builder()
-                    .freeboardId(freeboardId)
-                    .tagId(tag.getTagId())
-                    .tagDisplayName(tagInput.trim())
-                    .build();
+        for (int i = 0; i < tagInputs.size(); i++) {
+            String tagInput = tagInputs.get(i);
+            log.info(">>> [{}/{}] 태그 처리 시작: '{}'", i+1, tagInputs.size(), tagInput);
 
-            int result = freeboardTagMapper.insert(freeboardTag);
-            if (result == 0) {
+            try {
+                Tag tag = getOrCreateTag(tagInput.trim());
+                log.info(">>> 태그 생성/조회 완료: tagId={}, tagName={}", tag.getTagId(), tag.getTagName());
+
+                FreeboardTag freeboardTag = FreeboardTag.builder()
+                        .freeboardId(freeboardId)
+                        .tagId(tag.getTagId())
+                        .tagDisplayName(tagInput.trim())
+                        .build();
+
+                log.info(">>> FreeboardTag insert 시도: {}", freeboardTag);
+
+                int result = freeboardTagMapper.insert(freeboardTag);
+                log.info(">>> insert 결과: result={}", result);
+
+                if (result == 0) {
+                    log.error(">>> insert 실패: result=0, freeboardTag={}", freeboardTag);
+                    throw new CustomBusinessException(TagErrorCode.TAG_SAVE_FAILED);
+                }
+
+                log.info(">>> [{}/{}] 태그 처리 완료", i+1, tagInputs.size());
+            } catch (CustomBusinessException e) {
+                log.error(">>> [{}/{}] CustomBusinessException 발생: tagInput='{}', errorCode={}",
+                        i+1, tagInputs.size(), tagInput, e.getErrorCode(), e);
+                throw e;
+            } catch (Exception e) {
+                log.error(">>> [{}/{}] Exception 발생: tagInput='{}'",
+                        i+1, tagInputs.size(), tagInput, e);
                 throw new CustomBusinessException(TagErrorCode.TAG_SAVE_FAILED);
             }
         }
@@ -195,11 +219,27 @@ public class TagService {
 
     @Transactional
     public void updateFreeboardTags(Long freeboardId, List<String> tagInputs) {
-        freeboardTagMapper.deleteByFreeboardId(freeboardId);
+        log.info(">>> updateFreeboardTags 시작: freeboardId={}, tagInputs={}", freeboardId, tagInputs);
+
+        try {
+            int deleteCount = freeboardTagMapper.deleteByFreeboardId(freeboardId);
+            log.info(">>> 기존 태그 삭제 완료: freeboardId={}, 삭제된 개수={}", freeboardId, deleteCount);
+        } catch (Exception e) {
+            log.error(">>> 태그 삭제 실패: freeboardId={}", freeboardId, e);
+            throw e;
+        }
 
         if (tagInputs != null && !tagInputs.isEmpty()) {
-            attachTagsToFreeboard(freeboardId, tagInputs);
+            try {
+                attachTagsToFreeboard(freeboardId, tagInputs);
+                log.info(">>> 새 태그 저장 완료: freeboardId={}", freeboardId);
+            } catch (Exception e) {
+                log.error(">>> 태그 저장 실패: freeboardId={}", freeboardId, e);
+                throw e;
+            }
         }
+
+        log.info(">>> updateFreeboardTags 완료: freeboardId={}", freeboardId);
     }
 
     public List<TagAutocompleteDto> searchTagsForAutocomplete(String keyword, int limit) {
