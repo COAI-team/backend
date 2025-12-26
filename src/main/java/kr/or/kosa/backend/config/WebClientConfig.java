@@ -1,8 +1,13 @@
 package kr.or.kosa.backend.config;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.boot.web.reactive.function.client.WebClientCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.codec.json.Jackson2JsonDecoder;
+import org.springframework.http.codec.json.Jackson2JsonEncoder;
 import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
 
@@ -10,19 +15,34 @@ import org.springframework.web.reactive.function.client.WebClient;
 public class WebClientConfig {
 
     @Bean
-    public WebClient webClient() {
+    public WebClient webClient(ObjectMapper objectMapper) {
+        ExchangeStrategies strategies = ExchangeStrategies.builder()
+                .codecs(configurer -> {
+                    configurer.defaultCodecs().maxInMemorySize(16 * 1024 * 1024);
+                    configurer.defaultCodecs().jackson2JsonDecoder(new Jackson2JsonDecoder(objectMapper));
+                    configurer.defaultCodecs().jackson2JsonEncoder(new Jackson2JsonEncoder(objectMapper));
+                })
+                .build();
 
         return WebClient.builder()
-                // 기본 헤더 설정 (GitHub API 필수)
                 .defaultHeader(HttpHeaders.ACCEPT, "application/vnd.github+json")
-                .defaultHeader(HttpHeaders.USER_AGENT, "kosa-backend") // GitHub 필수
-                // 응답 버퍼 크기 증가 (GitHub 일부 응답이 클 경우 대비)
-                .exchangeStrategies(ExchangeStrategies.builder()
-                        .codecs(configurer ->
-                                configurer.defaultCodecs().maxInMemorySize(16 * 1024 * 1024)
-                        )
-                        .build()
-                )
+                .defaultHeader(HttpHeaders.USER_AGENT, "kosa-backend")
+                .exchangeStrategies(strategies)
                 .build();
+    }
+
+    // WebClient.Builder에도 동일한 설정 적용
+    @Bean
+    public WebClientCustomizer webClientCustomizer(ObjectMapper objectMapper) {
+        return webClientBuilder -> {
+            ExchangeStrategies strategies = ExchangeStrategies.builder()
+                    .codecs(configurer -> {
+                        configurer.defaultCodecs().maxInMemorySize(16 * 1024 * 1024);
+                        configurer.defaultCodecs().jackson2JsonDecoder(new Jackson2JsonDecoder(objectMapper));
+                        configurer.defaultCodecs().jackson2JsonEncoder(new Jackson2JsonEncoder(objectMapper));
+                    })
+                    .build();
+            webClientBuilder.exchangeStrategies(strategies);
+        };
     }
 }
