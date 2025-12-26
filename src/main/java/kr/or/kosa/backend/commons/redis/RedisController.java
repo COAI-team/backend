@@ -14,7 +14,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/redis")
 @RequiredArgsConstructor
-public class RedisTestController {
+public class RedisController {
 
     private final RedisService redisService;
 
@@ -36,6 +36,6 @@ public class RedisTestController {
         System.out.println("🔑 Redis Key = " + key);
 
         // 2️⃣ 상위 5명 조회
-        return redisService.getTop5(problemDifficulty);
+        return redisService.getTodayTop5();
     }
 }

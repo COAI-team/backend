@@ -45,4 +45,13 @@
         WHERE user_id = #{userId}
     </update>
 
+
+    <update id="disableOtp">
+        UPDATE admin_otp
+        SET otp_enabled = 0,
+        enabled_at = NULL
+        WHERE user_id = #{userId}
+    </update>
+
+
 </mapper>

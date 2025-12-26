@@ -119,7 +119,7 @@ public class AlgorithmEvaluationService {
 
         ScoreCalculationResult score = scoreCalculator.calculateFinalScore(params);
 
-            //redisService.setAlgoRank(userId, problem.getAlgoProblemDifficulty().getDisplayName(), submission.getFinalScore().doubleValue());
+        redisService.setAlgoRank(submission.getUserId(), problem.getAlgoProblemDifficulty().getDisplayName(), submission.getFinalScore().doubleValue());
 
 
         // 5. 제출 정보 업데이트

@@ -98,5 +98,42 @@ public class AdminOtpService {
         AdminOtpDto otp = adminOtpMapper.findByUserId(userId);
         return otp != null && otp.isOtpEnabled();
     }
+
+
+    @Transactional
+    public String resetOtp(Long userId) {
+
+        AdminOtpDto existing = adminOtpMapper.findByUserId(userId);
+
+        if (existing == null) {
+            throw new CustomBusinessException(
+                GoogleOTPErrorCode.OTP_NOT_REGISTERED
+            );
+        }
+
+        // 기존 OTP 비활성화
+        adminOtpMapper.disableOtp(userId);
+
+        String secret;
+        try {
+            secret = gAuth.createCredentials().getKey();
+        } catch (Exception e) {
+            throw new CustomBusinessException(
+                GoogleOTPErrorCode.OTP_GENERATION_FAILED
+            );
+        }
+
+        adminOtpMapper.upsert(
+            AdminOtpDto.builder()
+                .userId(userId)
+                .otpSecret(secret)
+                .otpEnabled(false)
+                .build()
+        );
+
+        return secret;
+    }
+
+
 }
 
