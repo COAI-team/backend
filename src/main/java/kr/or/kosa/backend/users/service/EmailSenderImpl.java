@@ -25,15 +25,21 @@ public class EmailSenderImpl implements EmailSender {
             return false;
         }
         try {
+            System.out.println("sending email to: " + to);
+            System.out.println("sending subject to: " + subject);
+            System.out.println("sending text to: " + text);
             SimpleMailMessage message = new SimpleMailMessage(baseMessage);
+            System.out.println("message to: " + message.toString());
             message.setTo(to);
             message.setSubject(subject);
             message.setText(text);
-
+            System.out.println("=====11111=" );
             mailSender.send(message);
+            System.out.println("=====2222222222=" );
 
             return true; // 성공
         } catch (Exception e) {
+            System.out.println("sending email to: " + e.toString());
             log.error("Failed to send email to {}: {}", to, e.getMessage());
             return false; // 실패
         }

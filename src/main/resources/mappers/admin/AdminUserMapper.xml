@@ -108,22 +108,29 @@
         u.USER_CREATEDAT,
         u.USER_DELETEDAT,
         up.balance,
-        MAX(s.start_date) AS start_date,
-        MAX(s.end_date) AS end_date,
+        s.start_date,
+        s.end_date,
         CASE
-        WHEN MAX(s.end_date) > NOW() THEN 'ACTIVE'
-        WHEN MAX(s.end_date) IS NULL THEN 'NONE'
+        WHEN s.end_date > NOW() THEN 'ACTIVE'
+        WHEN s.end_date IS NULL THEN 'NONE'
         ELSE 'EXPIRED'
         END AS subscription_status,
         s.subscription_type
         FROM USERS u
-        LEFT JOIN user_points up ON up.user_id = u.USER_ID
-        LEFT JOIN subscriptions s ON s.user_id = u.USER_ID AND s.status = 'ACTIVE'
-        WHERE u.USER_ID = #{userId}
-        GROUP BY
-        u.USER_ID, u.USER_EMAIL, u.USER_NAME, u.USER_NICKNAME,
-        u.USER_ROLE, u.USER_GRADE, u.USER_CREATEDAT, u.USER_DELETEDAT, up.balance;
-
+        LEFT JOIN user_points up
+        ON up.user_id = u.USER_ID
+        LEFT JOIN subscriptions s
+        ON s.user_id = u.USER_ID
+        AND s.status = 'ACTIVE'
+        AND s.subscription_id = (
+        SELECT s2.subscription_id
+        FROM subscriptions s2
+        WHERE s2.user_id = u.USER_ID
+        AND s2.status = 'ACTIVE'
+        ORDER BY s2.end_date DESC
+        LIMIT 1
+        )
+        WHERE u.USER_ID = #{userId};
     </select>
 
 

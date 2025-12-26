@@ -18,41 +18,73 @@ import java.util.stream.Collectors;
 @Slf4j
 public class RedisService {
 
-    private final RedisTemplate<String, Object> redisTemplate; // ✅ 제네릭 고정
+    private final RedisTemplate<String, Object> redisTemplate;
     private final UserMapper userMapper;
 
     private static final int TOP_N = 5;
     private static final Duration RANK_TTL = Duration.ofDays(2);
 
-    /** ✅ 키 생성 (한군데서만 만들기) */
-    private String buildRankKey(LocalDate date, String difficulty) {
-        return String.format("algo:rank:%s:%s", date, difficulty.trim().toUpperCase());
+    /* =====================================================
+     * 🔑 Key 생성 메서드
+     * ===================================================== */
+
+    /** 난이도별 랭킹 키 */
+    private String buildDifficultyRankKey(LocalDate date, String difficulty) {
+        return String.format(
+            "algo:rank:%s:%s",
+            date,
+            difficulty.trim().toUpperCase()
+        );
     }
 
-    /** ✅ 랭킹 저장 (ZSET) : member=userId, score=finalScore */
+    /** ⭐ 날짜별 전체 랭킹 Master 키 */
+    private String buildDailyRankKey(LocalDate date) {
+        return String.format("algo:rank:%s", date);
+    }
+
+    /* =====================================================
+     * 🏆 랭킹 저장
+     * ===================================================== */
+
+    /**
+     * 랭킹 저장
+     * - 난이도별 ZSET
+     * - 날짜별 전체 ZSET (Master)
+     */
     public void setAlgoRank(long userId, String problemDifficulty, double finalScore) {
-        String key = buildRankKey(LocalDate.now(), problemDifficulty);
+        LocalDate today = LocalDate.now();
 
-        redisTemplate.opsForZSet().add(key, String.valueOf(userId), finalScore);
-        redisTemplate.expire(key, RANK_TTL);
+        String difficultyKey = buildDifficultyRankKey(today, problemDifficulty);
+        String dailyKey = buildDailyRankKey(today);
 
-        log.info("✅ ZSET ADD key={}, member={}, score={}", key, userId, finalScore);
+        // 난이도별 랭킹
+        redisTemplate.opsForZSet()
+            .add(difficultyKey, String.valueOf(userId), finalScore);
+        redisTemplate.expire(difficultyKey, RANK_TTL);
+
+        // ⭐ 전체 랭킹 (Master)
+        redisTemplate.opsForZSet()
+            .add(dailyKey, String.valueOf(userId), finalScore);
+        redisTemplate.expire(dailyKey, RANK_TTL);
+
+        log.info(
+            "✅ REDIS RANK ADD | difficultyKey={} | dailyKey={} | userId={} | score={}",
+            difficultyKey, dailyKey, userId, finalScore
+        );
     }
 
-    /** ✅ 상위 N명 조회 */
-    public List<AlgoRankDto> getTopN(String difficulty, int limit) {
-        String key = buildRankKey(LocalDate.now(), difficulty);
+    /* =====================================================
+     * 📊 랭킹 조회 (공통)
+     * ===================================================== */
 
-        Set<ZSetOperations.TypedTuple<Object>> tuples =
-            redisTemplate.opsForZSet().reverseRangeWithScores(key, 0, limit - 1);
-
-        // ✅ null/empty 먼저 처리
+    private List<AlgoRankDto> buildRankResult(
+        Set<ZSetOperations.TypedTuple<Object>> tuples
+    ) {
         if (tuples == null || tuples.isEmpty()) {
-            log.info("⚠️ ZSET EMPTY key={}", key);
             return List.of();
         }
 
-        // ✅ userIds 추출 (null 안전)
+        // userId 추출
         List<Long> userIds = tuples.stream()
             .map(ZSetOperations.TypedTuple::getValue)
             .filter(Objects::nonNull)
@@ -64,30 +96,31 @@ public class RedisService {
             return List.of();
         }
 
-        // ✅ DB에서 닉네임 조회 (null 안전 + Map 변환)
-        Map<Long, String> nicknameMap = userMapper.findNicknamesByIds(userIds).stream()
-            .filter(Objects::nonNull)
-            .collect(Collectors.toMap(
-                Users::getUserId,
-                Users::getUserNickname,
-                (a, b) -> a // 중복 키 방지
-            ));
+        // DB에서 닉네임 조회
+        Map<Long, String> nicknameMap =
+            userMapper.findNicknamesByIds(userIds).stream()
+                .filter(Objects::nonNull)
+                .collect(Collectors.toMap(
+                    Users::getUserId,
+                    Users::getUserNickname,
+                    (a, b) -> a
+                ));
 
-        // ✅ rank까지 포함해서 반환 (Unknown 방지)
+        // rank 포함 결과 생성
         int rank = 0;
         List<AlgoRankDto> result = new ArrayList<>();
 
         for (ZSetOperations.TypedTuple<Object> t : tuples) {
             if (t.getValue() == null) continue;
 
-            long uid = Long.parseLong(t.getValue().toString());
-            double score = (t.getScore() == null) ? 0.0 : t.getScore();
-
             rank++;
+            long userId = Long.parseLong(t.getValue().toString());
+            double score = t.getScore() == null ? 0.0 : t.getScore();
+
             result.add(new AlgoRankDto(
                 rank,
-                uid,
-                nicknameMap.getOrDefault(uid, "Unknown"),
+                userId,
+                nicknameMap.getOrDefault(userId, "Unknown"),
                 score
             ));
         }
@@ -95,8 +128,43 @@ public class RedisService {
         return result;
     }
 
-    /** ✅ 상위 5명 */
-    public List<AlgoRankDto> getTop5(String difficulty) {
-        return getTopN(difficulty, TOP_N);
+    /* =====================================================
+     * 🥇 난이도별 랭킹 조회
+     * ===================================================== */
+
+    public List<AlgoRankDto> getTopNByDifficulty(String difficulty, int limit) {
+        String key = buildDifficultyRankKey(LocalDate.now(), difficulty);
+
+        Set<ZSetOperations.TypedTuple<Object>> tuples =
+            redisTemplate.opsForZSet()
+                .reverseRangeWithScores(key, 0, limit - 1);
+
+        log.info("📊 REDIS RANK FETCH | key={}", key);
+
+        return buildRankResult(tuples);
+    }
+
+    public List<AlgoRankDto> getTop5ByDifficulty(String difficulty) {
+        return getTopNByDifficulty(difficulty, TOP_N);
+    }
+
+    /* =====================================================
+     * ⭐ 오늘 전체 랭킹 조회 (Master)
+     * ===================================================== */
+
+    public List<AlgoRankDto> getTodayTopN(int limit) {
+        String key = buildDailyRankKey(LocalDate.now());
+
+        Set<ZSetOperations.TypedTuple<Object>> tuples =
+            redisTemplate.opsForZSet()
+                .reverseRangeWithScores(key, 0, limit - 1);
+
+        log.info("📊 REDIS DAILY RANK FETCH | key={}", key);
+
+        return buildRankResult(tuples);
+    }
+
+    public List<AlgoRankDto> getTodayTop5() {
+        return getTodayTopN(TOP_N);
     }
 }

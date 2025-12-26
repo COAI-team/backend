@@ -12,4 +12,6 @@ public interface AdminOtpMapper {
     int updateSecret(AdminOtpDto adminOtp);
 
     int enableOtp(Long userId);
+    void disableOtp(Long userId);
+
 }

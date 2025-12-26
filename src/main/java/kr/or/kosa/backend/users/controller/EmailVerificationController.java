@@ -33,6 +33,7 @@ public class EmailVerificationController {
     public ResponseEntity<EmailResponse> sendEmail(@RequestParam String email) {
         try {
             long expireAt = emailVerificationService.sendVerificationEmail(email);
+            System.out.println("expireAt = " + expireAt);
             return ResponseEntity.ok(EmailResponse.builder()
                     .success(true)
                     .message("인증 이메일을 보냈습니다.")

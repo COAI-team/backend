@@ -40,8 +40,10 @@ public class EmailVerificationServiceImpl implements EmailVerificationService {
 
         String subject = "회원가입 이메일 인증코드";
         String text = "인증 코드: " + code + "\n5분 안에 입력해주세요.";
-
+        System.out.println("subject = " + subject);
+        System.out.println("text = " + text);
         boolean sent = send(email, subject, text);
+        System.out.println("sent = " + sent);
 
         return sent ? System.currentTimeMillis() + (EXPIRATION_SECONDS * 1000) : -1;
     }
@@ -80,6 +82,7 @@ public class EmailVerificationServiceImpl implements EmailVerificationService {
     @Override
     public boolean send(String to, String subject, String text) {
         boolean sent = emailSender.sendEmail(to, subject, text);
+        System.out.println("sent = " + sent);
         if (!sent) {
             log.error("Email sending failed (returned false)");
         }
