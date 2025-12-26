@@ -5,15 +5,22 @@
 
 <mapper namespace="kr.or.kosa.backend.tag.mapper.CodeboardTagMapper">
 
+    <resultMap id="CodeboardTagMap"
+               type="kr.or.kosa.backend.tag.domain.CodeboardTag">
+        <id property="codeboardId" column="CODEBOARD_ID"/>
+        <id property="tagId" column="TAG_ID"/>
+        <result property="tagDisplayName" column="TAG_DISPLAY_NAME"/>
+    </resultMap>
+
     <!-- 게시글의 태그 조회 -->
-    <select id="findByCodeboardId" resultType="kr.or.kosa.backend.tag.domain.CodeboardTag">
+    <select id="findByCodeboardId" resultMap="CodeboardTagMap">
         SELECT CODEBOARD_ID, TAG_ID, TAG_DISPLAY_NAME
         FROM CODEBOARD_TAG
         WHERE CODEBOARD_ID = #{codeboardId}
     </select>
 
     <!-- 여러 게시글의 태그 조회 -->
-    <select id="findByCodeboardIdIn" resultType="kr.or.kosa.backend.tag.domain.CodeboardTag">
+    <select id="findByCodeboardIdIn" resultMap="CodeboardTagMap">
         SELECT CODEBOARD_ID, TAG_ID, TAG_DISPLAY_NAME
         FROM CODEBOARD_TAG
         WHERE CODEBOARD_ID IN
@@ -23,7 +30,7 @@
     </select>
 
     <!-- 태그로 게시글 검색 -->
-    <select id="findByTagId" resultType="kr.or.kosa.backend.tag.domain.CodeboardTag">
+    <select id="findByTagId" resultMap="CodeboardTagMap">
         SELECT CODEBOARD_ID, TAG_ID, TAG_DISPLAY_NAME
         FROM CODEBOARD_TAG
         WHERE TAG_ID = #{tagId}
