@@ -44,7 +44,20 @@
     </insert>
 
     <!-- 댓글 단건 조회 -->
-    <select id="selectCommentById" resultType="kr.or.kosa.backend.comment.domain.Comment">
+    <resultMap id="commentMap" type="kr.or.kosa.backend.comment.domain.Comment">
+        <id property="commentId" column="COMMENT_ID"/>
+        <result property="boardId" column="BOARD_ID"/>
+        <result property="boardType" column="BOARD_TYPE"/>
+        <result property="parentCommentId" column="PARENT_COMMENT_ID"/>
+        <result property="userId" column="USER_ID"/>
+        <result property="content" column="CONTENT"/>
+        <result property="likeCount" column="LIKE_COUNT"/>
+        <result property="isDeleted" column="IS_DELETED"/>
+        <result property="createdAt" column="CREATED_AT"/>
+        <result property="updatedAt" column="UPDATED_AT"/>
+    </resultMap>
+
+    <select id="selectCommentById" resultMap="commentMap">
         SELECT
         COMMENT_ID,
         BOARD_ID,
