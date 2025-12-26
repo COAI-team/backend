@@ -29,6 +29,10 @@ public final class BattleRedisKeyUtil {
         return "battle:room:" + roomId + ":members";
     }
 
+    public static String matchRoomKey(String matchId) {
+        return "battle:match:" + matchId + ":room";
+    }
+
     public static String passwordAttemptKey(String roomId, Long userId) {
         return "battle:pw:attempt:" + roomId + ":" + userId;
     }

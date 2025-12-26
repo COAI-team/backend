@@ -2,23 +2,11 @@ package kr.or.kosa.backend.battle.domain;
 
 import java.io.Serializable;
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
-import java.time.Instant;
+import java.util.Objects;
 
-import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
-import com.fasterxml.jackson.databind.annotation.JsonSerialize;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
-import kr.or.kosa.backend.battle.jackson.InstantIsoDeserializer;
-import kr.or.kosa.backend.battle.jackson.InstantIsoSerializer;
-
-@Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
 public class BattleRoomState implements Serializable {
     private String roomId;
     private String matchId;
@@ -27,6 +15,7 @@ public class BattleRoomState implements Serializable {
     private Long hostUserId;
     private Long guestUserId;
     private Long algoProblemId;
+    private boolean randomProblem;
     private Long languageId;
     private String levelMode;
     private BigDecimal betAmount;
@@ -34,24 +23,35 @@ public class BattleRoomState implements Serializable {
     private boolean countdownStarted;
     private boolean isPrivate;
     private String passwordHash;
-    @JsonSerialize(using = InstantIsoSerializer.class)
-    @JsonDeserialize(using = InstantIsoDeserializer.class)
-    private Instant createdAt;
-    @JsonSerialize(using = InstantIsoSerializer.class)
-    @JsonDeserialize(using = InstantIsoDeserializer.class)
-    private Instant startedAt;
-    @JsonSerialize(using = InstantIsoSerializer.class)
-    @JsonDeserialize(using = InstantIsoDeserializer.class)
-    private Instant finishedAt;
-    @JsonSerialize(using = InstantIsoSerializer.class)
-    @JsonDeserialize(using = InstantIsoDeserializer.class)
-    private Instant postGameUntil;
+
+    // KST LocalDateTime only
+    private LocalDateTime createdAt;
+    private LocalDateTime startedAt;
+    private LocalDateTime finishedAt;
+    private LocalDateTime postGameUntil;
+    private LocalDateTime readyCooldownUntil;
+
     private Long winnerUserId;
     private String winReason;
     private Map<Long, BattleParticipantState> participants = new HashMap<>();
 
+    public BattleRoomState() {
+    }
+
     public BattleParticipantState participant(Long userId) {
-        return participants.get(userId);
+        if (userId == null || participants == null) {
+            return null;
+        }
+        BattleParticipantState direct = participants.get(userId);
+        if (direct != null) {
+            return direct;
+        }
+        for (BattleParticipantState candidate : participants.values()) {
+            if (candidate != null && Objects.equals(candidate.getUserId(), userId)) {
+                return candidate;
+            }
+        }
+        return null;
     }
 
     public void addOrUpdateParticipant(BattleParticipantState participant) {
@@ -73,6 +73,7 @@ public class BattleRoomState implements Serializable {
         private Long hostUserId;
         private Long guestUserId;
         private Long algoProblemId;
+        private boolean randomProblem;
         private Long languageId;
         private String levelMode;
         private BigDecimal betAmount;
@@ -80,10 +81,13 @@ public class BattleRoomState implements Serializable {
         private boolean countdownStarted;
         private boolean isPrivate;
         private String passwordHash;
-        private Instant createdAt;
-        private Instant startedAt;
-        private Instant finishedAt;
-        private Instant postGameUntil;
+
+        private LocalDateTime createdAt;
+        private LocalDateTime startedAt;
+        private LocalDateTime finishedAt;
+        private LocalDateTime postGameUntil;
+        private LocalDateTime readyCooldownUntil;
+
         private Long winnerUserId;
         private String winReason;
         private Map<Long, BattleParticipantState> participants = new HashMap<>();
@@ -95,6 +99,7 @@ public class BattleRoomState implements Serializable {
         public BattleRoomStateBuilder hostUserId(Long hostUserId) { this.hostUserId = hostUserId; return this; }
         public BattleRoomStateBuilder guestUserId(Long guestUserId) { this.guestUserId = guestUserId; return this; }
         public BattleRoomStateBuilder algoProblemId(Long algoProblemId) { this.algoProblemId = algoProblemId; return this; }
+        public BattleRoomStateBuilder randomProblem(boolean randomProblem) { this.randomProblem = randomProblem; return this; }
         public BattleRoomStateBuilder languageId(Long languageId) { this.languageId = languageId; return this; }
         public BattleRoomStateBuilder levelMode(String levelMode) { this.levelMode = levelMode; return this; }
         public BattleRoomStateBuilder betAmount(BigDecimal betAmount) { this.betAmount = betAmount; return this; }
@@ -102,10 +107,13 @@ public class BattleRoomState implements Serializable {
         public BattleRoomStateBuilder countdownStarted(boolean countdownStarted) { this.countdownStarted = countdownStarted; return this; }
         public BattleRoomStateBuilder isPrivate(boolean isPrivate) { this.isPrivate = isPrivate; return this; }
         public BattleRoomStateBuilder passwordHash(String passwordHash) { this.passwordHash = passwordHash; return this; }
-        public BattleRoomStateBuilder createdAt(Instant createdAt) { this.createdAt = createdAt; return this; }
-        public BattleRoomStateBuilder startedAt(Instant startedAt) { this.startedAt = startedAt; return this; }
-        public BattleRoomStateBuilder finishedAt(Instant finishedAt) { this.finishedAt = finishedAt; return this; }
-        public BattleRoomStateBuilder postGameUntil(Instant postGameUntil) { this.postGameUntil = postGameUntil; return this; }
+
+        public BattleRoomStateBuilder createdAt(LocalDateTime createdAt) { this.createdAt = createdAt; return this; }
+        public BattleRoomStateBuilder startedAt(LocalDateTime startedAt) { this.startedAt = startedAt; return this; }
+        public BattleRoomStateBuilder finishedAt(LocalDateTime finishedAt) { this.finishedAt = finishedAt; return this; }
+        public BattleRoomStateBuilder postGameUntil(LocalDateTime postGameUntil) { this.postGameUntil = postGameUntil; return this; }
+        public BattleRoomStateBuilder readyCooldownUntil(LocalDateTime readyCooldownUntil) { this.readyCooldownUntil = readyCooldownUntil; return this; }
+
         public BattleRoomStateBuilder winnerUserId(Long winnerUserId) { this.winnerUserId = winnerUserId; return this; }
         public BattleRoomStateBuilder winReason(String winReason) { this.winReason = winReason; return this; }
         public BattleRoomStateBuilder participants(Map<Long, BattleParticipantState> participants) { this.participants = participants; return this; }
@@ -119,6 +127,7 @@ public class BattleRoomState implements Serializable {
             state.setHostUserId(hostUserId);
             state.setGuestUserId(guestUserId);
             state.setAlgoProblemId(algoProblemId);
+            state.setRandomProblem(randomProblem);
             state.setLanguageId(languageId);
             state.setLevelMode(levelMode);
             state.setBetAmount(betAmount);
@@ -126,10 +135,13 @@ public class BattleRoomState implements Serializable {
             state.setCountdownStarted(countdownStarted);
             state.setPrivate(isPrivate);
             state.setPasswordHash(passwordHash);
+
             state.setCreatedAt(createdAt);
             state.setStartedAt(startedAt);
             state.setFinishedAt(finishedAt);
             state.setPostGameUntil(postGameUntil);
+            state.setReadyCooldownUntil(readyCooldownUntil);
+
             state.setWinnerUserId(winnerUserId);
             state.setWinReason(winReason);
             state.setParticipants(participants != null ? participants : new HashMap<>());
@@ -137,7 +149,7 @@ public class BattleRoomState implements Serializable {
         }
     }
 
-    // Manual getters/setters to guard against annotation processing issues
+    // getters/setters
     public String getRoomId() { return roomId; }
     public void setRoomId(String roomId) { this.roomId = roomId; }
     public String getMatchId() { return matchId; }
@@ -152,6 +164,8 @@ public class BattleRoomState implements Serializable {
     public void setGuestUserId(Long guestUserId) { this.guestUserId = guestUserId; }
     public Long getAlgoProblemId() { return algoProblemId; }
     public void setAlgoProblemId(Long algoProblemId) { this.algoProblemId = algoProblemId; }
+    public boolean isRandomProblem() { return randomProblem; }
+    public void setRandomProblem(boolean randomProblem) { this.randomProblem = randomProblem; }
     public Long getLanguageId() { return languageId; }
     public void setLanguageId(Long languageId) { this.languageId = languageId; }
     public String getLevelMode() { return levelMode; }
@@ -166,14 +180,18 @@ public class BattleRoomState implements Serializable {
     public void setPrivate(boolean aPrivate) { this.isPrivate = aPrivate; }
     public String getPasswordHash() { return passwordHash; }
     public void setPasswordHash(String passwordHash) { this.passwordHash = passwordHash; }
-    public Instant getCreatedAt() { return createdAt; }
-    public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
-    public Instant getStartedAt() { return startedAt; }
-    public void setStartedAt(Instant startedAt) { this.startedAt = startedAt; }
-    public Instant getFinishedAt() { return finishedAt; }
-    public void setFinishedAt(Instant finishedAt) { this.finishedAt = finishedAt; }
-    public Instant getPostGameUntil() { return postGameUntil; }
-    public void setPostGameUntil(Instant postGameUntil) { this.postGameUntil = postGameUntil; }
+
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+    public LocalDateTime getStartedAt() { return startedAt; }
+    public void setStartedAt(LocalDateTime startedAt) { this.startedAt = startedAt; }
+    public LocalDateTime getFinishedAt() { return finishedAt; }
+    public void setFinishedAt(LocalDateTime finishedAt) { this.finishedAt = finishedAt; }
+    public LocalDateTime getPostGameUntil() { return postGameUntil; }
+    public void setPostGameUntil(LocalDateTime postGameUntil) { this.postGameUntil = postGameUntil; }
+    public LocalDateTime getReadyCooldownUntil() { return readyCooldownUntil; }
+    public void setReadyCooldownUntil(LocalDateTime readyCooldownUntil) { this.readyCooldownUntil = readyCooldownUntil; }
+
     public Long getWinnerUserId() { return winnerUserId; }
     public void setWinnerUserId(Long winnerUserId) { this.winnerUserId = winnerUserId; }
     public String getWinReason() { return winReason; }

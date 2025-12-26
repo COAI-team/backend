@@ -28,7 +28,8 @@ public class BattleUserAdapter implements BattleUserPort {
                 BattleUserProfile.builder()
                         .userId(userId)
                         .nickname(user.getUserNickname())
-                        .build()
+                        .grade(user.getUserGrade())
+                .build()
         );
     }
 }

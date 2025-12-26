@@ -13,7 +13,9 @@ public interface BattleMatchMapper {
 
     int updateParticipants(@Param("matchId") String matchId,
                            @Param("hostUserId") Long hostUserId,
-                           @Param("guestUserId") Long guestUserId);
+                           @Param("guestUserId") Long guestUserId,
+                           @Param("hostLevelSnapshot") String hostLevelSnapshot,
+                           @Param("guestLevelSnapshot") String guestLevelSnapshot);
 
     int updateStatus(@Param("matchId") String matchId,
                      @Param("status") String status,
@@ -25,6 +27,18 @@ public interface BattleMatchMapper {
 
     int updateMaxDuration(@Param("matchId") String matchId,
                           @Param("maxDurationMinutes") Integer maxDurationMinutes);
+
+    int updateProblem(@Param("matchId") String matchId,
+                      @Param("algoProblemId") Long algoProblemId);
+
+    int updateHostAcAt(@Param("matchId") String matchId,
+                       @Param("acAt") java.time.LocalDateTime acAt);
+
+    int updateGuestAcAt(@Param("matchId") String matchId,
+                        @Param("acAt") java.time.LocalDateTime acAt);
+
+    int updateWinnerElapsedMs(@Param("matchId") String matchId,
+                              @Param("winnerElapsedMs") Integer winnerElapsedMs);
 
     Optional<BattleMatch> findById(@Param("matchId") String matchId);
 
