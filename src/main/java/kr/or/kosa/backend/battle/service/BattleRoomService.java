@@ -744,6 +744,27 @@ public class BattleRoomService {
     }
 
     public BattleRoomResponse leaveRoom(String roomId, Long userId) {
+        return leaveRoomInternal(roomId, userId, false);
+    }
+
+    public void handleDisconnect(Long userId) {
+        if (userId == null) return;
+        String roomId = stringRedisTemplate.opsForValue().get(BattleRedisKeyUtil.activeRoomKey(userId));
+        if (roomId == null) return;
+        try {
+            leaveRoomInternal(roomId, userId, true);
+        } catch (BattleException ex) {
+            if (ex.getErrorCode() == BattleErrorCode.NOT_PARTICIPANT
+                    || ex.getErrorCode() == BattleErrorCode.ROOM_NOT_FOUND) {
+                cleanupActiveMapping(userId, roomId, null);
+            }
+            log.warn("[battle] userId={} action=disconnect-leave errorCode={}", userId, ex.getErrorCode().getCode());
+        } catch (Exception ex) {
+            log.warn("[battle] userId={} action=disconnect-leave error={}", userId, ex.getMessage());
+        }
+    }
+
+    private BattleRoomResponse leaveRoomInternal(String roomId, Long userId, boolean allowCountdown) {
         String userLock = redisLockManager.lock(BattleRedisKeyUtil.userLockKey(userId));
         if (userLock == null) throw new BattleException(BattleErrorCode.LOCK_TIMEOUT);
 
@@ -756,7 +777,9 @@ public class BattleRoomService {
                         .orElseThrow(() -> new BattleException(BattleErrorCode.ROOM_NOT_FOUND));
 
                 if (!isParticipant(state, userId)) throw new BattleException(BattleErrorCode.NOT_PARTICIPANT);
-                if (state.getStatus() == BattleStatus.COUNTDOWN) throw new BattleException(BattleErrorCode.INVALID_STATUS);
+                if (!allowCountdown && state.getStatus() == BattleStatus.COUNTDOWN) {
+                    throw new BattleException(BattleErrorCode.INVALID_STATUS);
+                }
 
                 if (state.getStatus() == BattleStatus.WAITING || state.getStatus() == BattleStatus.COUNTDOWN) {
                     if (Objects.equals(userId, state.getHostUserId())) {
