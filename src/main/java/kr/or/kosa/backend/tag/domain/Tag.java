@@ -12,4 +12,6 @@ import lombok.NoArgsConstructor;
 public class Tag {
     private Long tagId;
     private String tagName;
+    private String popularDisplayName;
+    private Long usageCount;
 }

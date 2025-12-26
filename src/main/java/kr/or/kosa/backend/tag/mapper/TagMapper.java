@@ -14,10 +14,8 @@ public interface TagMapper {
     @Options(useCache = false, flushCache = Options.FlushCachePolicy.TRUE)
     Optional<Tag> findByTagName(@Param("tagName") String tagName);
 
-    // int insertTag(Tag tag);
+    // 동시성을 위해 insert를 upsert로
     void upsertTag(Tag tag);
-
-    int deleteTag(@Param("tagId") Long tagId);
 
     List<Tag> findByTagNameStartingWith(@Param("keyword") String keyword);
 
@@ -25,4 +23,6 @@ public interface TagMapper {
 
     Long countByTagId(@Param("tagId") Long tagId);
 
+    // 사용되지 않는 태그 스케줄러가 삭제
+    int deleteUnusedTags();
 }
