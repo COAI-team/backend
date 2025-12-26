@@ -5,11 +5,12 @@
 
 <mapper namespace="kr.or.kosa.backend.tag.mapper.TagMapper">
 
-    <!-- 태그명으로 조회 -->
+    <!-- 태그명으로 조회 (대소문자 구분 없음) -->
     <select id="findByTagName" resultType="kr.or.kosa.backend.tag.domain.Tag">
         SELECT TAG_ID, TAG_NAME
         FROM TAG
-        WHERE TAG_NAME = #{tagName}
+        WHERE LOWER(TAG_NAME) = LOWER(#{tagName})
+        LIMIT 1
     </select>
 
     <!-- 태그 저장 -->
