@@ -33,8 +33,9 @@ public class TagService {
         String normalizedName = tagInput.toLowerCase().trim();
 
         Optional<Tag> existingTag = tagMapper.findByTagName(normalizedName);
-        if (existingTag.isPresent()) {
-            return existingTag.get();
+        log.error(">>> DEBUG: normalizedName='{}', 조회결과={}", normalizedName, existingTag.isPresent());
+        if (existingTag.isEmpty()) {
+            log.error(">>> DEBUG: 실행할 쿼리 - SELECT TAG_ID, TAG_NAME FROM TAG WHERE LOWER(TAG_NAME) = LOWER('{}') LIMIT 1", normalizedName);
         }
 
         try {
