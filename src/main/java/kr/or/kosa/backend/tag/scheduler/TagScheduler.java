@@ -14,8 +14,8 @@ public class TagScheduler {
 
     private final TagMapper tagMapper;
 
-    // 매일 새벽 3시에 실행
-    @Scheduled(cron = "0 0 3 * * *")
+    // 매일 새벽 2시에 실행
+    @Scheduled(cron = "0 0 2 * * *")
     @Transactional
     public void cleanupUnusedTags() {
         log.info(">>> 사용되지 않는 태그 정리 시작");
