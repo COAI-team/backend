@@ -96,8 +96,10 @@ public class RateLimitInterceptor implements HandlerInterceptor {
      * URI에서 UsageType 결정
      */
     private UsageType determineUsageType(String uri) {
-        // Rate Limit 제외 대상: 공유하기 (무료 사용자도 기존 제출 결과 공유 가능)
-        if (uri.contains("/visibility")) {
+        // Rate Limit 제외 대상
+        // - 공유하기: 무료 사용자도 기존 제출 결과 공유 가능
+        // - 샘플 테스트(/submissions/test): 코드 실행만 하고 실제 제출이 아님
+        if (uri.contains("/visibility") || uri.contains("/submissions/test")) {
             return null;
         }
 
@@ -105,8 +107,8 @@ public class RateLimitInterceptor implements HandlerInterceptor {
         if (uri.contains("/generate") || uri.contains("/pool/draw")) {
             return UsageType.GENERATE;
         }
-        // 문제 풀이/제출 관련 엔드포인트
-        if (uri.contains("/solve") || uri.contains("/submit") || uri.contains("/submissions")) {
+        // 문제 풀이/제출 관련 엔드포인트 (실제 제출만 카운트)
+        if (uri.contains("/submissions")) {
             return UsageType.SOLVE;
         }
         // 코드 분석 관련 엔드포인트
