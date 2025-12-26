@@ -31,11 +31,14 @@ public class TagService {
     @Transactional
     public Tag getOrCreateTag(String tagInput) {
         String normalizedName = tagInput.toLowerCase().trim();
+        log.info(">>> getOrCreateTag 시작: normalizedName='{}'", normalizedName);
 
         Optional<Tag> existingTag = tagMapper.findByTagName(normalizedName);
         log.error(">>> DEBUG: normalizedName='{}', 조회결과={}", normalizedName, existingTag.isPresent());
-        if (existingTag.isEmpty()) {
-            log.error(">>> DEBUG: 실행할 쿼리 - SELECT TAG_ID, TAG_NAME FROM TAG WHERE LOWER(TAG_NAME) = LOWER('{}') LIMIT 1", normalizedName);
+
+        if (existingTag.isPresent()) {
+            log.info("기존 태그 조회 성공: tagId={}, tagName={}", existingTag.get().getTagId(), normalizedName);
+            return existingTag.get();
         }
 
         try {
@@ -43,17 +46,25 @@ public class TagService {
                     .tagName(normalizedName)
                     .build();
 
+            log.info(">>> 새 태그 insert 시도: tagName='{}'", normalizedName);
             int result = tagMapper.insertTag(newTag);
+
             if (result == 0 || newTag.getTagId() == null) {
                 throw new CustomBusinessException(TagErrorCode.TAG_SAVE_FAILED);
             }
 
-            log.info("새 태그 생성: tagId={}, tagName={}", newTag.getTagId(), normalizedName);
+            log.info("새 태그 생성 성공: tagId={}, tagName={}", newTag.getTagId(), normalizedName);
             return newTag;
 
         } catch (DataIntegrityViolationException e) {
+            log.warn("태그 중복 발생, 재조회: tagName={}", normalizedName);
+
+            // 재조회 (캐시 우회를 위해 다시 한번 조회)
             return tagMapper.findByTagName(normalizedName)
-                    .orElseThrow(() -> new CustomBusinessException(TagErrorCode.TAG_SAVE_FAILED));
+                    .orElseThrow(() -> {
+                        log.error("재조회 실패: DB 확인 필요 - tagName={}", normalizedName);
+                        return new CustomBusinessException(TagErrorCode.TAG_SAVE_FAILED);
+                    });
         }
     }
 
@@ -84,49 +95,48 @@ public class TagService {
     @Transactional
     public void attachTagsToFreeboard(Long freeboardId, List<String> tagInputs) {
         if (tagInputs == null || tagInputs.isEmpty()) {
-            log.info(">>> attachTagsToFreeboard: 태그 입력이 없음");
+            log.info(">>> 첨부할 태그가 없습니다: freeboardId={}", freeboardId);
             return;
         }
 
         log.info(">>> attachTagsToFreeboard 시작: freeboardId={}, tagInputs={}", freeboardId, tagInputs);
 
-        for (int i = 0; i < tagInputs.size(); i++) {
-            String tagInput = tagInputs.get(i);
-            log.info(">>> [{}/{}] 태그 처리 시작: '{}'", i+1, tagInputs.size(), tagInput);
+        // 정규화된 이름 기준으로 중복 제거
+        Map<String, String> uniqueTags = new LinkedHashMap<>();
+        for (String tagInput : tagInputs) {
+            String normalizedName = tagInput.toLowerCase().trim();
+            if (!uniqueTags.containsKey(normalizedName)) {
+                uniqueTags.put(normalizedName, tagInput.trim());
+            }
+        }
+
+        int index = 1;
+        for (Map.Entry<String, String> entry : uniqueTags.entrySet()) {
+            String normalizedName = entry.getKey();
+            String originalInput = entry.getValue();
+
+            log.info(">>> [{}/{}] 태그 처리 시작: '{}'", index, uniqueTags.size(), originalInput);
 
             try {
-                Tag tag = getOrCreateTag(tagInput.trim());
-                log.info(">>> 태그 생성/조회 완료: tagId={}, tagName={}", tag.getTagId(), tag.getTagName());
+                Tag tag = getOrCreateTag(originalInput);
 
                 FreeboardTag freeboardTag = FreeboardTag.builder()
                         .freeboardId(freeboardId)
                         .tagId(tag.getTagId())
-                        .tagDisplayName(tagInput.trim())
+                        .tagDisplayName(originalInput)
                         .build();
 
-                log.info(">>> FreeboardTag insert 시도: {}", freeboardTag);
-
-                int result = freeboardTagMapper.insert(freeboardTag);
-                log.info(">>> insert 결과: result={}", result);
-
-                if (result == 0) {
-                    log.error(">>> insert 실패: result=0, freeboardTag={}", freeboardTag);
-                    throw new CustomBusinessException(TagErrorCode.TAG_SAVE_FAILED);
-                }
-
-                log.info(">>> [{}/{}] 태그 처리 완료", i+1, tagInputs.size());
+                freeboardTagMapper.insert(freeboardTag);
+                log.info(">>> [{}/{}] 태그 연결 성공: tagId={}, displayName={}",
+                        index, uniqueTags.size(), tag.getTagId(), originalInput);
             } catch (CustomBusinessException e) {
                 log.error(">>> [{}/{}] CustomBusinessException 발생: tagInput='{}', errorCode={}",
-                        i+1, tagInputs.size(), tagInput, e.getErrorCode(), e);
+                        index, uniqueTags.size(), originalInput, e.getErrorCode());
                 throw e;
-            } catch (Exception e) {
-                log.error(">>> [{}/{}] Exception 발생: tagInput='{}'",
-                        i+1, tagInputs.size(), tagInput, e);
-                throw new CustomBusinessException(TagErrorCode.TAG_SAVE_FAILED);
             }
-        }
 
-        log.info("자유게시판 태그 저장 완료: freeboardId={}, 태그 수={}", freeboardId, tagInputs.size());
+            index++;
+        }
     }
 
     public Map<Long, List<String>> getFreeboardTagsMap(List<Long> freeboardIds) {
