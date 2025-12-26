@@ -4,28 +4,60 @@
 
 <mapper namespace="kr.or.kosa.backend.codeboard.mapper.CodeboardMapper">
 
+    <!-- CodeboardListResponseDto용 resultMap -->
+    <resultMap id="codeboardListMap" type="kr.or.kosa.backend.codeboard.dto.CodeboardListResponseDto">
+        <id property="codeboardId" column="CODEBOARD_ID"/>
+        <result property="userId" column="USER_ID"/>
+        <result property="userNickname" column="USER_NICKNAME"/>
+        <result property="userImage" column="USER_IMAGE"/>
+        <result property="analysisId" column="ANALYSIS_ID"/>
+        <result property="codeboardTitle" column="CODEBOARD_TITLE"/>
+        <result property="codeboardSummary" column="CODEBOARD_SUMMARY"/>
+        <result property="codeboardClick" column="CODEBOARD_CLICK"/>
+        <result property="codeboardCreatedAt" column="CODEBOARD_CREATED_AT"/>
+        <result property="likeCount" column="LIKE_COUNT"/>
+        <result property="commentCount" column="COMMENT_COUNT"/>
+        <result property="aiScore" column="AI_SCORE"/>
+    </resultMap>
+
+    <!-- CodeboardDetailResponseDto용 resultMap -->
+    <resultMap id="codeboardDetailMap" type="kr.or.kosa.backend.codeboard.dto.CodeboardDetailResponseDto">
+        <id property="codeboardId" column="CODEBOARD_ID"/>
+        <result property="userId" column="USER_ID"/>
+        <result property="userNickname" column="USER_NICKNAME"/>
+        <result property="userImage" column="USER_IMAGE"/>
+        <result property="analysisId" column="ANALYSIS_ID"/>
+        <result property="codeboardTitle" column="CODEBOARD_TITLE"/>
+        <result property="codeboardContent" column="CODEBOARD_CONTENT"/>
+        <result property="codeboardClick" column="CODEBOARD_CLICK"/>
+        <result property="likeCount" column="LIKE_COUNT"/>
+        <result property="commentCount" column="COMMENT_COUNT"/>
+        <result property="isLiked" column="IS_LIKED"/>
+        <result property="codeboardCreatedAt" column="CODEBOARD_CREATED_AT"/>
+    </resultMap>
+
     <!-- 게시글 목록 조회 -->
-    <select id="findPosts" resultType="kr.or.kosa.backend.codeboard.dto.CodeboardListResponseDto">
+    <select id="findPosts" resultMap="codeboardListMap">
         SELECT
-        C.CODEBOARD_ID AS codeboardId,
-        C.USER_ID AS userId,
-        U.USER_NICKNAME AS userNickname,
-        U.USER_IMAGE AS userImage,
-        C.ANALYSIS_ID AS analysisId,
-        C.CODEBOARD_TITLE AS codeboardTitle,
-        SUBSTRING(C.CODEBOARD_PLAIN_TEXT, 1, 200) AS codeboardSummary,
-        C.CODEBOARD_CLICK AS codeboardClick,
-        C.CODEBOARD_CREATED_AT AS codeboardCreatedAt,
+        C.CODEBOARD_ID,
+        C.USER_ID,
+        U.USER_NICKNAME,
+        U.USER_IMAGE,
+        C.ANALYSIS_ID,
+        C.CODEBOARD_TITLE,
+        SUBSTRING(C.CODEBOARD_PLAIN_TEXT, 1, 200) AS CODEBOARD_SUMMARY,
+        C.CODEBOARD_CLICK,
+        C.CODEBOARD_CREATED_AT,
         (SELECT COUNT(*)
         FROM `LIKE`
         WHERE REFERENCE_ID = C.CODEBOARD_ID
-        AND REFERENCE_TYPE = 'POST_CODEBOARD') AS likeCount,
+        AND REFERENCE_TYPE = 'POST_CODEBOARD') AS LIKE_COUNT,
         (SELECT COUNT(*)
         FROM COMMENT
         WHERE BOARD_ID = C.CODEBOARD_ID
         AND BOARD_TYPE = 'CODEBOARD'
-        AND IS_DELETED = 0) AS commentCount,
-        CAH.AI_SCORE AS aiScore
+        AND IS_DELETED = 0) AS COMMENT_COUNT,
+        CAH.AI_SCORE
         FROM CODEBOARD C
         INNER JOIN USERS U ON C.USER_ID = U.USER_ID
         LEFT JOIN CODE_ANALYSIS_HISTORY CAH
@@ -47,10 +79,10 @@
         ORDER BY
         <choose>
             <when test="sort.column == 'like_count'">
-                likeCount ${sort.directionSql}
+                LIKE_COUNT ${sort.directionSql}
             </when>
             <when test="sort.column == 'comment_count'">
-                commentCount ${sort.directionSql}
+                COMMENT_COUNT ${sort.directionSql}
             </when>
             <when test="sort.column == 'view_count'">
                 C.CODEBOARD_CLICK ${sort.directionSql}
@@ -105,25 +137,25 @@
     </update>
 
     <!-- 게시글 상세 조회 -->
-    <select id="selectById" resultType="kr.or.kosa.backend.codeboard.dto.CodeboardDetailResponseDto">
+    <select id="selectById" resultMap="codeboardDetailMap">
         SELECT
-        C.CODEBOARD_ID AS codeboardId,
-        C.USER_ID AS userId,
-        U.USER_NICKNAME AS userNickname,
-        U.USER_IMAGE AS userImage,
-        C.ANALYSIS_ID AS analysisId,
-        C.CODEBOARD_TITLE AS codeboardTitle,
-        C.CODEBOARD_BLOCKS AS codeboardContent,
-        C.CODEBOARD_CLICK AS codeboardClick,
+        C.CODEBOARD_ID,
+        C.USER_ID,
+        U.USER_NICKNAME,
+        U.USER_IMAGE,
+        C.ANALYSIS_ID,
+        C.CODEBOARD_TITLE,
+        C.CODEBOARD_BLOCKS AS CODEBOARD_CONTENT,
+        C.CODEBOARD_CLICK,
         (SELECT COUNT(*)
         FROM `LIKE` L
         WHERE L.REFERENCE_ID = C.CODEBOARD_ID
-        AND L.REFERENCE_TYPE = 'POST_CODEBOARD') AS likeCount,
+        AND L.REFERENCE_TYPE = 'POST_CODEBOARD') AS LIKE_COUNT,
         (SELECT COUNT(*)
         FROM COMMENT CM
         WHERE CM.BOARD_ID = C.CODEBOARD_ID
         AND CM.BOARD_TYPE = 'CODEBOARD'
-        AND CM.IS_DELETED = FALSE) AS commentCount,
+        AND CM.IS_DELETED = FALSE) AS COMMENT_COUNT,
         <if test="userId != null">
             EXISTS(
             SELECT 1
@@ -131,12 +163,12 @@
             WHERE L2.REFERENCE_ID = C.CODEBOARD_ID
             AND L2.REFERENCE_TYPE = 'POST_CODEBOARD'
             AND L2.USER_ID = #{userId}
-            ) AS isLiked,
+            ) AS IS_LIKED,
         </if>
         <if test="userId == null">
-            FALSE AS isLiked,
+            FALSE AS IS_LIKED,
         </if>
-        C.CODEBOARD_CREATED_AT AS codeboardCreatedAt
+        C.CODEBOARD_CREATED_AT
         FROM CODEBOARD C
         LEFT JOIN USERS U ON C.USER_ID = U.USER_ID
         WHERE C.CODEBOARD_ID = #{codeboardId}
