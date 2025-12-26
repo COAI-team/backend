@@ -2,10 +2,13 @@ package kr.or.kosa.backend.algorithm.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import kr.or.kosa.backend.algorithm.dto.PoolStatusDto;
+import kr.or.kosa.backend.algorithm.dto.enums.UsageType;
 import kr.or.kosa.backend.algorithm.dto.response.ProblemGenerationResponseDto;
 import kr.or.kosa.backend.algorithm.exception.AlgoErrorCode;
+import kr.or.kosa.backend.algorithm.service.DailyMissionService;
 import kr.or.kosa.backend.algorithm.service.ProblemGenerationOrchestrator;
 import kr.or.kosa.backend.algorithm.service.ProblemPoolService;
+import kr.or.kosa.backend.algorithm.service.RateLimitService;
 import kr.or.kosa.backend.commons.exception.custom.CustomBusinessException;
 import kr.or.kosa.backend.commons.response.ApiResponse;
 import kr.or.kosa.backend.security.jwt.JwtAuthentication;
@@ -36,6 +39,8 @@ public class ProblemPoolController {
 
     private final ProblemPoolService poolService;
     private final ObjectMapper objectMapper;
+    private final RateLimitService rateLimitService;
+    private final DailyMissionService dailyMissionService;
 
     /**
      * SecurityContext에서 사용자 ID 추출
@@ -81,6 +86,7 @@ public class ProblemPoolController {
      * 풀에서 문제 꺼내기 (SSE 스트리밍)
      * <p>풀에 문제가 있으면 즉시 반환, 없으면 실시간 생성
      * <p>SSE는 Authorization 헤더를 지원하지 않으므로 userId를 쿼리 파라미터로 받음
+     * <p>Rate Limit은 인터셉터가 아닌 이 메서드에서 직접 처리 (SSE 재연결 중복 방지)
      *
      * GET /api/algo/pool/draw/stream?difficulty=GOLD&topic=DFS/BFS&theme=SANTA_DELIVERY&userId=3
      */
@@ -94,7 +100,36 @@ public class ProblemPoolController {
         log.info("풀에서 문제 꺼내기 요청 - difficulty: {}, topic: {}, theme: {}, userId: {}",
                 difficulty, topic, theme, userId);
 
+        // 1. userId 필수 체크
+        if (userId == null) {
+            log.warn("SSE 요청 - userId 없음 (로그인 필요)");
+            return createErrorFlux("로그인이 필요합니다.");
+        }
+
+        // 2. 진행 중인 요청 체크 (SSE 재연결 중복 방지)
+        if (rateLimitService.isInProgress(userId, UsageType.GENERATE)) {
+            log.warn("SSE 재연결 감지 - 이미 진행 중인 요청 있음, userId: {}", userId);
+            return createErrorFlux("이미 문제 생성이 진행 중입니다. 잠시 후 다시 시도해주세요.");
+        }
+
+        // 3. 구독자 여부 확인
+        boolean isSubscriber = dailyMissionService.isSubscriber(userId);
+
+        // 4. 사용량 체크 (증가 없이 체크만)
+        RateLimitService.UsageCheckResult checkResult =
+                rateLimitService.checkUsageOnly(userId, UsageType.GENERATE, isSubscriber);
+
+        if (!checkResult.allowed()) {
+            log.info("Rate limit 초과 - userId: {}, 사용량: {}/{}", userId, checkResult.currentUsage(), checkResult.dailyLimit());
+            return createErrorFlux(checkResult.message());
+        }
+
+        // 5. 진행 중 마커 설정 (재연결 감지용)
+        rateLimitService.setInProgress(userId, UsageType.GENERATE);
+        log.debug("진행 중 마커 설정 완료 - userId: {}", userId);
+
         final Long finalUserId = userId;
+        final boolean finalIsSubscriber = isSubscriber;
 
         return Flux.create(sink -> {
             reactor.core.scheduler.Schedulers.boundedElastic().schedule(() -> {
@@ -125,13 +160,15 @@ public class ProblemPoolController {
                             }
                     );
 
+                    // 6. 성공 시에만 사용량 증가 (구독자가 아닌 경우)
+                    if (!finalIsSubscriber) {
+                        rateLimitService.incrementUsageOnly(finalUserId, UsageType.GENERATE);
+                    }
+
                     // 요청 처리 시간 측정 (fetchTime)
                     double fetchTime = (System.currentTimeMillis() - requestStartTime) / 1000.0;
 
-                    // 풀에서 가져왔는지 판단: 진행률 콜백이 호출되지 않았고, fetchTime이 짧으면 풀에서 가져온 것
-                    // progressCallback이 한번도 호출되지 않았으면 fromPoolFlag[0]은 초기값 false 유지
-                    // 하지만 실제로 풀에서 가져온 경우에는 progressCallback이 호출되지 않음
-                    // fetchTime < 3초이고 generationTime이 있으면 풀에서 가져온 것으로 판단
+                    // 풀에서 가져왔는지 판단
                     boolean fromPool = fetchTime < 3.0 && response.getGenerationTime() != null;
 
                     // 완료 이벤트 전송 (DB 필드 직접 매핑)
@@ -140,28 +177,28 @@ public class ProblemPoolController {
                     completeEvent.put("problemId", response.getProblemId());
                     completeEvent.put("title", response.getProblem().getAlgoProblemTitle());
                     completeEvent.put("description", response.getProblem().getAlgoProblemDescription());
-                    completeEvent.put("inputFormat", response.getProblem().getInputFormat());  // DB의 INPUT_FORMAT 컬럼
-                    completeEvent.put("outputFormat", response.getProblem().getOutputFormat());  // DB의 OUTPUT_FORMAT 컬럼
-                    completeEvent.put("constraints", response.getProblem().getConstraints());  // DB의 CONSTRAINTS 컬럼
-                    completeEvent.put("algoProblemTags", response.getProblem().getAlgoProblemTags());  // DB의 ALGO_PROBLEM_TAGS 컬럼
-                    completeEvent.put("testcases", response.getTestCases());  // 테스트케이스 목록 (isSample 포함)
+                    completeEvent.put("inputFormat", response.getProblem().getInputFormat());
+                    completeEvent.put("outputFormat", response.getProblem().getOutputFormat());
+                    completeEvent.put("constraints", response.getProblem().getConstraints());
+                    completeEvent.put("algoProblemTags", response.getProblem().getAlgoProblemTags());
+                    completeEvent.put("testcases", response.getTestCases());
                     completeEvent.put("difficulty", response.getProblem().getAlgoProblemDifficulty().name());
                     completeEvent.put("testCaseCount", response.getTestCases() != null ? response.getTestCases().size() : 0);
-                    completeEvent.put("generationTime", response.getGenerationTime());  // LLM이 생성하는데 걸린 시간 (풀에 저장된 값)
-                    completeEvent.put("fetchTime", fromPool ? fetchTime : null);  // 풀에서 꺼내오는데 걸린 시간
+                    completeEvent.put("generationTime", response.getGenerationTime());
+                    completeEvent.put("fetchTime", fromPool ? fetchTime : null);
                     completeEvent.put("fromPool", fromPool);
 
                     sink.next("data: " + objectMapper.writeValueAsString(completeEvent) + "\n\n");
                     sink.complete();
 
-                    log.info("문제 전달 완료 - problemId: {}, fromPool: {}, fetchTime: {}초, generationTime: {}초",
-                            response.getProblemId(), fromPool, fetchTime, response.getGenerationTime());
+                    log.info("문제 전달 완료 - problemId: {}, userId: {}, fromPool: {}, fetchTime: {}초",
+                            response.getProblemId(), finalUserId, fromPool, fetchTime);
 
-                    // 비동기로 풀 보충 (풀에서 꺼낸 경우)
+                    // 비동기로 풀 보충
                     refillPoolAsync(difficulty, topic, theme);
 
                 } catch (Exception e) {
-                    log.error("문제 꺼내기 실패", e);
+                    log.error("문제 꺼내기 실패 - userId: {}", finalUserId, e);
                     try {
                         Map<String, Object> errorEvent = new HashMap<>();
                         errorEvent.put("type", "ERROR");
@@ -171,9 +208,20 @@ public class ProblemPoolController {
                         sink.next("data: {\"type\":\"ERROR\",\"message\":\"" + e.getMessage() + "\"}\n\n");
                     }
                     sink.complete();
+                } finally {
+                    // 7. 진행 중 마커 해제 (성공/실패 모두)
+                    rateLimitService.clearInProgress(finalUserId, UsageType.GENERATE);
+                    log.debug("진행 중 마커 해제 - userId: {}", finalUserId);
                 }
             });
         });
+    }
+
+    /**
+     * SSE 에러 응답 생성 헬퍼
+     */
+    private Flux<String> createErrorFlux(String message) {
+        return Flux.just("data: {\"type\":\"ERROR\",\"message\":\"" + message + "\"}\n\n");
     }
 
     /**

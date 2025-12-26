@@ -19,8 +19,9 @@ public class RateLimitConfig implements WebMvcConfigurer {
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(rateLimitInterceptor)
                 .addPathPatterns("/algo/problems/generate/**")  // 문제 생성 (POST + SSE GET)
-                .addPathPatterns("/algo/submissions/**")        // 코드 제출 (기존 /algo/solving/** 수정)
-                .addPathPatterns("/algo/pool/draw/**")          // 풀에서 문제 뽑기 (SSE GET)
-                .addPathPatterns("/analysis/analyze-stored");   // 코드 분석
+                .addPathPatterns("/algo/submissions/**")        // 코드 제출
+                .addPathPatterns("/algo/pool/draw")             // 풀에서 문제 뽑기 (POST 동기 방식)
+                .addPathPatterns("/analysis/analyze-stored")    // 코드 분석
+                .excludePathPatterns("/algo/pool/draw/stream"); // SSE 스트리밍은 컨트롤러에서 직접 처리 (재연결 중복 방지)
     }
 }

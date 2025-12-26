@@ -29,6 +29,10 @@ public class RateLimitService {
     private static final String KEY_PREFIX = "usage:daily:";
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd");
 
+    // SSE 스트리밍 진행 중 상태 관리용 (재연결 중복 방지)
+    private static final String IN_PROGRESS_PREFIX = "generation:inProgress:";
+    private static final int IN_PROGRESS_TTL_SECONDS = 180;  // 3분 (LLM 생성 시간 고려)
+
     /**
      * 사용량 체크 및 증가 (체크 후 사용 가능하면 증가)
      *
@@ -90,6 +94,83 @@ public class RateLimitService {
 
         UsageInfo usage = getUsage(userId);
         return Math.max(0, FREE_USER_DAILY_LIMIT - usage.getTotal());
+    }
+
+    // ===== SSE 스트리밍 전용 메서드 (재연결 중복 방지) =====
+
+    /**
+     * 사용량 체크만 수행 (증가 없음) - SSE 스트리밍용
+     * <p>SSE 스트리밍에서는 요청 시작 시 체크만 하고, 성공 시에만 증가시킴
+     *
+     * @param userId       사용자 ID
+     * @param type         사용 유형
+     * @param isSubscriber 구독자 여부
+     * @return 사용 가능 여부 및 잔여 횟수
+     */
+    public UsageCheckResult checkUsageOnly(Long userId, UsageType type, boolean isSubscriber) {
+        if (isSubscriber) {
+            return UsageCheckResult.allowed(-1, -1);  // 무제한
+        }
+
+        UsageInfo currentUsage = getUsage(userId);
+        int totalUsage = currentUsage.getTotal();
+
+        if (totalUsage >= FREE_USER_DAILY_LIMIT) {
+            log.info("사용자 {} 일일 한도 초과 (체크): {}/{}", userId, totalUsage, FREE_USER_DAILY_LIMIT);
+            return UsageCheckResult.denied(totalUsage, FREE_USER_DAILY_LIMIT);
+        }
+
+        int remaining = FREE_USER_DAILY_LIMIT - totalUsage;
+        return UsageCheckResult.allowed(totalUsage, remaining);
+    }
+
+    /**
+     * 사용량 증가만 수행 (체크 없음) - SSE 성공 시 호출
+     * <p>SSE 스트리밍 요청이 성공적으로 완료된 후 호출
+     *
+     * @param userId 사용자 ID
+     * @param type   사용 유형
+     */
+    public void incrementUsageOnly(Long userId, UsageType type) {
+        incrementUsage(userId, type);
+        log.info("사용자 {} 사용량 증가 (SSE 성공): {}", userId, type);
+    }
+
+    /**
+     * 진행 중 상태 설정 - SSE 요청 시작 시 호출
+     * <p>같은 사용자의 중복 요청(SSE 재연결)을 방지하기 위한 마커 설정
+     *
+     * @param userId 사용자 ID
+     * @param type   사용 유형
+     */
+    public void setInProgress(Long userId, UsageType type) {
+        String key = IN_PROGRESS_PREFIX + userId + ":" + type.name();
+        redisTemplate.opsForValue().set(key, "1", IN_PROGRESS_TTL_SECONDS, TimeUnit.SECONDS);
+        log.debug("진행 중 마커 설정 - userId: {}, type: {}, TTL: {}초", userId, type, IN_PROGRESS_TTL_SECONDS);
+    }
+
+    /**
+     * 진행 중 상태 해제 - SSE 요청 완료/에러 시 호출
+     *
+     * @param userId 사용자 ID
+     * @param type   사용 유형
+     */
+    public void clearInProgress(Long userId, UsageType type) {
+        String key = IN_PROGRESS_PREFIX + userId + ":" + type.name();
+        redisTemplate.delete(key);
+        log.debug("진행 중 마커 해제 - userId: {}, type: {}", userId, type);
+    }
+
+    /**
+     * 진행 중 여부 확인 - SSE 재연결 감지용
+     *
+     * @param userId 사용자 ID
+     * @param type   사용 유형
+     * @return 진행 중이면 true
+     */
+    public boolean isInProgress(Long userId, UsageType type) {
+        String key = IN_PROGRESS_PREFIX + userId + ":" + type.name();
+        return Boolean.TRUE.equals(redisTemplate.hasKey(key));
     }
 
     /**
