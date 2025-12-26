@@ -21,13 +21,10 @@ public class RedisConfig {
         RedisTemplate<String, Object> template = new RedisTemplate<>();
         template.setConnectionFactory(connectionFactory);
 
-        // Key는 String으로 직렬화
         template.setKeySerializer(new StringRedisSerializer());
 
-        // Value는 JSON으로 직렬화
         template.setValueSerializer(new GenericJackson2JsonRedisSerializer());
 
-        // Hash Key/Value도 설정
         template.setHashKeySerializer(new StringRedisSerializer());
         template.setHashValueSerializer(new GenericJackson2JsonRedisSerializer());
 

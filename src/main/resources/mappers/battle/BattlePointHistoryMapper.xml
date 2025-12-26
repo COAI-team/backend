@@ -12,6 +12,7 @@
         user_id,
         change_amount,
         type,
+        payment_order_id,
         description,
         battle_match_id,
         created_at
@@ -19,6 +20,7 @@
         #{userId},
         #{changeAmount},
         #{type},
+        #{paymentOrderId},
         #{description},
         #{battleMatchId},
         NOW()

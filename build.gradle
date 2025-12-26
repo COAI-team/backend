@@ -43,6 +43,7 @@ dependencies {
     /* ------------------------
      * 기본 Spring Boot 설정
      * ------------------------ */
+
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-mail'
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
@@ -77,6 +78,8 @@ dependencies {
     /* ANTLR */
     antlr "org.antlr:antlr4:4.13.1"
     implementation 'org.antlr:antlr4-runtime:4.13.1'
+
+    implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310'
 }
 
 generateGrammarSource {
@@ -84,6 +87,7 @@ generateGrammarSource {
 }
 
 dependencies {
+
     /* Spring Integration */
     implementation 'org.springframework.boot:spring-boot-starter-integration'
 

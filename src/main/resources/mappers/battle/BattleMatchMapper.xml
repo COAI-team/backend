@@ -12,13 +12,19 @@
         <result column="ALGO_PROBLEM_ID" property="algoProblemId"/>
         <result column="LANGUAGE_ID" property="languageId"/>
         <result column="LEVEL_MODE" property="levelMode"/>
+        <result column="HOST_LEVEL_SNAPSHOT" property="hostLevelSnapshot"/>
+        <result column="GUEST_LEVEL_SNAPSHOT" property="guestLevelSnapshot"/>
         <result column="ROOM_TITLE" property="roomTitle"/>
         <result column="BET_AMOUNT" property="betAmount"/>
         <result column="MAX_DURATION_MINUTES" property="maxDurationMinutes"/>
+        <result column="COUNTDOWN_STARTED_AT" property="countdownStartedAt"/>
         <result column="STARTED_AT" property="startedAt"/>
         <result column="FINISHED_AT" property="finishedAt"/>
+        <result column="HOST_AC_AT" property="hostAcAt"/>
+        <result column="GUEST_AC_AT" property="guestAcAt"/>
         <result column="WINNER_USER_ID" property="winnerUserId"/>
         <result column="WIN_REASON" property="winReason"/>
+        <result column="WINNER_ELAPSED_MS" property="winnerElapsedMs"/>
         <result column="SETTLEMENT_STATUS" property="settlementStatus"/>
     </resultMap>
 
@@ -31,13 +37,19 @@
         ALGO_PROBLEM_ID,
         LANGUAGE_ID,
         LEVEL_MODE,
+        HOST_LEVEL_SNAPSHOT,
+        GUEST_LEVEL_SNAPSHOT,
         ROOM_TITLE,
         BET_AMOUNT,
         MAX_DURATION_MINUTES,
+        COUNTDOWN_STARTED_AT,
         STARTED_AT,
         FINISHED_AT,
+        HOST_AC_AT,
+        GUEST_AC_AT,
         WINNER_USER_ID,
         WIN_REASON,
+        WINNER_ELAPSED_MS,
         SETTLEMENT_STATUS
         ) VALUES (
         #{matchId},
@@ -47,13 +59,19 @@
         #{algoProblemId},
         #{languageId},
         #{levelMode},
+        #{hostLevelSnapshot},
+        #{guestLevelSnapshot},
         #{roomTitle},
         #{betAmount},
         #{maxDurationMinutes},
+        #{countdownStartedAt},
         #{startedAt},
         #{finishedAt},
+        #{hostAcAt},
+        #{guestAcAt},
         #{winnerUserId},
         #{winReason},
+        #{winnerElapsedMs},
         #{settlementStatus}
         )
     </insert>
@@ -61,7 +79,9 @@
     <update id="updateParticipants">
         UPDATE BATTLE_MATCHES
         SET HOST_USER_ID = #{hostUserId},
-            GUEST_USER_ID = #{guestUserId}
+            GUEST_USER_ID = #{guestUserId},
+            HOST_LEVEL_SNAPSHOT = #{hostLevelSnapshot},
+            GUEST_LEVEL_SNAPSHOT = #{guestLevelSnapshot}
         WHERE MATCH_ID = #{matchId}
     </update>
 
@@ -70,8 +90,27 @@
         SET STATUS = #{status},
             WINNER_USER_ID = #{winnerUserId},
             WIN_REASON = #{winReason},
-            STARTED_AT = CASE WHEN #{status} IN ('COUNTDOWN','RUNNING') AND STARTED_AT IS NULL THEN NOW() ELSE STARTED_AT END,
+            COUNTDOWN_STARTED_AT = CASE WHEN #{status} = 'COUNTDOWN' AND COUNTDOWN_STARTED_AT IS NULL THEN NOW() ELSE COUNTDOWN_STARTED_AT END,
+            STARTED_AT = CASE WHEN #{status} = 'RUNNING' AND STARTED_AT IS NULL THEN NOW() ELSE STARTED_AT END,
             FINISHED_AT = CASE WHEN #{status} IN ('FINISHED', 'CANCELED') THEN NOW() ELSE FINISHED_AT END
+        WHERE MATCH_ID = #{matchId}
+    </update>
+
+    <update id="updateHostAcAt">
+        UPDATE BATTLE_MATCHES
+        SET HOST_AC_AT = CASE WHEN HOST_AC_AT IS NULL THEN #{acAt} ELSE HOST_AC_AT END
+        WHERE MATCH_ID = #{matchId}
+    </update>
+
+    <update id="updateGuestAcAt">
+        UPDATE BATTLE_MATCHES
+        SET GUEST_AC_AT = CASE WHEN GUEST_AC_AT IS NULL THEN #{acAt} ELSE GUEST_AC_AT END
+        WHERE MATCH_ID = #{matchId}
+    </update>
+
+    <update id="updateWinnerElapsedMs">
+        UPDATE BATTLE_MATCHES
+        SET WINNER_ELAPSED_MS = #{winnerElapsedMs}
         WHERE MATCH_ID = #{matchId}
     </update>
 
@@ -87,6 +126,12 @@
         WHERE MATCH_ID = #{matchId}
     </update>
 
+    <update id="updateProblem">
+        UPDATE BATTLE_MATCHES
+        SET ALGO_PROBLEM_ID = #{algoProblemId}
+        WHERE MATCH_ID = #{matchId}
+    </update>
+
     <select id="findById" resultMap="BattleMatchMap">
         SELECT
             MATCH_ID,
@@ -96,13 +141,19 @@
             ALGO_PROBLEM_ID,
             LANGUAGE_ID,
             LEVEL_MODE,
+            HOST_LEVEL_SNAPSHOT,
+            GUEST_LEVEL_SNAPSHOT,
             ROOM_TITLE,
             BET_AMOUNT,
             MAX_DURATION_MINUTES,
+            COUNTDOWN_STARTED_AT,
             STARTED_AT,
             FINISHED_AT,
+            HOST_AC_AT,
+            GUEST_AC_AT,
             WINNER_USER_ID,
             WIN_REASON,
+            WINNER_ELAPSED_MS,
             SETTLEMENT_STATUS
         FROM BATTLE_MATCHES
         WHERE MATCH_ID = #{matchId}
@@ -117,13 +168,19 @@
             ALGO_PROBLEM_ID,
             LANGUAGE_ID,
             LEVEL_MODE,
+            HOST_LEVEL_SNAPSHOT,
+            GUEST_LEVEL_SNAPSHOT,
             ROOM_TITLE,
             BET_AMOUNT,
             MAX_DURATION_MINUTES,
+            COUNTDOWN_STARTED_AT,
             STARTED_AT,
             FINISHED_AT,
+            HOST_AC_AT,
+            GUEST_AC_AT,
             WINNER_USER_ID,
             WIN_REASON,
+            WINNER_ELAPSED_MS,
             SETTLEMENT_STATUS
         FROM BATTLE_MATCHES
         WHERE FINISHED_AT IS NULL

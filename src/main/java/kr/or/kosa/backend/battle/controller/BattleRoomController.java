@@ -119,11 +119,21 @@ public class BattleRoomController {
         return ResponseEntity.ok(ApiResponse.success(room));
     }
 
+    @PostMapping("/{roomId}/reset")
+    public ResponseEntity<ApiResponse<BattleRoomResponse>> resetRoom(
+            @PathVariable String roomId,
+            Authentication authentication
+    ) {
+        Long userId = requireUserId(authentication);
+        BattleRoomResponse room = battleRoomService.resetRoomForParticipant(roomId, userId);
+        return ResponseEntity.ok(ApiResponse.success(room));
+    }
+
     private Long requireUserId(Authentication authentication) {
         if (authentication == null
                 || !authentication.isAuthenticated()
                 || authentication instanceof AnonymousAuthenticationToken) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "로그인이 필요합니다.");
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "???? ?????.");
         }
 
         Object principal = authentication.getPrincipal();
@@ -139,7 +149,8 @@ public class BattleRoomController {
         try {
             return Long.valueOf(authentication.getName());
         } catch (NumberFormatException e) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "로그인이 필요합니다.");
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "???? ?????.");
         }
     }
 }
+

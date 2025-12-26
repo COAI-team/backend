@@ -5,6 +5,7 @@ import java.util.List;
 import kr.or.kosa.backend.battle.domain.BattleEventType;
 import kr.or.kosa.backend.battle.domain.BattleRoomState;
 import kr.or.kosa.backend.battle.dto.BattleErrorMessage;
+import kr.or.kosa.backend.battle.dto.BattleFinishResponse;
 import kr.or.kosa.backend.battle.dto.BattleRoomListResponse;
 import kr.or.kosa.backend.battle.dto.BattleRoomResponse;
 import kr.or.kosa.backend.battle.dto.BattleSubmitResultResponse;
@@ -12,14 +13,17 @@ import kr.or.kosa.backend.battle.dto.BattleWsMessage;
 import kr.or.kosa.backend.battle.exception.BattleErrorCode;
 import kr.or.kosa.backend.commons.exception.custom.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class BattleMessageService {
 
     private final SimpMessagingTemplate messagingTemplate;
+    private final BattleMatchService battleMatchService;
 
     public void publishRoomList(List<BattleRoomResponse> rooms) {
         BattleRoomListResponse response = BattleRoomListResponse.builder()
@@ -73,11 +77,21 @@ public class BattleMessageService {
     }
 
     public void publishFinish(BattleRoomState state) {
-        BattleWsMessage<BattleRoomResponse> message = BattleWsMessage.<BattleRoomResponse>builder()
+        BattleFinishResponse payload = BattleFinishResponse.from(
+                state,
+                battleMatchService.findById(state.getMatchId()).orElse(null)
+        );
+        if (payload != null) {
+            log.info("[battle] matchId={} roomId={} action=broadcast-finish winner={} reason={} hostScore={} guestScore={}",
+                    state.getMatchId(), state.getRoomId(), payload.getWinnerUserId(), payload.getWinReason(),
+                    payload.getHost() != null ? payload.getHost().getFinalScore() : null,
+                    payload.getGuest() != null ? payload.getGuest().getFinalScore() : null);
+        }
+        BattleWsMessage<BattleFinishResponse> message = BattleWsMessage.<BattleFinishResponse>builder()
                 .type(BattleEventType.FINISH)
                 .roomId(state.getRoomId())
                 .matchId(state.getMatchId())
-                .payload(BattleRoomResponse.from(state))
+                .payload(payload)
                 .build();
         messagingTemplate.convertAndSend("/topic/battle/room/" + state.getRoomId(), message);
     }
