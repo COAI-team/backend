@@ -271,68 +271,6 @@ public class AlgorithmProblemController {
         });
     }
 
-    /**
-     * 문제 목록 조회
-     * GET /api/algo/problems?page=1&size=10&difficulty=BRONZE&source=AI_GENERATED&keyword=검색어&topic=배열&problemType=ALGORITHM
-     */
-//    @GetMapping
-//    public ResponseEntity<ApiResponse<Map<String, Object>>> getProblems(
-//            @RequestParam(defaultValue = "1") int page,
-//            @RequestParam(defaultValue = "10") int size,
-//            @RequestParam(required = false) String difficulty,
-//            @RequestParam(required = false) String source,
-//            @RequestParam(required = false) String keyword,
-//            @RequestParam(required = false) String topic,
-//            @RequestParam(required = false) String problemType,
-//            @AuthenticationPrincipal JwtAuthentication authentication) {
-//
-//        log.info("문제 목록 조회 요청 - page: {}, size: {}, difficulty: {}, source: {}, keyword: {}, topic: {}, problemType: {}",
-//                page, size, difficulty, source, keyword, topic, problemType);
-//
-//        try {
-//            if (page < 1) {
-//                page = 1;
-//            }
-//            if (size < 1 || size > 100) {
-//                size = 10;
-//            }
-//
-//            Long userId = null;
-//            if (authentication != null) {
-//                JwtUserDetails userDetails = (JwtUserDetails) authentication.getPrincipal();
-//                userId = userDetails.id().longValue();
-//            }
-//
-//            int offset = (page - 1) * size;
-//
-//            List<AlgoProblemDto> problems = algorithmProblemService.getProblemsWithFilter(
-//                    offset, size, difficulty, source, keyword, topic, problemType);
-//
-//            int totalCount = algorithmProblemService.getTotalProblemsCountWithFilter(
-//                    difficulty, source, keyword, topic, problemType);
-//
-//            int totalPages = (int) Math.ceil((double) totalCount / size);
-//            boolean hasNext = page < totalPages;
-//            boolean hasPrevious = page > 1;
-//
-//            Map<String, Object> responseData = new HashMap<>();
-//            responseData.put("problems", problems);
-//            responseData.put("currentPage", page);
-//            responseData.put("pageSize", size);
-//            responseData.put("totalCount", totalCount);
-//            responseData.put("totalPages", totalPages);
-//            responseData.put("hasNext", hasNext);
-//            responseData.put("hasPrevious", hasPrevious);
-//
-//            log.info("문제 목록 조회 성공 - 조회된 문제 수: {}", problems.size());
-//
-//            return ResponseEntity.ok(ApiResponse.success(responseData));
-//
-//        } catch (Exception e) {
-//            log.error("문제 목록 조회 실패", e);
-//            throw new CustomBusinessException(AlgoErrorCode.INVALID_INPUT);
-//        }
-//    }
 
     @GetMapping
     public ResponseEntity<ApiResponse<Map<String, Object>>> getProblems(

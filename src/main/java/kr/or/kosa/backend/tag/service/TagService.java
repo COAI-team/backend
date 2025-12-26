@@ -30,42 +30,18 @@ public class TagService {
 
     @Transactional
     public Tag getOrCreateTag(String tagInput) {
-        String normalizedName = tagInput.toLowerCase().trim();
-        log.info(">>> getOrCreateTag 시작: normalizedName='{}'", normalizedName);
+        String normalizedTagName = tagInput.trim().toLowerCase();
 
-        Optional<Tag> existingTag = tagMapper.findByTagName(normalizedName);
-        log.error(">>> DEBUG: normalizedName='{}', 조회결과={}", normalizedName, existingTag.isPresent());
+        // 임시 Tag 객체 생성 (tagId는 null)
+        Tag tag = Tag.builder()
+                .tagName(normalizedTagName)
+                .build();
 
-        if (existingTag.isPresent()) {
-            log.info("기존 태그 조회 성공: tagId={}, tagName={}", existingTag.get().getTagId(), normalizedName);
-            return existingTag.get();
-        }
+        // UPSERT 실행 - MyBatis가 tag 객체의 tagId 필드에 값을 주입
+        tagMapper.upsertTag(tag);
 
-        try {
-            Tag newTag = Tag.builder()
-                    .tagName(normalizedName)
-                    .build();
-
-            log.info(">>> 새 태그 insert 시도: tagName='{}'", normalizedName);
-            int result = tagMapper.insertTag(newTag);
-
-            if (result == 0 || newTag.getTagId() == null) {
-                throw new CustomBusinessException(TagErrorCode.TAG_SAVE_FAILED);
-            }
-
-            log.info("새 태그 생성 성공: tagId={}, tagName={}", newTag.getTagId(), normalizedName);
-            return newTag;
-
-        } catch (DataIntegrityViolationException e) {
-            log.warn("태그 중복 발생, 재조회: tagName={}", normalizedName);
-
-            // 재조회 (캐시 우회를 위해 다시 한번 조회)
-            return tagMapper.findByTagName(normalizedName)
-                    .orElseThrow(() -> {
-                        log.error("재조회 실패: DB 확인 필요 - tagName={}", normalizedName);
-                        return new CustomBusinessException(TagErrorCode.TAG_SAVE_FAILED);
-                    });
-        }
+        // MyBatis의 useGeneratedKeys로 tagId가 채워진 상태로 반환
+        return tag;
     }
 
     @Transactional

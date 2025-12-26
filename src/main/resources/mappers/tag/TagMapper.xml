@@ -15,10 +15,14 @@
         WHERE LOWER(TAG_NAME) = LOWER(#{tagName})
         LIMIT 1
     </select>
+
     <!-- 태그 저장 -->
-    <insert id="insertTag" useGeneratedKeys="true" keyProperty="tagId">
+    <insert id="upsertTag" parameterType="kr.or.kosa.backend.tag.domain.Tag"
+            useGeneratedKeys="true" keyProperty="tagId" keyColumn="TAG_ID">
         INSERT INTO TAG (TAG_NAME)
         VALUES (#{tagName})
+        ON DUPLICATE KEY UPDATE
+        TAG_ID = LAST_INSERT_ID(TAG_ID)
     </insert>
 
     <!-- 태그 삭제 -->
