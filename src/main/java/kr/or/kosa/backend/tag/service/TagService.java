@@ -11,7 +11,6 @@ import kr.or.kosa.backend.tag.mapper.FreeboardTagMapper;
 import kr.or.kosa.backend.tag.mapper.TagMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,15 +31,12 @@ public class TagService {
     public Tag getOrCreateTag(String tagInput) {
         String normalizedTagName = tagInput.trim().toLowerCase();
 
-        // 임시 Tag 객체 생성 (tagId는 null)
         Tag tag = Tag.builder()
                 .tagName(normalizedTagName)
                 .build();
 
-        // UPSERT 실행 - MyBatis가 tag 객체의 tagId 필드에 값을 주입
         tagMapper.upsertTag(tag);
 
-        // MyBatis의 useGeneratedKeys로 tagId가 채워진 상태로 반환
         return tag;
     }
 
@@ -244,12 +240,22 @@ public class TagService {
         return tags.stream()
                 .limit(limit)
                 .map(tag -> {
-                    String popularDisplay = tagMapper.findMostUsedDisplayName(tag.getTagId());
+                    // 캐시된 인기 표기 사용
+                    String popularDisplay = tag.getPopularDisplayName();
                     if (popularDisplay == null || popularDisplay.isEmpty()) {
-                        popularDisplay = tag.getTagName();
+                        // 캐시가 없으면 실시간 조회 (fallback)
+                        popularDisplay = tagMapper.findMostUsedDisplayName(tag.getTagId());
+                        if (popularDisplay == null || popularDisplay.isEmpty()) {
+                            popularDisplay = tag.getTagName();
+                        }
                     }
 
-                    Long count = tagMapper.countByTagId(tag.getTagId());
+                    // 캐시된 사용 횟수 사용
+                    Long count = tag.getUsageCount();
+                    if (count == null) {
+                        // 캐시가 없으면 실시간 조회 (fallback)
+                        count = tagMapper.countByTagId(tag.getTagId());
+                    }
 
                     return TagAutocompleteDto.builder()
                             .tagId(tag.getTagId())
