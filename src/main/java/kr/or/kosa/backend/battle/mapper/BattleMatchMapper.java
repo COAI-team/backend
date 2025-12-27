@@ -22,6 +22,12 @@ public interface BattleMatchMapper {
                      @Param("winnerUserId") Long winnerUserId,
                      @Param("winReason") String winReason);
 
+    int updateCountdownStartedAt(@Param("matchId") String matchId,
+                                 @Param("countdownStartedAt") java.time.LocalDateTime countdownStartedAt);
+
+    int updateStartedAt(@Param("matchId") String matchId,
+                        @Param("startedAt") java.time.LocalDateTime startedAt);
+
     int updateSettlementStatus(@Param("matchId") String matchId,
                                @Param("settlementStatus") String settlementStatus);
 
