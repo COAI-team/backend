@@ -7,6 +7,7 @@ import kr.or.kosa.backend.battle.domain.BattleRoomState;
 import kr.or.kosa.backend.battle.domain.BattleSettlementStatus;
 import kr.or.kosa.backend.battle.domain.BattleStatus;
 import kr.or.kosa.backend.battle.mapper.BattleMatchMapper;
+import kr.or.kosa.backend.battle.util.BattleTime;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -62,11 +63,17 @@ public class BattleMatchService {
 
     @Transactional
     public void markRunning(String matchId) {
+        if (matchId == null) return;
+        LocalDateTime now = BattleTime.nowKst();
+        battleMatchMapper.updateStartedAt(matchId, now);
         battleMatchMapper.updateStatus(matchId, BattleStatus.RUNNING.name(), null, null);
     }
 
     @Transactional
     public void markCountdown(String matchId) {
+        if (matchId == null) return;
+        LocalDateTime now = BattleTime.nowKst();
+        battleMatchMapper.updateCountdownStartedAt(matchId, now);
         battleMatchMapper.updateStatus(matchId, BattleStatus.COUNTDOWN.name(), null, null);
     }
 

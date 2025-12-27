@@ -59,6 +59,9 @@ public class BattleRoomService {
     private static final Duration POSTGAME_LOCK_DURATION = Duration.ofSeconds(30);
     private static final Duration WAITING_DISCONNECT_GRACE = Duration.ofSeconds(6);
     private static final Duration DISCONNECT_RECHECK_GRACE = Duration.ofSeconds(3);
+    private static final Duration DISCONNECT_RECHECK_WINDOW = Duration.ofSeconds(30);
+    private static final Duration STARTUP_DISCONNECT_GRACE = Duration.ofSeconds(20);
+    private static final int DISCONNECT_RECHECK_MAX = 6;
     private static final BigDecimal TIME_BONUS_PER_SECOND = new BigDecimal("0.01");
     private static final BigDecimal MAX_SCORE = new BigDecimal("100.00");
     private static final int JUDGE_ERROR_LIMIT = 3;
@@ -2248,6 +2251,20 @@ public class BattleRoomService {
 
         Long opponent = resolveOpponent(state, userId);
         if (opponent == null) {
+            LocalDateTime startedAt = state.getStartedAt();
+            if (startedAt != null) {
+                LocalDateTime now = BattleTime.nowKst();
+                if (now.isBefore(startedAt.plusSeconds(STARTUP_DISCONNECT_GRACE.getSeconds()))) {
+                    scheduleOpponentRecheck(roomId, userId);
+                    log.warn("[battle] matchId={} userId={} action=opponent-recheck-startup-grace", state.getMatchId(), userId);
+                    return;
+                }
+            }
+            if (shouldRetryOpponentRecheck(roomId, userId)) {
+                scheduleOpponentRecheck(roomId, userId);
+                log.warn("[battle] matchId={} userId={} action=opponent-recheck-retry", state.getMatchId(), userId);
+                return;
+            }
             cancelRoom(state);
             return;
         }
@@ -2263,6 +2280,16 @@ public class BattleRoomService {
 
     private String opponentRecheckKey(String roomId, Long userId) {
         return "battle:grace:recheck:" + roomId + ":" + userId;
+    }
+
+    private boolean shouldRetryOpponentRecheck(String roomId, Long userId) {
+        if (roomId == null || userId == null) return false;
+        String key = "battle:grace:recheck:count:" + roomId + ":" + userId;
+        Long count = stringRedisTemplate.opsForValue().increment(key);
+        if (count != null && count == 1L) {
+            stringRedisTemplate.expire(key, DISCONNECT_RECHECK_WINDOW);
+        }
+        return count != null && count <= DISCONNECT_RECHECK_MAX;
     }
 
     private Long resolveOpponent(BattleRoomState state, Long userId) {

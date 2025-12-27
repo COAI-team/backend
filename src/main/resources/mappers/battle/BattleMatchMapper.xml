@@ -96,6 +96,18 @@
         WHERE MATCH_ID = #{matchId}
     </update>
 
+    <update id="updateCountdownStartedAt">
+        UPDATE BATTLE_MATCHES
+        SET COUNTDOWN_STARTED_AT = COALESCE(COUNTDOWN_STARTED_AT, #{countdownStartedAt})
+        WHERE MATCH_ID = #{matchId}
+    </update>
+
+    <update id="updateStartedAt">
+        UPDATE BATTLE_MATCHES
+        SET STARTED_AT = COALESCE(STARTED_AT, #{startedAt})
+        WHERE MATCH_ID = #{matchId}
+    </update>
+
     <update id="updateHostAcAt">
         UPDATE BATTLE_MATCHES
         SET HOST_AC_AT = CASE WHEN HOST_AC_AT IS NULL THEN #{acAt} ELSE HOST_AC_AT END
