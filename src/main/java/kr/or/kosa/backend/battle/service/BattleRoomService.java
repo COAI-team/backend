@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Duration;
-import java.time.Instant; // 스케줄러 경계(예약)에서만 필요
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -57,6 +57,11 @@ public class BattleRoomService {
     private static final int COUNTDOWN_SECONDS = 5;
     private static final Duration SUBMIT_COOLDOWN = Duration.ofSeconds(2);
     private static final Duration POSTGAME_LOCK_DURATION = Duration.ofSeconds(30);
+    private static final Duration WAITING_DISCONNECT_GRACE = Duration.ofSeconds(6);
+    private static final Duration DISCONNECT_RECHECK_GRACE = Duration.ofSeconds(3);
+    private static final Duration DISCONNECT_RECHECK_WINDOW = Duration.ofSeconds(30);
+    private static final Duration STARTUP_DISCONNECT_GRACE = Duration.ofSeconds(20);
+    private static final int DISCONNECT_RECHECK_MAX = 6;
     private static final BigDecimal TIME_BONUS_PER_SECOND = new BigDecimal("0.01");
     private static final BigDecimal MAX_SCORE = new BigDecimal("100.00");
     private static final int JUDGE_ERROR_LIMIT = 3;
@@ -193,6 +198,9 @@ public class BattleRoomService {
                                 String.valueOf(state.getHostUserId())
                         )
                 );
+                if (finishedPostGame) {
+                    keepHost = true;
+                }
                 if (keepHost) {
                     setActiveRoom(state.getHostUserId(), state.getRoomId());
                     addMember(state.getRoomId(), state.getHostUserId());
@@ -205,6 +213,9 @@ public class BattleRoomService {
                                 String.valueOf(state.getGuestUserId())
                         )
                 );
+                if (finishedPostGame) {
+                    keepGuest = true;
+                }
                 if (keepGuest) {
                     setActiveRoom(state.getGuestUserId(), state.getRoomId());
                     addMember(state.getRoomId(), state.getGuestUserId());
@@ -453,7 +464,7 @@ public class BattleRoomService {
 
             String password = request.getPassword();
             boolean isPrivate = password != null && !password.isBlank();
-            if (isPrivate && !password.matches("^\\d{4}$")) {
+            if (isPrivate && !password.matches("^\\d{1,4}$")) {
                 throw new BattleException(BattleErrorCode.INVALID_STATUS);
             }
             String passwordHash = isPrivate ? passwordEncoder.encode(password) : null;
@@ -562,6 +573,7 @@ public class BattleRoomService {
         if (requesterId != null && isParticipant(state, requesterId)) {
             setActiveRoom(requesterId, roomId);
             addMember(roomId, requesterId);
+            cancelWaitingDisconnectGrace(roomId, requesterId);
         }
         ensureActiveAndMembers(state);
         saveRoom(state);
@@ -583,6 +595,11 @@ public class BattleRoomService {
 
         BattleRoomState state = stateOpt.get();
         LocalDateTime now = BattleTime.nowKst();
+
+        if (!isParticipant(state, userId)) {
+            cleanupActiveMapping(userId, roomId, state);
+            return Optional.empty();
+        }
 
         if (state.getStatus() == BattleStatus.FINISHED || state.getStatus() == BattleStatus.CANCELED) {
             Boolean isMember = stringRedisTemplate.opsForSet().isMember(
@@ -668,7 +685,7 @@ public class BattleRoomService {
                 if (state.isPrivate()) {
                     enforcePasswordRateLimit(roomId, userId);
 
-                    if (password == null || !password.matches("^\\d{4}$")
+                    if (password == null || !password.matches("^\\d{1,4}$")
                             || !passwordEncoder.matches(password, state.getPasswordHash())) {
                         registerPasswordFailure(roomId, userId);
                         randomDelay();
@@ -680,6 +697,7 @@ public class BattleRoomService {
                 boolean alreadyParticipant = isParticipant(state, userId);
                 if (state.getStatus() == BattleStatus.RUNNING && alreadyParticipant) {
                     cancelDisconnectGrace(state.getRoomId(), userId);
+                    cancelWaitingDisconnectGrace(state.getRoomId(), userId);
                     saveRoom(state);
                     setActiveRoom(userId, roomId);
                     addMember(roomId, userId);
@@ -691,6 +709,7 @@ public class BattleRoomService {
                 }
 
                 if (alreadyParticipant) {
+                    cancelWaitingDisconnectGrace(state.getRoomId(), userId);
                     ensureNicknames(state);
                     ensureActiveAndMembers(state);
                     saveRoom(state);
@@ -752,6 +771,15 @@ public class BattleRoomService {
         String roomId = stringRedisTemplate.opsForValue().get(BattleRedisKeyUtil.activeRoomKey(userId));
         if (roomId == null) return;
         try {
+            BattleRoomState state = getRoomState(roomId).orElse(null);
+            if (state == null) {
+                cleanupActiveMapping(userId, roomId, null);
+                return;
+            }
+            if (state.getStatus() == BattleStatus.WAITING || state.getStatus() == BattleStatus.COUNTDOWN) {
+                startWaitingDisconnectGrace(state, userId);
+                return;
+            }
             leaveRoomInternal(roomId, userId, true);
         } catch (BattleException ex) {
             if (ex.getErrorCode() == BattleErrorCode.NOT_PARTICIPANT
@@ -773,6 +801,7 @@ public class BattleRoomService {
             if (lockToken == null) throw new BattleException(BattleErrorCode.LOCK_TIMEOUT);
 
             try {
+                cancelWaitingDisconnectGrace(roomId, userId);
                 BattleRoomState state = getRoomState(roomId)
                         .orElseThrow(() -> new BattleException(BattleErrorCode.ROOM_NOT_FOUND));
 
@@ -848,6 +877,7 @@ public class BattleRoomService {
                     startDisconnectGrace(state, userId);
                 } else if (state.getStatus() == BattleStatus.FINISHED || state.getStatus() == BattleStatus.CANCELED) {
                     cancelDisconnectGrace(roomId, userId);
+                    cancelWaitingDisconnectGrace(roomId, userId);
                     clearActiveRoom(userId, roomId);
                     removeMember(roomId, userId);
                     Optional.ofNullable(state.getParticipants()).ifPresent(map -> map.remove(userId));
@@ -1232,7 +1262,7 @@ public class BattleRoomService {
 
             if (request.getIsPrivate() != null) {
                 if (Boolean.TRUE.equals(request.getIsPrivate())) {
-                    if (request.getNewPassword() == null || !request.getNewPassword().matches("^\\d{4}$")) {
+                    if (request.getNewPassword() == null || !request.getNewPassword().matches("^\\d{1,4}$")) {
                         throw new BattleException(BattleErrorCode.INVALID_STATUS);
                     }
                     state.setPrivate(true);
@@ -1242,7 +1272,7 @@ public class BattleRoomService {
                     state.setPasswordHash(null);
                 }
             } else if (request.getNewPassword() != null) {
-                if (!request.getNewPassword().matches("^\\d{4}$")) {
+                if (!request.getNewPassword().matches("^\\d{1,4}$")) {
                     throw new BattleException(BattleErrorCode.INVALID_STATUS);
                 }
                 state.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
@@ -1376,6 +1406,12 @@ public class BattleRoomService {
                 battleMessageService.publishRoomState(state);
                 broadcastLobby();
                 return;
+            }
+
+            if (state.isRandomProblem()) {
+                Long randomId = selectRandomProblemId();
+                state.setAlgoProblemId(randomId);
+                battleMatchService.updateProblem(state.getMatchId(), randomId);
             }
 
             state.setStatus(BattleStatus.RUNNING);
@@ -1716,8 +1752,10 @@ public class BattleRoomService {
 
             Set<String> members = stringRedisTemplate.opsForSet().members(BattleRedisKeyUtil.membersKey(roomId));
             boolean hasMembers = members != null && !members.isEmpty();
+            boolean hasParticipants = state.getHostUserId() != null || state.getGuestUserId() != null;
 
-            if ((state.getStatus() == BattleStatus.FINISHED || state.getStatus() == BattleStatus.CANCELED) && hasMembers) {
+            if ((state.getStatus() == BattleStatus.FINISHED || state.getStatus() == BattleStatus.CANCELED)
+                    && (hasMembers || hasParticipants)) {
                 syncParticipantsWithMembers(state, members);
                 resetForNextMatch(state);
                 ensureNicknames(state);
@@ -1932,10 +1970,6 @@ public class BattleRoomService {
             });
         }
 
-        if (state.isRandomProblem()) {
-            state.setAlgoProblemId(selectRandomProblemId());
-        }
-
         String previousMatchId = state.getMatchId();
         String newMatchId = UUID.randomUUID().toString();
         state.setMatchId(newMatchId);
@@ -2021,12 +2055,7 @@ public class BattleRoomService {
 
     private String buildJudgeSummary(BigDecimal baseScore, String message) {
         BigDecimal score = baseScore != null ? baseScore : BigDecimal.ZERO;
-        String smell = scoreToSmell(score);
-        String issue = extractIssueHint(message);
-        if (issue == null || issue.isBlank()) {
-            return smell;
-        }
-        return smell + ": " + issue;
+        return scoreToSmell(score);
     }
 
     private String normalizeJudgeDetail(String message) {
@@ -2066,6 +2095,9 @@ public class BattleRoomService {
         if (message == null || message.isBlank()) return null;
         String normalized = message.replace('\r', ' ').replace('\n', ' ').toLowerCase();
         if (containsAny(normalized, "\uCEF4\uD30C\uC77C", "compile")) return "\uCEF4\uD30C\uC77C \uC624\uB958\uB85C \uC2E4\uD589 \uBD88\uAC00";
+        if (containsAny(normalized, "\uC5B8\uC5B4") && containsAny(normalized, "\uB2E4\uB978", "\uBD88\uC77C\uCE58", "mismatch")) {
+            return "\uC120\uD0DD \uC5B8\uC5B4 \uBD88\uC77C\uCE58";
+        }
         if (containsAny(normalized, "\uC785\uB825") && containsAny(normalized, "\uC5C6", "\uB204\uB77D", "\uBC1B\uC9C0", "\uC77D\uC9C0")) {
             return "\uC785\uB825 \uCC98\uB9AC \uB204\uB77D";
         }
@@ -2127,12 +2159,12 @@ public class BattleRoomService {
         battleMessageService.publishRoomState(state);
         broadcastLobby();
 
-        String nickname = offenderId != null ? fetchNickname(offenderId) : "참가자";
+        String nickname = offenderId != null ? fetchNickname(offenderId) : "\uCC38\uAC00\uC790";
         String message;
         if (ex.getErrorCode() == BattleErrorCode.POINT_ACCOUNT_MISSING) {
-            message = nickname + "님의 포인트 정보가 없습니다. 다시 로그인 후 시도해 주세요.";
+            message = nickname + "\uC758 \uD3EC\uC778\uD2B8 \uACC4\uC88C\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4. \uC7A0\uC2DC \uB85C\uADF8\uC778 \uD6C4 \uB2E4\uC2DC \uC2DC\uB3C4\uD574 \uC8FC\uC138\uC694.";
         } else if (ex.getErrorCode() == BattleErrorCode.INSUFFICIENT_POINTS) {
-            message = nickname + "님의 포인트가 부족합니다.";
+            message = nickname + "\uC758 \uD3EC\uC778\uD2B8\uAC00 \uBD80\uC871\uD569\uB2C8\uB2E4.";
         } else {
             message = ex.getErrorCode().getMessage();
         }
@@ -2148,12 +2180,17 @@ public class BattleRoomService {
      * ------------------------------------------------------------ */
 
     private void startDisconnectGrace(BattleRoomState state, Long userId) {
-        Long opponent = Objects.equals(userId, state.getHostUserId()) ? state.getGuestUserId() : state.getHostUserId();
+        Long opponent = resolveOpponent(state, userId);
         if (opponent == null) {
-            // 상대가 없으면 그냥 취소
-            cancelRoom(state);
+            scheduleOpponentRecheck(state.getRoomId(), userId);
             return;
         }
+
+        startDisconnectGraceInternal(state, userId, opponent);
+    }
+
+    private void startDisconnectGraceInternal(BattleRoomState state, Long userId, Long opponent) {
+        if (state == null || state.getRoomId() == null || userId == null || opponent == null) return;
 
         String key = graceKey(state.getRoomId(), userId);
         if (Boolean.TRUE.equals(stringRedisTemplate.hasKey(key))) return;
@@ -2184,10 +2221,150 @@ public class BattleRoomService {
         String key = graceKey(roomId, userId);
         stringRedisTemplate.delete(key);
         Optional.ofNullable(disconnectTasks.remove(key)).ifPresent(f -> f.cancel(false));
+        cancelOpponentRecheck(roomId, userId);
     }
 
     private String graceKey(String roomId, Long userId) {
         return "battle:grace:" + roomId + ":" + userId;
+    }
+
+    private void scheduleOpponentRecheck(String roomId, Long userId) {
+        if (roomId == null || userId == null) return;
+        String key = opponentRecheckKey(roomId, userId);
+        if (Boolean.TRUE.equals(stringRedisTemplate.hasKey(key))) return;
+
+        stringRedisTemplate.opsForValue().set(key, "1", DISCONNECT_RECHECK_GRACE);
+
+        ScheduledFuture<?> future = battleTaskScheduler.schedule(
+                () -> handleOpponentRecheck(roomId, userId, key),
+                Instant.now().plus(DISCONNECT_RECHECK_GRACE)
+        );
+        disconnectTasks.put(key, future);
+    }
+
+    private void handleOpponentRecheck(String roomId, Long userId, String key) {
+        stringRedisTemplate.delete(key);
+        disconnectTasks.remove(key);
+
+        BattleRoomState state = getRoomState(roomId).orElse(null);
+        if (state == null || state.getStatus() != BattleStatus.RUNNING) return;
+
+        Long opponent = resolveOpponent(state, userId);
+        if (opponent == null) {
+            LocalDateTime startedAt = state.getStartedAt();
+            if (startedAt != null) {
+                LocalDateTime now = BattleTime.nowKst();
+                if (now.isBefore(startedAt.plusSeconds(STARTUP_DISCONNECT_GRACE.getSeconds()))) {
+                    scheduleOpponentRecheck(roomId, userId);
+                    log.warn("[battle] matchId={} userId={} action=opponent-recheck-startup-grace", state.getMatchId(), userId);
+                    return;
+                }
+            }
+            if (shouldRetryOpponentRecheck(roomId, userId)) {
+                scheduleOpponentRecheck(roomId, userId);
+                log.warn("[battle] matchId={} userId={} action=opponent-recheck-retry", state.getMatchId(), userId);
+                return;
+            }
+            cancelRoom(state);
+            return;
+        }
+
+        startDisconnectGraceInternal(state, userId, opponent);
+    }
+
+    private void cancelOpponentRecheck(String roomId, Long userId) {
+        String key = opponentRecheckKey(roomId, userId);
+        stringRedisTemplate.delete(key);
+        Optional.ofNullable(disconnectTasks.remove(key)).ifPresent(f -> f.cancel(false));
+    }
+
+    private String opponentRecheckKey(String roomId, Long userId) {
+        return "battle:grace:recheck:" + roomId + ":" + userId;
+    }
+
+    private boolean shouldRetryOpponentRecheck(String roomId, Long userId) {
+        if (roomId == null || userId == null) return false;
+        String key = "battle:grace:recheck:count:" + roomId + ":" + userId;
+        Long count = stringRedisTemplate.opsForValue().increment(key);
+        if (count != null && count == 1L) {
+            stringRedisTemplate.expire(key, DISCONNECT_RECHECK_WINDOW);
+        }
+        return count != null && count <= DISCONNECT_RECHECK_MAX;
+    }
+
+    private Long resolveOpponent(BattleRoomState state, Long userId) {
+        if (state == null || userId == null) return null;
+        if (Objects.equals(userId, state.getHostUserId())) return state.getGuestUserId();
+        if (Objects.equals(userId, state.getGuestUserId())) return state.getHostUserId();
+
+        if (state.getParticipants() != null) {
+            for (BattleParticipantState participant : state.getParticipants().values()) {
+                if (participant != null && participant.getUserId() != null && !participant.getUserId().equals(userId)) {
+                    return participant.getUserId();
+                }
+            }
+        }
+
+        Set<String> members = stringRedisTemplate.opsForSet().members(BattleRedisKeyUtil.membersKey(state.getRoomId()));
+        if (members != null) {
+            for (String member : members) {
+                if (member == null) continue;
+                try {
+                    Long candidate = Long.valueOf(member);
+                    if (!candidate.equals(userId)) return candidate;
+                } catch (NumberFormatException ignored) {
+                    // ignore invalid member id
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private void startWaitingDisconnectGrace(BattleRoomState state, Long userId) {
+        String key = waitingGraceKey(state.getRoomId(), userId);
+        if (Boolean.TRUE.equals(stringRedisTemplate.hasKey(key))) return;
+
+        stringRedisTemplate.opsForValue().set(key, "1", WAITING_DISCONNECT_GRACE);
+
+        ScheduledFuture<?> future = battleTaskScheduler.schedule(
+                () -> removeAfterWaitingGrace(state.getRoomId(), userId),
+                Instant.now().plus(WAITING_DISCONNECT_GRACE)
+        );
+
+        disconnectTasks.put(key, future);
+        log.info("[battle] matchId={} userId={} action=disconnect-waiting-grace", state.getMatchId(), userId);
+    }
+
+    private void removeAfterWaitingGrace(String roomId, Long userId) {
+        String key = waitingGraceKey(roomId, userId);
+        Boolean exists = stringRedisTemplate.hasKey(key);
+        if (!Boolean.TRUE.equals(exists)) return;
+
+        stringRedisTemplate.delete(key);
+        disconnectTasks.remove(key);
+
+        try {
+            leaveRoomInternal(roomId, userId, true);
+        } catch (BattleException ex) {
+            if (ex.getErrorCode() == BattleErrorCode.NOT_PARTICIPANT
+                    || ex.getErrorCode() == BattleErrorCode.ROOM_NOT_FOUND) {
+                cleanupActiveMapping(userId, roomId, null);
+            }
+            log.warn("[battle] userId={} action=waiting-grace-leave errorCode={}", userId, ex.getErrorCode().getCode());
+        } catch (Exception ex) {
+            log.warn("[battle] userId={} action=waiting-grace-leave error={}", userId, ex.getMessage());
+        }
+    }
+
+    private void cancelWaitingDisconnectGrace(String roomId, Long userId) {
+        String key = waitingGraceKey(roomId, userId);
+        stringRedisTemplate.delete(key);
+        Optional.ofNullable(disconnectTasks.remove(key)).ifPresent(f -> f.cancel(false));
+    }
+
+    private String waitingGraceKey(String roomId, Long userId) {
+        return "battle:grace:waiting:" + roomId + ":" + userId;
     }
 
     private void cancelRoom(BattleRoomState state) {
