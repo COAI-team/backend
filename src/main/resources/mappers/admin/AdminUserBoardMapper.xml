@@ -171,8 +171,8 @@
         FROM CODEBOARD c
         JOIN CODE_ANALYSIS_HISTORY cah
         ON cah.ANALYSIS_ID = c.ANALYSIS_ID
-        WHERE c.CODEBOARD_ID = 1
-<!--        WHERE c.CODEBOARD_ID = #{boardId}-->
+<!--        WHERE c.CODEBOARD_ID = 1-->
+        WHERE c.CODEBOARD_ID = #{boardId}
     </select>
 
     <!-- 자유게시판 단건 조회 -->
