@@ -61,7 +61,6 @@ public class AdminDashBoardController {
         @RequestParam(defaultValue = "6") int limit
     ) {
         List<SalesStatsDto> result = adminBatchDashBoardService.getSalesMonthlyStats(limit);
-        System.out.println("result ==>> " + result);
         return ResponseEntity.ok(
             ApiResponse.success(result)
         );

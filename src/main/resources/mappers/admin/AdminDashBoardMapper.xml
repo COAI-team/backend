@@ -189,13 +189,13 @@
     <select id="selectLanguageRankingTop5"
             resultType="kr.or.kosa.backend.admin.dto.dashBoard.LanguageRankDto">
         SELECT
+        stat_year,
+        stat_month,
         language_name,
         SUM(usage_count) AS total_usage
         FROM ADMIN_LANGUAGE_RANKING_MONTHLY
-        GROUP BY language_name
-        ORDER BY total_usage DESC
-        LIMIT 5;
-
+        GROUP BY stat_year, stat_month, language_name
+        ORDER BY stat_year DESC, stat_month  DESC , total_usage DESC
     </select>
 <!--    월별  알고리즘 많이푼 유저 탑5-->
     <select id="selectAlgoSolveRankingTop5"
