@@ -57,7 +57,7 @@ public class  AdminUserBoardController {
         return ResponseEntity.ok(ApiResponse.success(result));
     }
 
-    @DeleteMapping("/boarddelte")
+    @PostMapping("/boarddelte")
     public ResponseEntity<ApiResponse<Void>> deleteBoard(
         @RequestBody DeleteBoardRequestDto deleteBoardRequestDto
         ){
