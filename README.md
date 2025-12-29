@@ -1,4 +1,4 @@
-# Code-Nose Backend 문서
+# Code-Nose Backend
 
 ## 개요
 Code-Nose 프로젝트의 백엔드는 Spring Boot 기반으로 구축된 풀스택 웹 애플리케이션의 서버 측 구현입니다. GitHub OAuth 인증, 실시간 WebSocket 통신, AI LLM 통합, 결제 시스템 등을 주요 기능으로 제공합니다.
