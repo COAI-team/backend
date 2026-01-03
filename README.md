@@ -177,27 +177,18 @@ Frontend → GitHubLoginController → GitHubOAuthService → UserService → Jw
 ## Main Components
 
 ### Controllers
-├── GitHubLoginController (OAuth callback)
-├── HealthController (Health check)
-├── AdminUserBoardController (Admin APIs)
-└── ChatController (Message handling)
-
-shell
-Copy code
+├── GitHubLoginController (OAuth callback)  
+├── HealthController (Health check)  
+├── AdminUserBoardController (Admin APIs)  
+└── ChatController (Message handling)  
 
 ### Services
-├── GitHubOAuthService
-├── UserService
-└── PaymentService (Toss Payments integration)
+├── GitHubOAuthService  
+├── UserService  
+└── PaymentService (Toss Payments integration)  
 
-shell
-Copy code
-
-### Aspects
-└── PerformanceMonitoringAspect (AOP-based performance monitoring)
-
-yaml
-Copy code
+### Aspects  
+└── PerformanceMonitoringAspect (AOP-based performance monitoring)  
 
 ---
 
@@ -241,31 +232,25 @@ Copy code
 3. **State Transition**
 READY → PROCESSING → DONE / CANCELED
 
-yaml
-Copy code
-
 ---
 
 ## Deployment Environment
 
 ### Infrastructure
-├── AWS EC2
-│ └── Docker Containers
-├── Jenkins
-│ └── GitHub Push → Docker Build → Deploy
-├── Nginx
-│ └── Reverse Proxy
-├── RDS
-│ └── MySQL / PostgreSQL
-├── Redis
-│ └── Session / Cache / Lock
-├── Elastic Stack
-│ └── Logging / Monitoring
-└── Amazon S3
-└── Static Files
-
-yaml
-Copy code
+├── AWS EC2  
+│ └── Docker Containers  
+├── Jenkins  
+│ └── GitHub Push → Docker Build → Deploy  
+├── Nginx  
+│ └── Reverse Proxy  
+├── RDS  
+│ └── MySQL / PostgreSQL  
+├── Redis  
+│ └── Session / Cache / Lock  
+├── Elastic Stack  
+│ └── Logging / Monitoring  
+└── Amazon S3  
+└── Static Files  
 
 ---
 
