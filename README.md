@@ -112,3 +112,180 @@ XSS: Frontend React + Backend HTML 이스케이프
 JWT: Redis refresh 토큰 TTL 관리
 
 CORS: Spring Boot 설정
+
+---
+
+# Code-Nose Backend
+
+## Overview
+The backend of the **Code-Nose** project is a server-side implementation of a full-stack web application built on **Spring Boot**.  
+It provides core features such as **GitHub OAuth authentication**, **real-time WebSocket communication**, **AI LLM integration**, and a **payment system**.
+
+---
+
+## Tech Stack
+
+**Backend Framework**  
+- Spring Boot  
+- Spring Security  
+- Spring WebFlux  
+
+**ORM**  
+- MyBatis  
+
+**Database**  
+- MySQL  
+- PostgreSQL  
+- Redis  
+
+**Real-time Communication**  
+- WebSocket  
+- SSE (Server-Sent Events)  
+
+**Monitoring & Observability**  
+- Elastic Kibana  
+- Langfuse  
+
+**Deployment & Infrastructure**  
+- Docker  
+- Jenkins (CI/CD)  
+- AWS EC2  
+- Nginx  
+
+**Storage**  
+- Amazon S3  
+
+**Vector Database**  
+- Qdrant  
+
+**Payments**  
+- Toss Payments  
+
+---
+
+## Architecture Overview
+
+### Authentication System
+Frontend → GitHubLoginController → GitHubOAuthService → UserService → JwtProvider → Redis / DB
+
+- **GitHub OAuth Flow**: Handles `auth/github/callback?code&state`
+- **JWT Tokens**: Access / Refresh token issuance (Redis TTL: 14 days)
+- **Security Filter**: Request validation via `JwtAuthenticationFilter`
+
+---
+
+## Main Components
+
+### Controllers
+├── GitHubLoginController (OAuth callback)
+├── HealthController (Health check)
+├── AdminUserBoardController (Admin APIs)
+└── ChatController (Message handling)
+
+shell
+Copy code
+
+### Services
+├── GitHubOAuthService
+├── UserService
+└── PaymentService (Toss Payments integration)
+
+shell
+Copy code
+
+### Aspects
+└── PerformanceMonitoringAspect (AOP-based performance monitoring)
+
+yaml
+Copy code
+
+---
+
+## Core Features
+
+### 1. GitHub OAuth Authentication Flow
+
+GET /auth/github
+→ Redirect to GitHub authorization
+
+Copy code
+GET /auth/github/callback?code=xxx&state=yyy
+
+markdown
+Copy code
+
+1. Retrieve GitHub user information  
+2. Check user existence in `Users` table (linking required or not)  
+3. Generate JWT tokens  
+4. Store refresh token in Redis  
+5. Return `200 OK` with `GitHubCallbackResponse`  
+
+---
+
+### 2. Real-Time Communication (WebSocket)
+
+- Graceful WebSocket shutdown handling  
+- Concurrency control using Redis locks  
+- Supports COUNTDOWN and 1vs1 Battle modes  
+- `LocalDateTime` serialization via `JavaTimeModule`  
+
+---
+
+### 3. Payment System (Toss Payments)
+
+1. **Internal DB**
+   - Create Order (`orderId`, `amount`)
+2. **External API**
+   - Toss READY request
+   - Toss Confirm API call
+3. **State Transition**
+READY → PROCESSING → DONE / CANCELED
+
+yaml
+Copy code
+
+---
+
+## Deployment Environment
+
+### Infrastructure
+├── AWS EC2
+│ └── Docker Containers
+├── Jenkins
+│ └── GitHub Push → Docker Build → Deploy
+├── Nginx
+│ └── Reverse Proxy
+├── RDS
+│ └── MySQL / PostgreSQL
+├── Redis
+│ └── Session / Cache / Lock
+├── Elastic Stack
+│ └── Logging / Monitoring
+└── Amazon S3
+└── Static Files
+
+yaml
+Copy code
+
+---
+
+## Monitoring & Logging
+
+### PerformanceMonitoringAspect
+- START / SUCCESS / ERROR logs  
+- SLOW / VERYSLOW execution logs  
+- Execution time measurement (milliseconds)  
+
+### Kibana Logs
+- WebSocketMessageBrokerStats  
+- JwtAuthenticationFilter  
+- Controller-level performance metrics  
+
+---
+
+## Security Measures
+
+- **SQL Injection**: PreparedStatement usage  
+- **XSS Protection**: React automatic escaping + backend HTML escaping  
+- **JWT Security**: Refresh token TTL management via Redis  
+- **CORS**: Configured through Spring Boot  
