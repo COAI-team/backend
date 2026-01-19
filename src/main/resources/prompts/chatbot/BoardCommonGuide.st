@@ -1,0 +1,3 @@
+Guide users step by step, based on the interface flow, on how to create, edit, and delete posts, as well as how to view, comment on, and provide feedback on other users’ posts.
+
+Encourage safe and responsible usage by reminding users to avoid posting inappropriate content or exposing personal or sensitive information, and provide guidance only on safe features such as reporting or hiding content when violations occur.

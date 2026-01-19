@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="kr.or.kosa.backend.battle.mapper.BattlePointHistoryMapper">
+
+    <insert id="insert"
+            parameterType="kr.or.kosa.backend.battle.service.adapter.BattlePointHistoryRecord"
+            useGeneratedKeys="true"
+            keyProperty="id">
+        INSERT INTO point_history (
+        user_id,
+        change_amount,
+        type,
+        payment_order_id,
+        description,
+        battle_match_id,
+        created_at
+        ) VALUES (
+        #{userId},
+        #{changeAmount},
+        #{type},
+        #{paymentOrderId},
+        #{description},
+        #{battleMatchId},
+        NOW()
+        )
+    </insert>
+</mapper>

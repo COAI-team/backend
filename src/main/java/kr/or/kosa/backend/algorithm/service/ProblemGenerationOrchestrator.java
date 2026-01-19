@@ -1,0 +1,475 @@
+package kr.or.kosa.backend.algorithm.service;
+
+import kr.or.kosa.backend.algorithm.dto.AlgoProblemDto;
+import kr.or.kosa.backend.algorithm.dto.AlgoTestcaseDto;
+import kr.or.kosa.backend.algorithm.dto.DifficultySpec;
+import kr.or.kosa.backend.algorithm.dto.ValidationResultDto;
+import kr.or.kosa.backend.algorithm.dto.request.ProblemGenerationRequestDto;
+import kr.or.kosa.backend.algorithm.dto.response.ProblemGenerationResponseDto;
+import kr.or.kosa.backend.algorithm.service.validation.CodeExecutionValidator;
+import kr.or.kosa.backend.algorithm.service.validation.SelfCorrectionService;
+import kr.or.kosa.backend.algorithm.service.validation.SimilarityChecker;
+import kr.or.kosa.backend.algorithm.service.validation.StructureValidator;
+import kr.or.kosa.backend.algorithm.service.validation.TimeRatioValidator;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.ai.document.Document;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
+import java.util.function.Consumer;
+
+/**
+ * Phase 5-1: 문제 생성 메인 오케스트레이터
+ * LLM 문제 생성 → 검증 → Self-Correction → DB 저장 전체 플로우 관리
+ *
+ * Phase 6 개선:
+ * - 품질 등급 시스템 적용 (AUTO_APPROVED / AUTO_REJECTED)
+ * - 모든 검증 통과 시 AUTO_APPROVED, 실패 시 AUTO_REJECTED
+ * - AUTO_REJECTED된 문제는 Pool에 저장하지 않음
+ *
+ * Phase 4 개선:
+ * - AlgorithmProfileRegistry 연동으로 프로필 기반 시간/메모리 제한 적용
+ * - 유사도 검사에 테마 파라미터 전달 (Phase 3 연동)
+ */
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class ProblemGenerationOrchestrator {
+
+    private final LLMChatService llmChatService;
+    private final LLMResponseParser llmResponseParser;
+    private final ProblemGenerationPromptBuilder promptBuilder;
+    private final AlgorithmProblemService problemService;
+
+    // RAG 관련 서비스
+    private final ProblemVectorStoreService vectorStoreService;
+    private final AlgorithmSynonymDictionary synonymDictionary;
+
+    // Phase 4: 알고리즘 프로필 레지스트리
+    private final AlgorithmProfileRegistry profileRegistry;
+
+    // 검증기들
+    private final StructureValidator structureValidator;
+    private final CodeExecutionValidator codeExecutionValidator;
+    private final TimeRatioValidator timeRatioValidator;
+    private final SimilarityChecker similarityChecker;
+    private final SelfCorrectionService selfCorrectionService;
+
+    // Code-First 테스트케이스 생성기
+    private final TestCaseGeneratorService testCaseGeneratorService;
+
+    // RAG 설정
+    @Value("${algorithm.generation.rag-enabled:true}")
+    private boolean ragEnabled;
+
+    @Value("${algorithm.generation.few-shot-count:3}")
+    private int fewShotCount;
+
+    /**
+     * 문제 생성 전체 플로우 실행 (생성 + 검증 + DB 저장)
+     *
+     * @param request          문제 생성 요청
+     * @param userId           생성자 ID
+     * @param progressCallback 진행률 콜백 (nullable)
+     * @return 생성된 문제 응답
+     */
+    public ProblemGenerationResponseDto generateProblem(
+            ProblemGenerationRequestDto request,
+            Long userId,
+            Consumer<ProgressEvent> progressCallback) {
+
+        log.info("문제 생성 플로우 시작 - topic: {}, difficulty: {}",
+                request.getTopic(), request.getDifficulty());
+
+        try {
+            // 1. 문제 생성 + 검증 (DB 저장 제외)
+            ProblemGenerationResponseDto generatedProblem = generateWithoutSaving(request, progressCallback);
+
+            // 2. DB 저장
+            notifyProgress(progressCallback, "SAVING", "문제 저장 중...", 90);
+            Long problemId = problemService.saveGeneratedProblem(generatedProblem, userId);
+            generatedProblem.setProblemId(problemId);
+
+            notifyProgress(progressCallback, "COMPLETED", "문제 생성 완료", 100);
+            log.info("문제 생성 완료 - problemId: {}, 소요시간: {}초", problemId, generatedProblem.getGenerationTime());
+
+            return generatedProblem;
+
+        } catch (Exception e) {
+            log.error("문제 생성 플로우 중 오류 발생", e);
+            notifyProgress(progressCallback, "ERROR", "오류 발생: " + e.getMessage(), -1);
+            throw new RuntimeException("문제 생성 실패: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * 문제 생성만 수행 (DB 저장 없음) - 풀 채우기용
+     * <p>진행률 콜백 없이 호출하는 오버로드 메서드
+     *
+     * @param request 문제 생성 요청
+     * @return 생성된 문제 응답 (problemId는 null)
+     */
+    public ProblemGenerationResponseDto generateWithoutSaving(ProblemGenerationRequestDto request) {
+        return generateWithoutSaving(request, null);
+    }
+
+    /**
+     * 문제 생성만 수행 (DB 저장 없음)
+     * <p>LLM 생성 → Code-First → 검증 → Self-Correction 수행
+     * <p>풀에 저장된 후, 소비 시점에 saveGeneratedProblem()으로 저장
+     *
+     * @param request          문제 생성 요청
+     * @param progressCallback 진행률 콜백 (nullable, 풀 채우기 시 null)
+     * @return 생성된 문제 응답 (problemId는 null)
+     */
+    public ProblemGenerationResponseDto generateWithoutSaving(
+            ProblemGenerationRequestDto request,
+            Consumer<ProgressEvent> progressCallback) {
+
+        log.info("문제 생성 (저장 없음) 시작 - topic: {}, difficulty: {}",
+                request.getTopic(), request.getDifficulty());
+
+        long startTime = System.currentTimeMillis();
+
+        try {
+            // 1. LLM으로 문제 생성 (testCases는 input만 포함)
+            notifyProgress(progressCallback, "GENERATING", "LLM 문제 생성 중...", 10);
+            ProblemGenerationResponseDto generatedProblem = generateWithLLM(request);
+
+            if (generatedProblem == null || generatedProblem.getProblem() == null) {
+                throw new RuntimeException("LLM 문제 생성 실패");
+            }
+
+            // 2. Code-First: optimalCode 실행하여 testCase output 생성
+            notifyProgress(progressCallback, "GENERATING_OUTPUTS", "테스트케이스 출력 생성 중...", 15);
+            generatedProblem = generateTestCaseOutputs(generatedProblem);
+
+            // 3. 검증 및 Self-Correction 루프
+            int attempt = 0;
+            List<ValidationResultDto> validationResults;
+
+            do {
+                attempt++;
+                notifyProgress(progressCallback, "VALIDATING",
+                        String.format("검증 중... (시도 %d/%d)", attempt, selfCorrectionService.getMaxAttempts() + 1),
+                        20 + (attempt * 15));
+
+                // Phase 4: 테마 파라미터 전달 (Phase 3 유사도 검사 연동)
+                String theme = request.getAdditionalRequirements();
+                validationResults = runAllValidations(generatedProblem, theme);
+                boolean allPassed = validationResults.stream().allMatch(ValidationResultDto::isPassed);
+
+                if (allPassed) {
+                    log.info("모든 검증 통과 - 시도 #{}", attempt);
+                    break;
+                }
+
+                if (selfCorrectionService.canAttemptMore(attempt)) {
+                    notifyProgress(progressCallback, "CORRECTING",
+                            String.format("Self-Correction 시도 %d...", attempt), 50 + (attempt * 10));
+
+                    ProblemGenerationResponseDto corrected = selfCorrectionService.attemptCorrection(
+                            generatedProblem.getProblem(),
+                            generatedProblem.getTestCases(),
+                            generatedProblem.getOptimalCode(),
+                            generatedProblem.getNaiveCode(),
+                            validationResults,
+                            attempt);
+
+                    if (corrected != null && corrected.getProblem() != null) {
+                        generatedProblem = corrected;
+                    }
+                } else {
+                    log.warn("최대 수정 시도 횟수 초과");
+                    break;
+                }
+            } while (attempt <= selfCorrectionService.getMaxAttempts());
+
+            // 4. Phase 6: 품질 등급 적용
+            generatedProblem = applyQualityGrading(generatedProblem, validationResults, attempt);
+
+            // 5. 메타데이터 설정
+            generatedProblem.setGeneratedAt(LocalDateTime.now());
+
+            double generationTime = (System.currentTimeMillis() - startTime) / 1000.0;
+            generatedProblem.setGenerationTime(generationTime);
+
+            log.info("문제 생성 완료 (저장 없음) - 소요시간: {}초, 품질등급: {}",
+                    generationTime, generatedProblem.getReviewStatus());
+            return generatedProblem;
+
+        } catch (Exception e) {
+            log.error("문제 생성 (저장 없음) 중 오류 발생", e);
+            throw new RuntimeException("문제 생성 실패: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * LLM으로 문제 생성 (RAG 기반 Few-shot 학습 포함)
+     */
+    private ProblemGenerationResponseDto generateWithLLM(ProblemGenerationRequestDto request) {
+        log.info("LLM 문제 생성 시작 - RAG: {}, topic: {}, difficulty: {}",
+                ragEnabled, request.getTopic(), request.getDifficulty());
+
+        // 1. 주제 확장 (동의어 사전 활용)
+        Set<String> expandedTopics = synonymDictionary.expand(request.getTopic());
+        log.debug("주제 확장: {} → {}", request.getTopic(), expandedTopics);
+
+        // 2. RAG 기반 Few-shot 예시 검색 (활성화된 경우, 알고리즘 문제만)
+        List<Document> fewShotExamples = null;
+        if (ragEnabled && !"SQL".equalsIgnoreCase(request.getProblemType())) {
+            try {
+                String searchQuery = synonymDictionary.buildSearchQuery(
+                        request.getTopic(),
+                        request.getDifficulty().name()
+                );
+                fewShotExamples = vectorStoreService.getFewShotExamples(
+                        searchQuery,
+                        request.getDifficulty().name(),
+                        fewShotCount
+                );
+                log.info("RAG 검색 완료 - {}개 예시 문제 획득", fewShotExamples.size());
+            } catch (Exception e) {
+                log.warn("RAG 검색 실패, 지침 기반으로 진행: {}", e.getMessage());
+                fewShotExamples = null;
+            }
+        }
+
+        // 3. 프롬프트 생성 (RAG 예시 포함 여부에 따라 분기)
+        String systemPrompt = promptBuilder.buildSystemPrompt();
+        String userPrompt = (fewShotExamples != null && !fewShotExamples.isEmpty())
+                ? promptBuilder.buildUserPrompt(request, fewShotExamples)
+                : promptBuilder.buildUserPromptWithoutRag(request);
+
+        // 4. LLM 호출
+        String response = llmChatService.generate(systemPrompt, userPrompt);
+
+        // 5. 응답 파싱
+        LLMResponseParser.ParsedResult parsed = llmResponseParser.parse(response, request);
+        
+        // 6. Phase 4: 프로필 기반 시간/메모리 제한 적용
+        AlgoProblemDto problem = parsed.problem();
+        applyProfileBasedLimits(problem, request.getTopic(), request.getDifficulty().name());
+
+        // ParsedResult -> ProblemGenerationResponseDto 변환
+        return ProblemGenerationResponseDto.builder()
+                .problem(problem)
+                .testCases(parsed.testCases())
+                .optimalCode(parsed.optimalCode())
+                .naiveCode(parsed.naiveCode())
+                .language("Python")  // 기본 언어 (LANGUAGES 테이블의 LANGUAGE_NAME과 일치)
+                .status(ProblemGenerationResponseDto.GenerationStatus.SUCCESS)
+                .build();
+    }
+
+    /**
+     * Code-First: optimalCode를 실행하여 테스트케이스 expected output 생성
+     */
+    private ProblemGenerationResponseDto generateTestCaseOutputs(ProblemGenerationResponseDto problem) {
+        String optimalCode = problem.getOptimalCode();
+        String naiveCode = problem.getNaiveCode();
+        String language = problem.getLanguage() != null ? problem.getLanguage() : "Python";
+        List<AlgoTestcaseDto> testCases = problem.getTestCases();
+
+        if (optimalCode == null || optimalCode.isBlank()) {
+            log.warn("optimalCode가 없어 Code-First 출력 생성을 건너뜁니다.");
+            return problem;
+        }
+
+        if (testCases == null || testCases.isEmpty()) {
+            log.warn("testCases가 없어 Code-First 출력 생성을 건너뜁니다.");
+            return problem;
+        }
+
+        log.info("Code-First 테스트케이스 출력 생성 시작 - {}개 케이스", testCases.size());
+
+        TestCaseGeneratorService.TestCaseGenerationResult result =
+                testCaseGeneratorService.generateOutputs(optimalCode, naiveCode, language, testCases);
+
+        if (result.testCases().isEmpty()) {
+            log.error("Code-First 출력 생성 실패 - 모든 테스트케이스 실패");
+            throw new RuntimeException("테스트케이스 출력 생성 실패: optimalCode 실행 오류");
+        }
+
+        // 경고가 있으면 로그
+        if (!result.warnings().isEmpty()) {
+            log.warn("Code-First 출력 생성 경고: {}", result.warnings());
+        }
+
+        log.info("Code-First 출력 생성 완료 - 성공률: {}% ({}/{})",
+                String.format("%.1f", result.getSuccessRate()), result.successCount(), testCases.size());
+
+        // 결과를 problem에 반영
+        return ProblemGenerationResponseDto.builder()
+                .problem(problem.getProblem())
+                .testCases(result.testCases())  // 출력이 생성된 테스트케이스
+                .optimalCode(optimalCode)
+                .naiveCode(naiveCode)
+                .language(language)
+                .status(problem.getStatus())
+                .validationResults(problem.getValidationResults())
+                .build();
+    }
+
+    /**
+     * 모든 검증 실행
+     *
+     * @param problem 검증할 문제
+     * @param theme   스토리 테마 (Phase 3 유사도 검사에 전달, nullable)
+     */
+    private List<ValidationResultDto> runAllValidations(ProblemGenerationResponseDto problem, String theme) {
+        List<ValidationResultDto> results = new ArrayList<>();
+
+        AlgoProblemDto problemDto = problem.getProblem();
+        List<AlgoTestcaseDto> testCases = problem.getTestCases();
+        String optimalCode = problem.getOptimalCode();
+        String naiveCode = problem.getNaiveCode();
+        String language = problem.getLanguage() != null ? problem.getLanguage() : "Python";
+
+        // 1. 구조 검증
+        log.info("구조 검증 실행");
+        ValidationResultDto structureResult = structureValidator.validate(
+                problemDto, testCases, optimalCode, naiveCode);
+        results.add(structureResult);
+
+        // 2. 유사도 검사 (Phase 3: 테마 기반 다단계 검사)
+        log.info("유사도 검사 실행 - 테마: {}", theme);
+        ValidationResultDto similarityResult = similarityChecker.checkSimilarity(problemDto, theme);
+        results.add(similarityResult);
+
+        // 3. 코드 실행 검증 (최적 코드가 있을 경우)
+        if (optimalCode != null && !optimalCode.isBlank()) {
+            log.info("코드 실행 검증 실행");
+            ValidationResultDto executionResult = codeExecutionValidator.validate(
+                    optimalCode, language, testCases,
+                    problemDto.getTimelimit(), problemDto.getMemorylimit());
+            results.add(executionResult);
+        }
+
+        // 4. 시간 비율 검증 (최적/비효율 코드 모두 있을 경우)
+        if (optimalCode != null && !optimalCode.isBlank() &&
+            naiveCode != null && !naiveCode.isBlank()) {
+            log.info("시간 비율 검증 실행");
+            ValidationResultDto timeRatioResult = timeRatioValidator.validate(
+                    optimalCode, naiveCode, language, testCases,
+                    problemDto.getTimelimit(), problemDto.getMemorylimit());
+            results.add(timeRatioResult);
+        }
+
+        // 결과 요약 로그
+        long passedCount = results.stream().filter(ValidationResultDto::isPassed).count();
+        log.info("검증 완료 - 통과: {}/{}", passedCount, results.size());
+
+        return results;
+    }
+
+    /**
+     * Phase 6: 품질 등급 적용
+     *
+     * 구현 논리:
+     * - 모든 검증 통과 → AUTO_APPROVED (Pool 저장 및 사용자 제공 가능)
+     * - 하나라도 실패 → AUTO_REJECTED (Pool 저장 안 함, Fallback 적용)
+     *
+     * @param problem          생성된 문제
+     * @param validationResults 검증 결과 목록
+     * @param correctionAttempts Self-Correction 시도 횟수
+     * @return 품질 등급이 적용된 문제
+     */
+    private ProblemGenerationResponseDto applyQualityGrading(
+            ProblemGenerationResponseDto problem,
+            List<ValidationResultDto> validationResults,
+            int correctionAttempts) {
+
+        boolean allPassed = validationResults.stream().allMatch(ValidationResultDto::isPassed);
+
+        problem.setValidationResults(validationResults);
+
+        if (allPassed) {
+            log.info("품질 등급: AUTO_APPROVED - 모든 검증 통과 (시도 횟수: {})", correctionAttempts);
+            problem.setStatus(ProblemGenerationResponseDto.GenerationStatus.SUCCESS);
+            problem.setReviewStatus(ProblemGenerationResponseDto.ReviewStatus.AUTO_APPROVED);
+            problem.setMessage("모든 품질 검증을 통과했습니다.");
+            return problem;
+        }
+
+        // 실패한 검증기 목록 수집
+        List<String> failedValidators = validationResults.stream()
+                .filter(r -> !r.isPassed())
+                .map(ValidationResultDto::getValidatorName)
+                .toList();
+
+        log.warn("품질 등급: AUTO_REJECTED - 실패 검증기: {}, 시도 횟수: {}",
+                failedValidators, correctionAttempts);
+
+        problem.setStatus(ProblemGenerationResponseDto.GenerationStatus.VALIDATION_FAILED);
+        problem.setReviewStatus(ProblemGenerationResponseDto.ReviewStatus.AUTO_REJECTED);
+        problem.setMessage(String.format(
+                "품질 검증 실패. 실패 검증기: %s. %d회 Self-Correction 시도에도 해결되지 않음.",
+                failedValidators, correctionAttempts));
+
+        return problem;
+    }
+
+    /**
+     * 진행률 알림
+     */
+    private void notifyProgress(Consumer<ProgressEvent> callback, String status, String message, int percentage) {
+        if (callback != null) {
+            callback.accept(new ProgressEvent(status, message, percentage));
+        }
+        log.debug("Progress: [{}%] {} - {}", percentage, status, message);
+    }
+
+    /**
+     * 진행률 이벤트 클래스
+     */
+    public static class ProgressEvent {
+        private final String status;
+        private final String message;
+        private final int percentage;
+
+        public ProgressEvent(String status, String message, int percentage) {
+            this.status = status;
+            this.message = message;
+            this.percentage = percentage;
+        }
+
+        public String getStatus() { return status; }
+        public String getMessage() { return message; }
+        public int getPercentage() { return percentage; }
+    }
+
+    /**
+     * Phase 4: 프로필 기반 시간/메모리 제한 적용
+     *
+     * AlgorithmProfileRegistry에서 해당 주제/난이도의 스펙을 조회하여
+     * 문제의 시간/메모리 제한을 덮어씁니다.
+     * LLM이 생성한 값보다 프로필 기반 값이 더 신뢰성 있습니다.
+     *
+     * @param problem    적용 대상 문제
+     * @param topic      알고리즘 주제
+     * @param difficulty 난이도
+     */
+    private void applyProfileBasedLimits(AlgoProblemDto problem, String topic, String difficulty) {
+        if (problem == null) {
+            return;
+        }
+
+        DifficultySpec spec = profileRegistry.getDifficultySpec(topic, difficulty);
+
+        int originalTimeLimit = problem.getTimelimit();
+        int originalMemoryLimit = problem.getMemorylimit();
+
+        problem.setTimelimit(spec.getTimeLimit());
+        problem.setMemorylimit(spec.getMemoryLimit());
+
+        log.debug("프로필 기반 제한 적용 - topic: {}, difficulty: {}", topic, difficulty);
+        log.debug("  시간 제한: {}ms → {}ms", originalTimeLimit, spec.getTimeLimit());
+        log.debug("  메모리 제한: {}MB → {}MB", originalMemoryLimit, spec.getMemoryLimit());
+    }
+}

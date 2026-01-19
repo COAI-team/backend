@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="kr.or.kosa.backend.pay.repository.SubscriptionPlanMapper">
+
+    <resultMap id="SubscriptionPlanResultMap"
+               type="kr.or.kosa.backend.pay.entity.SubscriptionPlan">
+        <id     column="plan_code"    property="planCode"/>
+        <result column="name"         property="name"/>
+        <result column="monthly_fee"  property="monthlyFee"/>
+        <result column="active"       property="active"/>
+    </resultMap>
+
+    <select id="findActiveByPlanCode"
+            resultMap="SubscriptionPlanResultMap">
+        SELECT
+        plan_code,
+        name,
+        monthly_fee,
+        active
+        FROM subscription_plans
+        WHERE plan_code = #{planCode}
+        AND active = 1
+        LIMIT 1
+    </select>
+
+</mapper>

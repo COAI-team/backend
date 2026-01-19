@@ -1,0 +1,354 @@
+package kr.or.kosa.backend.algorithm.service;
+
+import kr.or.kosa.backend.algorithm.dto.DifficultySpec;
+import kr.or.kosa.backend.algorithm.dto.request.ProblemGenerationRequestDto;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.ai.document.Document;
+import org.springframework.stereotype.Component;
+
+import java.util.List;
+import java.util.Map;
+
+/**
+ * 알고리즘 문제 생성 프롬프트 빌더
+ * RAG 기반 Few-shot 학습을 위한 프롬프트 구성
+ *
+ * Phase 2 개선 사항:
+ * - StoryKeywordPool 연동으로 테마별 다양한 스토리 소재 제공
+ * - 같은 테마라도 랜덤 키워드 조합으로 매번 다른 문제 생성
+ *
+ * Phase 1 개선 사항:
+ * - AlgorithmProfileRegistry 연동으로 알고리즘별/난이도별 스펙 제공
+ * - 프로필 기반 가이드라인으로 더 정확한 문제 생성
+ */
+@Slf4j
+@Component
+@RequiredArgsConstructor
+public class ProblemGenerationPromptBuilder {
+
+    /**
+     * 스토리 키워드 풀 - 테마별 다양한 스토리 소재 제공
+     */
+    private final StoryKeywordPool storyKeywordPool;
+
+    /**
+     * 알고리즘 프로필 레지스트리 - 알고리즘별 난이도별 스펙 제공 (Phase 1)
+     */
+    private final AlgorithmProfileRegistry profileRegistry;
+
+    /**
+     * 사용 가능한 스토리 테마 목록 (겨울/연말 시즌)
+     * 프론트엔드 ProblemGenerator.jsx의 STORY_THEMES와 동기화 필수
+     *
+     * 동기화 대상:
+     * - coai-frontend/src/pages/algorithm/ProblemGenerator.jsx
+     * - coai-backend/src/main/java/.../controller/ProblemPoolController.java (ACTIVE_THEMES)
+     */
+    public static final Map<String, String> STORY_THEMES = Map.of(
+            "SANTA_DELIVERY", "산타의 선물 배달 - 크리스마스 이브에 산타와 루돌프가 선물을 배달하는 이야기. 굴뚝, 썰매, 선물 상자, 밤하늘을 배경으로 한 스토리.",
+            "SNOWBALL_FIGHT", "눈싸움 대작전 - 겨울 마을에서 펼쳐지는 눈싸움 대회. 눈덩이, 눈더미, 팀 진영, 눈밭을 배경으로 한 스토리.",
+            "CHRISTMAS_TREE", "크리스마스 트리 장식 - 크리스마스 트리를 꾸미는 이야기. 전구, 오너먼트, 별, 리본, 가지를 소재로 한 스토리.",
+            "NEW_YEAR_FIREWORKS", "새해 불꽃놀이 - 새해 카운트다운과 함께 펼쳐지는 불꽃놀이. 불꽃, 밤하늘, 색상, 타이밍을 소재로 한 스토리.",
+            "SKI_RESORT", "스키장 - 눈 덮인 산의 스키 리조트 이야기. 슬로프, 리프트, 스키어, 눈밭을 배경으로 한 스토리."
+    );
+
+    /**
+     * 시스템 프롬프트 생성
+     * 품질 기준 및 제약 조건 정의
+     */
+    public String buildSystemPrompt() {
+        return """
+                당신은 알고리즘 문제 출제 전문가입니다.
+
+                ## 역할
+                - 논리적으로 일관되고 풀이 가능한 알고리즘 문제 생성
+                - 명확한 제약 조건과 입출력 형식 제공
+                - 검증 가능한 테스트케이스 생성
+
+                ## 품질 기준
+                1. 문제 설명과 제약조건이 모순 없이 일치해야 합니다.
+                2. 테스트케이스는 최소 5개, 경계값과 특수값을 반드시 포함해야 합니다.
+                3. 난이도별 문제 특성 가이드라인:
+                    **BRONZE** (알고리즘 입문자 대상):
+                    - 알고리즘: 기본 구현, 브루트포스, 기본 정렬, 간단한 수학
+                    - 입력 크기: N ≤ 1,000
+                    - 특성: 단순 구현, 기초 문법 활용, 중학교 수준 수학 지식
+                    - 시간복잡도: O(N²) 이하로 충분히 해결 가능
+                    **SILVER** (코딩 테스트 중위 난이도):
+                    - 알고리즘: 스택/큐, 이분 탐색, DFS/BFS 기초, 기본 DP, 그리디 입문
+                    - 입력 크기: N ≤ 100,000
+                    - 특성: 기본 자료구조 활용, 표준 알고리즘 적용
+                    - 시간복잡도: O(N log N) ~ O(N²) 사이 최적해 요구
+                    **GOLD** (코딩 테스트 상위 난이도):
+                    - 알고리즘: 고급 DP, 다익스트라/플로이드, MST, 백트래킹, 투 포인터
+                    - 입력 크기: N ≤ 500,000
+                    - 특성: 복합 알고리즘 조합, 최적화 필요, 엣지 케이스 고려
+                    - 시간복잡도: O(N log N) 이하 최적해 필수
+                    **PLATINUM** (대회 중상위 난이도):
+                    - 알고리즘: DP 최적화, 세그먼트 트리, 이분 매칭, 네트워크 유량, KMP
+                    - 입력 크기: N ≤ 1,000,000
+                    - 특성: 고급 자료구조 필수, 복잡한 알고리즘 조합, 수학적 사고
+                    - 시간복잡도: O(N log N) 또는 O(N) 최적해 필수
+                4. Optimal 코드는 시간 제한 내 통과해야 합니다.
+                5. Naive 코드는 큰 입력에서 시간초과가 발생해야 합니다.
+
+                ## 언어 규칙 (필수)
+                - **모든 문제 제목, 설명, 제약조건, 입출력 형식은 반드시 한국어로 작성하세요.**
+                - 영어로 작성하면 안 됩니다. 한국어만 사용하세요.
+                - 코드(optimalCode, naiveCode)와 tags는 예외적으로 영어 사용 가능합니다.
+
+                ## 캐릭터/인물명 규칙
+                - 문제에 등장하는 캐릭터나 인물명은 가능한 **"코아이"**를 사용하세요.
+                - 예시: "코아이는 N개의 돌을 가지고 있다", "탐험가 코아이가 섬을 탐험한다"
+                - 여러 캐릭터가 필요한 경우: 모아이, 코아이, 돌이, 석이 등 변형 사용 가능
+
+                ## 금지 사항
+                - 상표권이 있는 캐릭터/브랜드명 사용 금지 (예: 마리오, 포켓몬, 디즈니 캐릭터 등)
+                - 기존 유명 문제와 동일한 스토리 금지
+                - 불명확하거나 애매한 제약 조건 금지
+                - **문제 설명에 알고리즘 힌트나 풀이 방향을 절대 암시하지 마세요.**
+                  - 금지 예시: "이 문제는 DP로 풀 수 있습니다", "그리디하게 접근하면..."
+                  - 금지 예시: "최적 부분 구조를 이용하여...", "분할 정복으로..."
+                  - 문제 설명은 순수하게 상황과 요구사항만 서술해야 합니다.
+                  - 문제에 알고리즘 토픽, 주제는 절대 포함하지 마세요.
+
+                ## naiveCode 생성 요구사항 (필수!)
+
+                naiveCode는 optimalCode와 **동일한 정답을 출력**해야 합니다. 이것은 품질 검증의 핵심입니다.
+
+                1. **동일 입력 -> 동일 출력**: 같은 입력에 대해 optimal과 naive가 반드시 같은 결과를 출력해야 합니다.
+                2. **정확성 우선**: 알고리즘 효율성보다 정확성이 중요합니다. naive는 느리지만 정확해야 합니다.
+                3. **오버플로우 주의**: naive에서도 long 사용 등 오버플로우 방지 처리를 해야 합니다.
+                4. **naive는 시간복잡도만 다르게**: naive는 O(N^2) 이상의 비효율적 알고리즘을 사용하되, 결과는 optimal과 완전히 동일해야 합니다.
+
+                **검증 실패 예시**: optimal과 naive의 출력이 다르면 품질 검증에 자동 실패합니다.
+
+                ## 응답 형식
+                반드시 유효한 JSON으로만 응답하세요. 다른 텍스트는 절대 포함하지 마세요.
+                """;
+    }
+
+    /**
+     * 사용자 프롬프트 생성 (RAG 예시 포함)
+     *
+     * @param request    문제 생성 요청
+     * @param references RAG로 검색된 참조 문제 목록
+     * @return 구성된 사용자 프롬프트
+     */
+    public String buildUserPrompt(ProblemGenerationRequestDto request, List<Document> references) {
+        StringBuilder sb = new StringBuilder();
+
+        // 1. Few-shot 예시 추가 (RAG 결과)
+        if (references != null && !references.isEmpty()) {
+            sb.append("## 참고 문제 예시\n\n");
+            sb.append("아래 예시들의 서술 방식, 구조, 품질을 참고하여 새로운 문제를 생성하세요.\n\n");
+
+            for (int i = 0; i < references.size(); i++) {
+                Document ref = references.get(i);
+                String title = getMetadata(ref, "title", "예시 " + (i + 1));
+                String difficulty = getMetadata(ref, "difficulty", "N/A");
+                String tags = getMetadata(ref, "tags", "N/A");
+
+                sb.append(String.format("### 예시 %d: %s\n", i + 1, title));
+                sb.append(String.format("난이도: %s | 태그: %s\n\n", difficulty, tags));
+                sb.append(ref.getText());
+                sb.append("\n\n---\n\n");
+            }
+        }
+
+        // 2. 프로필 기반 가이드라인 추가 (Phase 1)
+        sb.append(buildProfileGuidelines(request.getTopic(), request.getDifficulty().name()));
+
+        // 3. 생성 요청 본문
+        sb.append("## 새로운 문제 생성 요청\n\n");
+
+        if (references != null && !references.isEmpty()) {
+            sb.append("위 예시들의 서술 방식을 참고하여 **완전히 새로운** 문제를 생성하세요.\n\n");
+        }
+
+        sb.append(String.format("- 알고리즘: %s\n", request.getTopic()));
+        sb.append(String.format("- 난이도: %s\n", request.getDifficulty()));
+
+        if (request.getTimeLimit() != null) {
+            sb.append(String.format("- 시간 제한: %d ms\n", request.getTimeLimit()));
+        }
+
+        if (request.getMemoryLimit() != null) {
+            sb.append(String.format("- 메모리 제한: %d MB\n", request.getMemoryLimit()));
+        }
+
+        if (request.getAdditionalRequirements() != null && !request.getAdditionalRequirements().isBlank()) {
+            String additionalReqs = request.getAdditionalRequirements();
+            // "스토리 테마: " 프리픽스 제거하여 순수 테마 키 추출
+            String themeKey = additionalReqs.toUpperCase();
+            if (themeKey.startsWith("스토리 테마: ")) {
+                themeKey = themeKey.substring("스토리 테마: ".length());
+            }
+            String themeDescription = STORY_THEMES.getOrDefault(themeKey, additionalReqs);
+            sb.append(String.format("- 스토리 테마: %s\n", themeDescription));
+            sb.append("  **테마에 맞는 스토리텔링을 문제 설명에 반드시 적용하세요.**\n");
+
+            // Phase 2: 스토리 키워드 섹션 추가
+            sb.append(buildStoryKeywordSection(themeKey));
+        }
+
+        // 4. JSON 응답 형식 (Code-First 방식: 입력만 생성, 출력은 코드 실행으로 생성)
+        sb.append("""
+
+                **응답 형식 (JSON):**
+                ```json
+                {
+                  "title": "문제 제목",
+                  "description": "문제 설명 (스토리텔링 포함, 입력/출력 설명 포함하지 않음)",
+                  "constraints": "제약 조건 (예: 1 ≤ N ≤ 100,000)",
+                  "inputFormat": "입력 형식 설명",
+                  "outputFormat": "출력 형식 설명",
+                  "timeLimit": 1000,
+                  "memoryLimit": 256,
+                  "expectedTimeComplexity": "O(n log n)",
+                  "testCases": [
+                    {"input": "5\\n1 3 5 7 9", "isSample": true, "description": "기본 케이스"},
+                    {"input": "3\\n10 20 30", "isSample": true, "description": "음수 포함 케이스"},
+                    {"input": "1\\n0", "isSample": false, "description": "최소 입력 (경계값)"},
+                    {"input": "10\\n1000000000 -1000000000 0 0 0 0 0 0 0 0", "isSample": false, "description": "최대값/최소값 경계"},
+                    {"input": "100\\n1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100", "isSample": false, "description": "큰 입력 테스트"}
+                  ],
+                  "optimalCode": "Python 최적 풀이 코드 (전체 코드)",
+                  "naiveCode": "Python 비효율적 풀이 코드 (시간 초과 발생해야 함)",
+                  "tags": ["알고리즘 태그 1", "알고리즘 태그 2"]
+                }
+                ```
+
+                **중요 (필수 사항):**
+                - JSON만 출력하고 다른 설명은 절대 포함하지 마세요.
+                - **optimalCode와 naiveCode는 반드시 포함해야 합니다! 이 두 필드는 필수입니다.**
+                - optimalCode와 naiveCode는 완전한 Python 코드여야 합니다 (입력 받기부터 출력까지).
+                - 코드는 반드시 실행 가능해야 합니다. 함수를 정의했다면 마지막에 반드시 호출하세요!
+                - 올바른 예시: def solve(): ...코드... \\n\\nsolve()  (마지막에 solve() 호출)
+                - 잘못된 예시: def solve(): ...코드...  (함수 정의만 하고 호출 안함)
+                - expectedTimeComplexity도 반드시 포함하세요.
+
+                **테스트케이스 규칙 (Code-First 방식):**
+                - **output 필드는 작성하지 마세요!** 시스템이 optimalCode를 실행하여 자동 생성합니다.
+                - input만 작성하고, 다양한 케이스를 포함해야 합니다.
+                - 반드시 포함해야 하는 케이스 유형:
+                  1. 기본 케이스 (isSample: true, 2-3개)
+                  2. 경계값 테스트: 최소 입력 (N=1 또는 빈 배열)
+                  3. 경계값 테스트: 최대 입력 (제약조건의 상한에 가까운 값)
+                  4. 특수 케이스: 0, 음수, 같은 값 반복 등
+                  5. 스트레스 테스트: 시간복잡도 검증을 위한 큰 입력
+
+                **JSON 형식 필수 규칙:**
+                - 모든 문자열 값은 하나의 연속된 문자열이어야 합니다.
+                - 문자열 연결 연산자(+)를 절대 사용하지 마세요.
+                - 코드의 줄바꿈은 반드시 \\n 이스케이프 시퀀스로 표현하세요.
+                - 예시: "optimalCode": "def solve():\\n    n = int(input())\\n    print(n)"
+                - 잘못된 예시: "optimalCode": "def solve():" + "\\n    n = int(input())"
+
+                **테스트케이스 데이터 규칙:**
+                - input은 반드시 실제 문자열 데이터로 작성하세요.
+                - Python 코드나 표현식 (join, range, for 등)을 절대 사용하지 마세요.
+                - 잘못된 예시: "input": "".join(str(x) for x in range(100))
+                - 올바른 예시: "input": "1 2 3 4 5"
+                - 큰 데이터가 필요한 경우 적당한 크기(10~100개)의 실제 데이터를 작성하세요.
+                - 실제 실행 가능한 구체적인 데이터를 사용하세요.
+                """);
+
+        return sb.toString();
+    }
+
+    /**
+     * 지침만 사용하는 프롬프트 생성 (RAG 없음, 실험용)
+     */
+    public String buildUserPromptWithoutRag(ProblemGenerationRequestDto request) {
+        return buildUserPrompt(request, null);
+    }
+
+    /**
+     * RAG만 사용하는 프롬프트의 시스템 프롬프트 (실험용)
+     */
+    public String buildMinimalSystemPrompt() {
+        return """
+                알고리즘 문제를 생성하세요.
+                응답은 JSON 형식으로 작성하세요.
+                """;
+    }
+
+    /**
+     * 프로필 기반 가이드라인 생성 (Phase 1)
+     *
+     * 알고리즘 프로필에서 해당 주제/난이도의 스펙을 가져와
+     * LLM에 전달할 구체적인 가이드라인을 생성합니다.
+     *
+     * @param topic      알고리즘 주제 (예: "동적 프로그래밍", "DFS/BFS")
+     * @param difficulty 난이도 (BRONZE, SILVER, GOLD, PLATINUM)
+     * @return 프롬프트에 추가할 가이드라인 섹션 문자열
+     */
+    private String buildProfileGuidelines(String topic, String difficulty) {
+        if (!profileRegistry.hasProfile(topic)) {
+            log.debug("프로필 없음: {} → 가이드라인 섹션 생략", topic);
+            return "";
+        }
+
+        DifficultySpec spec = profileRegistry.getDifficultySpec(topic, difficulty);
+        String displayName = profileRegistry.getDisplayName(topic);
+        String promptAdditions = profileRegistry.getPromptAdditions(topic);
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("\n## 알고리즘 특성 기반 가이드라인\n\n");
+        sb.append(String.format("**%s - %s 난이도 기준:**\n", displayName, difficulty));
+        sb.append(String.format("- 입력 크기: %s\n", spec.getInputSize()));
+        sb.append(String.format("- 시간 제한: %d ms\n", spec.getTimeLimit()));
+        sb.append(String.format("- 메모리 제한: %d MB\n", spec.getMemoryLimit()));
+        sb.append(String.format("- 기대 시간복잡도: %s\n", spec.getTimeComplexity()));
+        sb.append(String.format("- 문제 특성: %s\n\n", spec.getDescription()));
+
+        // 알고리즘별 추가 가이드라인
+        if (promptAdditions != null && !promptAdditions.isBlank()) {
+            sb.append("**알고리즘별 추가 지침:**\n");
+            sb.append(promptAdditions);
+            sb.append("\n");
+        }
+
+        log.debug("프로필 가이드라인 생성: {} - {}", displayName, difficulty);
+        return sb.toString();
+    }
+
+    /**
+     * 스토리 키워드 섹션 생성 (Phase 2)
+     *
+     * 목적: 같은 테마라도 매번 다른 스토리가 생성되도록 랜덤 키워드 제공
+     *
+     * @param theme 테마 키 (예: "SANTA_DELIVERY")
+     * @return 프롬프트에 추가할 키워드 섹션 문자열
+     */
+    private String buildStoryKeywordSection(String theme) {
+        List<String> keywords = storyKeywordPool.getRandomKeywords(theme, 3);
+
+        if (keywords.isEmpty()) {
+            log.debug("테마 '{}' 에 대한 키워드가 없어 키워드 섹션을 생략합니다.", theme);
+            return "";
+        }
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("\n## 스토리 생성 참고사항\n\n");
+        sb.append(String.format("**반드시 활용할 키워드 (3개):** %s\n\n", String.join(", ", keywords)));
+        sb.append("위 키워드들을 문제 스토리에 자연스럽게 녹여서 생성하세요.\n");
+        sb.append("키워드를 직접 언급하거나, 해당 소재를 활용한 상황을 만들어 주세요.\n");
+
+        log.debug("테마 '{}' 에 대해 키워드 섹션 생성: {}", theme, keywords);
+        return sb.toString();
+    }
+
+    /**
+     * 문서 메타데이터 안전하게 가져오기
+     */
+    private String getMetadata(Document doc, String key, String defaultValue) {
+        if (doc.getMetadata() == null) {
+            return defaultValue;
+        }
+        Object value = doc.getMetadata().get(key);
+        return value != null ? value.toString() : defaultValue;
+    }
+}

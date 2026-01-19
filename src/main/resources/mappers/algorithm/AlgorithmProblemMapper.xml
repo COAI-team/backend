@@ -1,0 +1,367 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="kr.or.kosa.backend.algorithm.mapper.AlgorithmProblemMapper">
+
+    <!-- ResultMap 정의 -->
+    <resultMap id="AlgoProblemResultMap" type="kr.or.kosa.backend.algorithm.dto.AlgoProblemDto">
+        <id property="algoProblemId" column="ALGO_PROBLEM_ID"/>
+        <result property="algoProblemTitle" column="ALGO_PROBLEM_TITLE"/>
+        <result property="algoProblemDescription" column="ALGO_PROBLEM_DESCRIPTION"/>
+        <result property="algoProblemDifficulty" column="ALGO_PROBLEM_DIFFICULTY"
+                typeHandler="org.apache.ibatis.type.EnumTypeHandler"/>
+        <result property="algoProblemSource" column="ALGO_PROBLEM_SOURCE"
+                typeHandler="org.apache.ibatis.type.EnumTypeHandler"/>
+        <result property="problemType" column="PROBLEM_TYPE"
+                typeHandler="org.apache.ibatis.type.EnumTypeHandler"/>
+        <result property="initScript" column="INIT_SCRIPT"/>
+        <result property="timelimit" column="TIMELIMIT"/>
+        <result property="memorylimit" column="MEMORYLIMIT"/>
+        <result property="algoCreater" column="ALGO_CREATER"/>
+        <result property="algoCreatedAt" column="ALGO_CREATED_AT"/>
+        <result property="algoUpdatedAt" column="ALGO_UPDATED_AT"/>
+        <result property="algoProblemTags" column="ALGO_PROBLEM_TAGS"/>
+        <result property="algoProblemStatus" column="ALGO_PROBLEM_STATUS"/>
+        <result property="constraints" column="CONSTRAINTS"/>
+        <result property="inputFormat" column="INPUT_FORMAT"/>
+        <result property="outputFormat" column="OUTPUT_FORMAT"/>
+    </resultMap>
+
+    <!-- 기본 컬럼 정의 -->
+    <sql id="problemColumns">
+        ALGO_PROBLEM_ID,
+        ALGO_PROBLEM_TITLE,
+        ALGO_PROBLEM_DESCRIPTION,
+        ALGO_PROBLEM_DIFFICULTY,
+        ALGO_PROBLEM_SOURCE,
+        PROBLEM_TYPE,
+        INIT_SCRIPT,
+        TIMELIMIT,
+        MEMORYLIMIT,
+        ALGO_CREATER,
+        ALGO_CREATED_AT,
+        ALGO_UPDATED_AT,
+        ALGO_PROBLEM_TAGS,
+        ALGO_PROBLEM_STATUS,
+        CONSTRAINTS,
+        INPUT_FORMAT,
+        OUTPUT_FORMAT
+    </sql>
+
+    <!-- 전체 문제 목록 조회 (페이징) -->
+    <select id="selectProblems" resultMap="AlgoProblemResultMap">
+        SELECT
+        <include refid="problemColumns"/>
+        FROM ALGO_PROBLEMS
+        WHERE ALGO_PROBLEM_STATUS = 1
+        ORDER BY ALGO_CREATED_AT DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <!-- 전체 문제 수 조회 -->
+    <select id="countAllProblems" resultType="int">
+        SELECT COUNT(*)
+        FROM ALGO_PROBLEMS
+        WHERE ALGO_PROBLEM_STATUS = 1
+    </select>
+
+    <!-- 문제 목록 조회 (필터 포함) -->
+    <select id="selectProblemsWithFilter" resultMap="AlgoProblemResultMap">
+        SELECT
+        <include refid="problemColumns"/>
+        FROM ALGO_PROBLEMS
+        WHERE ALGO_PROBLEM_STATUS = 1
+        <if test="difficulty != null and difficulty != ''">
+            AND ALGO_PROBLEM_DIFFICULTY = #{difficulty}
+        </if>
+        <if test="source != null and source != ''">
+            AND ALGO_PROBLEM_SOURCE = #{source}
+        </if>
+        <if test="problemType != null and problemType != ''">
+            AND PROBLEM_TYPE = #{problemType}
+        </if>
+        <if test="keyword != null and keyword != ''">
+            AND (ALGO_PROBLEM_TITLE LIKE CONCAT('%', #{keyword}, '%')
+            OR ALGO_PROBLEM_DESCRIPTION LIKE CONCAT('%', #{keyword}, '%'))
+        </if>
+        ORDER BY ALGO_CREATED_AT DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <!-- 전체 문제 수 조회 (필터 포함) -->
+    <select id="countProblemsWithFilter" resultType="int">
+        SELECT COUNT(*)
+        FROM ALGO_PROBLEMS p
+        WHERE ALGO_PROBLEM_STATUS = 1
+        <if test="difficulty != null and difficulty != ''">
+            AND ALGO_PROBLEM_DIFFICULTY = #{difficulty}
+        </if>
+        <if test="source != null and source != ''">
+            AND ALGO_PROBLEM_SOURCE = #{source}
+        </if>
+        <if test="keyword != null and keyword != ''">
+            AND (ALGO_PROBLEM_TITLE LIKE CONCAT('%', #{keyword}, '%')
+            OR ALGO_PROBLEM_DESCRIPTION LIKE CONCAT('%', #{keyword}, '%'))
+        </if>
+        <if test="problemType != null and problemType != ''">
+            AND PROBLEM_TYPE = #{problemType}
+        </if>
+        <if test="solved != null and solved != ''">
+            <choose>
+                <when test="solved == 'solved' and userId != null">
+                    AND EXISTS (
+                    SELECT 1 FROM ALGO_SUBMISSIONS s
+                    WHERE s.USER_ID = #{userId}
+                    AND s.ALGO_PROBLEM_ID = p.ALGO_PROBLEM_ID
+                    AND s.JUDGE_RESULT = 'AC'
+                    )
+                </when>
+                <when test="solved == 'unsolved' and userId != null">
+                    AND NOT EXISTS (
+                    SELECT 1 FROM ALGO_SUBMISSIONS s
+                    WHERE s.USER_ID = #{userId}
+                    AND s.ALGO_PROBLEM_ID = p.ALGO_PROBLEM_ID
+                    AND s.JUDGE_RESULT = 'AC'
+                    )
+                </when>
+            </choose>
+        </if>
+    </select>
+
+    <!-- 문제 상세 조회 -->
+    <select id="selectProblemById" resultMap="AlgoProblemResultMap">
+        SELECT
+        <include refid="problemColumns"/>
+        FROM ALGO_PROBLEMS
+        WHERE ALGO_PROBLEM_ID = #{problemId}
+        AND ALGO_PROBLEM_STATUS = 1
+    </select>
+
+    <!-- 문제 존재 여부 확인 -->
+    <select id="existsProblemById" resultType="boolean">
+        SELECT COUNT(*) > 0
+        FROM ALGO_PROBLEMS
+        WHERE ALGO_PROBLEM_ID = #{problemId}
+        AND ALGO_PROBLEM_STATUS = 1
+    </select>
+
+    <!-- AI 생성 문제 저장 -->
+    <insert id="insertProblem"
+            parameterType="kr.or.kosa.backend.algorithm.dto.AlgoProblemDto"
+            useGeneratedKeys="true"
+            keyProperty="algoProblemId"
+            keyColumn="ALGO_PROBLEM_ID">
+        INSERT INTO ALGO_PROBLEMS (
+        ALGO_PROBLEM_TITLE, ALGO_PROBLEM_DESCRIPTION, ALGO_PROBLEM_DIFFICULTY, ALGO_PROBLEM_SOURCE,
+        PROBLEM_TYPE, INIT_SCRIPT, TIMELIMIT, MEMORYLIMIT, ALGO_CREATER,
+        ALGO_CREATED_AT, ALGO_UPDATED_AT, ALGO_PROBLEM_TAGS, ALGO_PROBLEM_STATUS,
+        CONSTRAINTS, INPUT_FORMAT, OUTPUT_FORMAT
+        ) VALUES (
+        #{algoProblemTitle}, #{algoProblemDescription}, #{algoProblemDifficulty}, #{algoProblemSource},
+        #{problemType,typeHandler=org.apache.ibatis.type.EnumTypeHandler}, #{initScript}, #{timelimit}, #{memorylimit}, #{algoCreater},
+        #{algoCreatedAt}, #{algoUpdatedAt}, #{algoProblemTags}, #{algoProblemStatus},
+        #{constraints}, #{inputFormat}, #{outputFormat}
+        )
+    </insert>
+
+    <!-- 테스트케이스 저장 -->
+    <insert id="insertTestcase"
+            parameterType="kr.or.kosa.backend.algorithm.dto.AlgoTestcaseDto"
+            useGeneratedKeys="true"
+            keyProperty="testcaseId"
+            keyColumn="TESTCASE_ID">
+        INSERT INTO ALGO_TESTCASES (
+        ALGO_PROBLEM_ID, INPUT_DATA, EXPECTED_OUTPUT, IS_SAMPLE
+        ) VALUES (
+        #{algoProblemId}, #{inputData}, #{expectedOutput}, #{isSample}
+        )
+    </insert>
+
+    <!-- 샘플 테스트케이스 조회 -->
+    <select id="selectSampleTestCasesByProblemId" resultMap="algoTestcaseResultMap">
+        SELECT TESTCASE_ID, ALGO_PROBLEM_ID, INPUT_DATA, EXPECTED_OUTPUT, IS_SAMPLE
+        FROM ALGO_TESTCASES
+        WHERE ALGO_PROBLEM_ID = #{problemId}
+        AND IS_SAMPLE = 1
+        ORDER BY TESTCASE_ID ASC
+    </select>
+
+    <!-- 모든 테스트케이스 조회 -->
+    <select id="selectTestCasesByProblemId" resultMap="algoTestcaseResultMap">
+        SELECT TESTCASE_ID, ALGO_PROBLEM_ID, INPUT_DATA, EXPECTED_OUTPUT, IS_SAMPLE
+        FROM ALGO_TESTCASES
+        WHERE ALGO_PROBLEM_ID = #{problemId}
+        ORDER BY TESTCASE_ID ASC
+    </select>
+
+    <!-- algoTestcaseResultMap -->
+    <resultMap id="algoTestcaseResultMap" type="kr.or.kosa.backend.algorithm.dto.AlgoTestcaseDto">
+        <id property="testcaseId" column="TESTCASE_ID"/>
+        <result property="algoProblemId" column="ALGO_PROBLEM_ID"/>
+        <result property="inputData" column="INPUT_DATA"/>
+        <result property="expectedOutput" column="EXPECTED_OUTPUT"/>
+        <result property="isSample" column="IS_SAMPLE"/>
+    </resultMap>
+
+    <!-- 문제별 통계 조회 (제출 수, 맞힌 사람 수) -->
+    <select id="selectProblemStatistics" resultType="map">
+        SELECT
+            COALESCE(COUNT(*), 0) AS totalAttempts,
+            COALESCE(COUNT(DISTINCT CASE WHEN JUDGE_RESULT = 'AC' THEN USER_ID END), 0) AS successCount
+        FROM ALGO_SUBMISSIONS
+        WHERE ALGO_PROBLEM_ID = #{problemId}
+    </select>
+
+    <!-- 사용자 풀이 상태 포함 문제 목록 조회 + 검색 기능 -->
+    <select id="selectProblemsWithUserStatus" resultType="map">
+        SELECT
+        p.ALGO_PROBLEM_ID as algoProblemId,
+        p.ALGO_PROBLEM_TITLE as algoProblemTitle,
+        p.ALGO_PROBLEM_DIFFICULTY as algoProblemDifficulty,
+        p.ALGO_PROBLEM_TAGS as algoProblemTags,
+        p.ALGO_PROBLEM_SOURCE as algoProblemSource,
+        p.PROBLEM_TYPE as problemType,
+        p.ALGO_CREATER as algoCreater,
+        COALESCE(stats.solveCount, 0) as solveCount,
+        COALESCE(stats.totalSubmissions, 0) as totalSubmissions,
+        CASE
+        WHEN stats.totalSubmissions > 0
+        THEN ROUND((stats.solveCount * 100.0 / stats.totalSubmissions), 1)
+        ELSE 0
+        END as accuracy,
+        CASE
+        WHEN #{userId} IS NOT NULL AND EXISTS (
+        SELECT 1 FROM ALGO_SUBMISSIONS s
+        WHERE s.USER_ID = #{userId}
+        AND s.ALGO_PROBLEM_ID = p.ALGO_PROBLEM_ID
+        AND s.JUDGE_RESULT = 'AC'
+        ) THEN 1
+        ELSE 0
+        END AS isSolved
+        FROM ALGO_PROBLEMS p
+        LEFT JOIN (
+        SELECT
+        ALGO_PROBLEM_ID,
+        COUNT(DISTINCT CASE WHEN JUDGE_RESULT = 'AC' THEN USER_ID END) as solveCount,
+        COUNT(*) as totalSubmissions
+        FROM ALGO_SUBMISSIONS
+        GROUP BY ALGO_PROBLEM_ID
+        ) stats ON p.ALGO_PROBLEM_ID = stats.ALGO_PROBLEM_ID
+        WHERE p.ALGO_PROBLEM_STATUS = 1
+        <if test="difficulty != null and difficulty != ''">
+            AND p.ALGO_PROBLEM_DIFFICULTY = #{difficulty}
+        </if>
+        <if test="tags != null and tags != ''">
+            AND p.ALGO_PROBLEM_TAGS LIKE CONCAT('%', #{tags}, '%')
+        </if>
+        <if test="keyword != null and keyword != ''">
+            AND (p.ALGO_PROBLEM_TITLE LIKE CONCAT('%', #{keyword}, '%')
+            OR p.ALGO_PROBLEM_DESCRIPTION LIKE CONCAT('%', #{keyword}, '%'))
+        </if>
+        <if test="solved != null and solved != ''">
+            <choose>
+                <when test="solved == 'solved' and userId != null">
+                    AND EXISTS (
+                    SELECT 1 FROM ALGO_SUBMISSIONS s
+                    WHERE s.USER_ID = #{userId}
+                    AND s.ALGO_PROBLEM_ID = p.ALGO_PROBLEM_ID
+                    AND s.JUDGE_RESULT = 'AC'
+                    )
+                </when>
+                <when test="solved == 'unsolved' and userId != null">
+                    AND NOT EXISTS (
+                    SELECT 1 FROM ALGO_SUBMISSIONS s
+                    WHERE s.USER_ID = #{userId}
+                    AND s.ALGO_PROBLEM_ID = p.ALGO_PROBLEM_ID
+                    AND s.JUDGE_RESULT = 'AC'
+                    )
+                </when>
+            </choose>
+        </if>
+        ORDER BY p.ALGO_PROBLEM_ID DESC
+        LIMIT #{size} OFFSET #{offset}
+    </select>
+
+    <!-- ===== Phase 8: Fallback 전략용 랜덤 문제 조회 ===== -->
+
+    <!-- 같은 난이도 + 같은 주제의 랜덤 문제 ID 조회 (Fallback 옵션 1) -->
+    <select id="findRandomProblemByDifficultyAndTopic" resultType="Long">
+        SELECT ALGO_PROBLEM_ID
+        FROM ALGO_PROBLEMS
+        WHERE ALGO_PROBLEM_STATUS = 1
+          AND ALGO_PROBLEM_DIFFICULTY = #{difficulty}
+          AND ALGO_PROBLEM_TAGS LIKE CONCAT('%', #{topic}, '%')
+        ORDER BY RAND()
+        LIMIT 1
+    </select>
+
+    <!-- 같은 난이도의 랜덤 문제 ID 조회 (Fallback 옵션 2) -->
+    <select id="findRandomProblemByDifficulty" resultType="Long">
+        SELECT ALGO_PROBLEM_ID
+        FROM ALGO_PROBLEMS
+        WHERE ALGO_PROBLEM_STATUS = 1
+          AND ALGO_PROBLEM_DIFFICULTY = #{difficulty}
+        ORDER BY RAND()
+        LIMIT 1
+    </select>
+
+    <!-- 사용 가능한 조합 목록 조회 (Fallback 옵션 3) -->
+    <select id="findAvailableCombinations" resultType="map">
+        SELECT
+            ALGO_PROBLEM_DIFFICULTY as difficulty,
+            ALGO_PROBLEM_TAGS as topic,
+            COUNT(*) as count
+        FROM ALGO_PROBLEMS
+        WHERE ALGO_PROBLEM_STATUS = 1
+        GROUP BY ALGO_PROBLEM_DIFFICULTY, ALGO_PROBLEM_TAGS
+        HAVING COUNT(*) > 0
+        ORDER BY count DESC
+        LIMIT 10
+    </select>
+    
+    <!-- 문제 목록 하단의 통계 정보 조회 -->
+    <!-- 통계 정보 조회 -->
+    <select id="selectProblemStatisticsForUser" resultType="map">
+        SELECT
+        (SELECT COUNT(*)
+        FROM ALGO_PROBLEMS
+        WHERE ALGO_PROBLEM_STATUS = 1) as totalProblems,
+
+        (SELECT COUNT(*)
+        FROM ALGO_SUBMISSIONS) as totalAttempts,
+
+        COALESCE(
+        (SELECT ROUND(AVG(accuracy), 1)
+        FROM (
+        SELECT
+        CASE
+        WHEN COUNT(*) > 0
+        THEN (COUNT(DISTINCT CASE WHEN JUDGE_RESULT = 'AC' THEN USER_ID END) * 100.0 / COUNT(*))
+        ELSE 0
+        END as accuracy
+        FROM ALGO_SUBMISSIONS
+        GROUP BY ALGO_PROBLEM_ID
+        ) as problem_accuracies
+        ), 0
+        ) as averageAccuracy,
+
+        <choose>
+            <when test="userId != null">
+                (SELECT COUNT(DISTINCT p.ALGO_PROBLEM_ID)
+                FROM ALGO_PROBLEMS p
+                WHERE p.ALGO_PROBLEM_STATUS = 1
+                AND EXISTS (
+                SELECT 1 FROM ALGO_SUBMISSIONS s
+                WHERE s.USER_ID = #{userId}
+                AND s.ALGO_PROBLEM_ID = p.ALGO_PROBLEM_ID
+                AND s.JUDGE_RESULT = 'AC'
+                )) as solvedProblems
+            </when>
+            <otherwise>
+                0 as solvedProblems
+            </otherwise>
+        </choose>
+    </select>
+
+</mapper>

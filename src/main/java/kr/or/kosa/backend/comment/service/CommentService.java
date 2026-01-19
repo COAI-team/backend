@@ -1,0 +1,234 @@
+package kr.or.kosa.backend.comment.service;
+
+import kr.or.kosa.backend.algorithm.dto.AlgoSubmissionDto;
+import kr.or.kosa.backend.algorithm.mapper.AlgorithmSubmissionMapper;
+import kr.or.kosa.backend.codeboard.dto.CodeboardDetailResponseDto;
+import kr.or.kosa.backend.codeboard.mapper.CodeboardMapper;
+import kr.or.kosa.backend.comment.domain.Comment;
+import kr.or.kosa.backend.comment.dto.CommentCreateRequest;
+import kr.or.kosa.backend.comment.dto.CommentResponse;
+import kr.or.kosa.backend.comment.dto.CommentUpdateRequest;
+import kr.or.kosa.backend.comment.exception.CommentErrorCode;
+import kr.or.kosa.backend.comment.mapper.CommentMapper;
+import kr.or.kosa.backend.commons.exception.custom.CustomBusinessException;
+import kr.or.kosa.backend.commons.pagination.CursorRequest;
+import kr.or.kosa.backend.commons.pagination.CursorResponse;
+import kr.or.kosa.backend.freeboard.dto.FreeboardDetailResponseDto;
+import kr.or.kosa.backend.freeboard.mapper.FreeboardMapper;
+import kr.or.kosa.backend.like.domain.ReferenceType;
+import kr.or.kosa.backend.like.service.LikeService;
+import kr.or.kosa.backend.notification.domain.NotificationType;
+import kr.or.kosa.backend.notification.service.NotificationService;
+import kr.or.kosa.backend.users.domain.Users;
+import kr.or.kosa.backend.users.mapper.UserMapper;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+@Transactional(readOnly = true)
+public class CommentService {
+
+    private final CommentMapper commentMapper;
+    private final CodeboardMapper codeBoardMapper;
+    private final FreeboardMapper freeboardMapper;
+    private final AlgorithmSubmissionMapper submissionMapper;
+    private final UserMapper userMapper;
+    private final NotificationService notificationService;
+    private final LikeService likeService;
+
+    @Transactional
+    public CommentResponse createComment(CommentCreateRequest request, Long userId) {
+        // 게시글 존재 여부 확인
+        Long boardAuthorId = getBoardAuthorId(request.boardType(), request.boardId());
+
+        // 대댓글인 경우 부모 댓글 검증
+        if (request.parentCommentId() != null) {
+            Comment parentComment = commentMapper.selectCommentById(request.parentCommentId());
+            if (parentComment == null) {
+                throw new CustomBusinessException(CommentErrorCode.PARENT_NOT_FOUND);
+            }
+
+            // 대댓글의 대댓글 방지
+            if (parentComment.getParentCommentId() != null) {
+                throw new CustomBusinessException(CommentErrorCode.DEPTH_LIMIT_EXCEEDED);
+            }
+
+            // 부모 댓글 작성자에게 알림 발송
+            if (parentComment.getUserId() != null && !parentComment.getUserId().equals(userId)) {
+                try {
+                    notificationService.sendNotification(
+                            parentComment.getUserId(),
+                            userId,
+                            NotificationType.COMMENT_REPLY,
+                            ReferenceType.COMMENT,
+                            parentComment.getCommentId()
+                    );
+                } catch (Exception e) {
+                    log.warn("알림 발송 실패 (댓글 작성은 계속 진행): {}", e.getMessage());
+                }
+            }
+        }
+        // 댓글인 경우 게시글 작성자에게 알림
+        else {
+            if (boardAuthorId != null && !boardAuthorId.equals(userId)) {
+                ReferenceType referenceType = switch (request.boardType()) {
+                    case "CODEBOARD" -> ReferenceType.POST_CODEBOARD;
+                    case "FREEBOARD" -> ReferenceType.POST_FREEBOARD;
+                    case "SUBMISSION" -> ReferenceType.SUBMISSION;
+                    default -> throw new CustomBusinessException(CommentErrorCode.INVALID_BOARD_TYPE);
+                };
+
+                try {
+                    notificationService.sendNotification(
+                            boardAuthorId,
+                            userId,
+                            NotificationType.POST_COMMENT,
+                            referenceType,
+                            request.boardId()
+                    );
+                } catch (Exception e) {
+                    log.warn("알림 발송 실패 (댓글 작성은 계속 진행): {}", e.getMessage());
+                }
+            }
+        }
+
+        Comment comment = Comment.builder()
+                .boardId(request.boardId())
+                .boardType(request.boardType())
+                .parentCommentId(request.parentCommentId())
+                .userId(userId)
+                .content(request.content())
+                .build();
+
+        Long inserted = commentMapper.insertComment(comment);
+        if (inserted == 0) {
+            throw new CustomBusinessException(CommentErrorCode.INSERT_ERROR);
+        }
+
+        // DB에서 다시 조회하여 자동 생성된 필드 값 가져오기
+        Comment savedComment = commentMapper.selectCommentById(comment.getCommentId());
+
+        // 사용자 정보 조회
+        Users user = userMapper.findById(userId);
+        String userNickname = user != null ? user.getUserNickname() : null;
+        String userImage = user != null ? user.getUserImage() : null;
+
+        return CommentResponse.builder()
+                .commentId(savedComment.getCommentId())
+                .boardId(savedComment.getBoardId())
+                .boardType(savedComment.getBoardType())
+                .parentCommentId(savedComment.getParentCommentId())
+                .userId(savedComment.getUserId())
+                .userNickname(userNickname)
+                .userImage(userImage)
+                .content(savedComment.getContent())
+                .likeCount(savedComment.getLikeCount())
+                .isLiked(false)
+                .isAuthor(savedComment.getUserId() != null && boardAuthorId != null && savedComment.getUserId().equals(boardAuthorId))
+                .isDeleted(savedComment.getIsDeleted())
+                .createdAt(savedComment.getCreatedAt())
+                .updatedAt(savedComment.getUpdatedAt())
+                .build();
+    }
+
+    // 커서 기반 댓글 목록 조회 (답글 포함)
+    public CursorResponse<CommentResponse> getComments(
+            Long boardId,
+            String boardType,
+            CursorRequest cursor,
+            Long userId
+    ) {
+        // 댓글 + 답글 모두 조회 (SQL에서 한 번에)
+        List<CommentResponse> comments = commentMapper.selectCommentsWithReplies(
+                boardId,
+                boardType,
+                cursor,
+                userId
+        );
+
+        // 전체 댓글 수 조회
+        Long totalElements = commentMapper.countComments(boardId, boardType);
+
+        return new CursorResponse<>(comments, cursor.getSize(), totalElements);
+    }
+
+    @Transactional
+    public void updateComment(Long commentId, CommentUpdateRequest request, Long userId) {
+        Comment comment = commentMapper.selectCommentById(commentId);
+        if (comment == null) {
+            throw new CustomBusinessException(CommentErrorCode.NOT_FOUND);
+        }
+
+        if (!comment.getUserId().equals(userId)) {
+            throw new CustomBusinessException(CommentErrorCode.NO_EDIT_PERMISSION);
+        }
+
+        if (comment.getIsDeleted()) {
+            throw new CustomBusinessException(CommentErrorCode.ALREADY_DELETED);
+        }
+
+        comment.update(request.content());
+
+        Long updated = commentMapper.updateComment(comment);
+        if (updated == 0) {
+            throw new CustomBusinessException(CommentErrorCode.UPDATE_ERROR);
+        }
+    }
+
+    @Transactional
+    public void deleteComment(Long commentId, Long userId) {
+        Comment comment = commentMapper.selectCommentById(commentId);
+        if (comment == null) {
+            throw new CustomBusinessException(CommentErrorCode.NOT_FOUND);
+        }
+
+        if (!comment.getUserId().equals(userId)) {
+            throw new CustomBusinessException(CommentErrorCode.NO_DELETE_PERMISSION);
+        }
+
+        // 소프트 딜리트
+        Long deleted = commentMapper.deleteComment(commentId);
+        if (deleted == 0) {
+            throw new CustomBusinessException(CommentErrorCode.DELETE_ERROR);
+        }
+
+        // 관련 좋아요 삭제
+        likeService.deleteByReference(ReferenceType.COMMENT, commentId);
+
+        // 관련 알림 삭제
+        notificationService.deleteByReference(ReferenceType.COMMENT, commentId);
+    }
+
+    private Long getBoardAuthorId(String boardType, Long boardId) {
+        return switch (boardType) {
+            case "CODEBOARD" -> {
+                CodeboardDetailResponseDto codeBoard = codeBoardMapper.selectById(boardId, null);
+                if (codeBoard == null) {
+                    throw new CustomBusinessException(CommentErrorCode.BOARD_NOT_FOUND);
+                }
+                yield codeBoard.getUserId();
+            }
+            case "FREEBOARD" -> {
+                FreeboardDetailResponseDto freeBoard = freeboardMapper.selectById(boardId);
+                if (freeBoard == null) {
+                    throw new CustomBusinessException(CommentErrorCode.BOARD_NOT_FOUND);
+                }
+                yield freeBoard.getUserId();
+            }
+            case "SUBMISSION" -> {
+                AlgoSubmissionDto submission = submissionMapper.selectSubmissionById(boardId);
+                if (submission == null) {
+                    throw new CustomBusinessException(CommentErrorCode.BOARD_NOT_FOUND);
+                }
+                yield submission.getUserId();
+            }
+            default -> throw new CustomBusinessException(CommentErrorCode.INVALID_BOARD_TYPE);
+        };
+    }
+}

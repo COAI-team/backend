@@ -1,0 +1,173 @@
+package kr.or.kosa.backend.algorithm.mapper;
+
+import kr.or.kosa.backend.algorithm.dto.AlgoProblemDto;
+import kr.or.kosa.backend.algorithm.dto.AlgoTestcaseDto;
+import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+
+import java.util.List;
+import java.util.Map;
+
+@Mapper
+public interface AlgorithmProblemMapper {
+
+    /**
+     * 전체 문제 목록 조회 (페이징)
+     *
+     * @param offset 시작 위치 (0부터)
+     * @param limit  조회 개수
+     * @return 문제 목록
+     */
+    List<AlgoProblemDto> selectProblems(@Param("offset") int offset, @Param("limit") int limit);
+
+    /**
+     * 전체 문제 수 조회
+     *
+     * @return 전체 문제 개수
+     */
+    int countAllProblems();
+
+    /**
+     * 문제 목록 조회 (필터 포함)
+     *
+     * @param offset     시작 위치 (0부터 시작)
+     * @param limit      조회 개수
+     * @param difficulty 난이도 필터 (nullable)
+     * @param source     출처 필터 (nullable)
+     * @param keyword    검색어 (nullable)
+     * @param problemType 문제 유형 필터 (nullable)
+     * @return 문제 목록
+     */
+    List<AlgoProblemDto> selectProblemsWithFilter(
+            @Param("offset") int offset,
+            @Param("limit") int limit,
+            @Param("difficulty") String difficulty,
+            @Param("source") String source,
+            @Param("keyword") String keyword,
+            @Param("problemType") String problemType);
+
+    /**
+     * 전체 문제 개수 조회 (필터 포함)
+     *
+     * @param difficulty 난이도 필터 (nullable)
+     * @param source     출처 필터 (nullable)
+     * @param keyword    검색어 (nullable)
+     * @param problemType 문제 유형 필터 (nullable)
+     * @return 필터링된 문제 개수
+     */
+    int countProblemsWithFilter(
+            @Param("difficulty") String difficulty,
+            @Param("source") String source,
+            @Param("keyword") String keyword,
+            @Param("problemType") String problemType,
+            @Param("userId") Long userId,
+            @Param("solved") String solved
+    );
+
+    /**
+     * 문제 상세 조회 (ID로)
+     *
+     * @param problemId 문제 ID
+     * @return 문제 정보 (없으면 null)
+     */
+    AlgoProblemDto selectProblemById(@Param("problemId") Long problemId);
+
+    /**
+     * 문제 존재 여부 확인
+     *
+     * @param problemId 문제 ID
+     * @return 존재 여부
+     */
+    boolean existsProblemById(@Param("problemId") Long problemId);
+
+    // ===== AI 생성 문제 저장 메서드 =====
+    /**
+     * 문제 저장 (AI 생성 또는 수동 등록)
+     *
+     * @param problem 문제 엔티티
+     * @return 저장된 행 수
+     */
+    int insertProblem(AlgoProblemDto problem);
+
+    /**
+     * 테스트케이스 저장
+     *
+     * @param testcase 테스트케이스 엔티티
+     * @return 저장된 행 수
+     */
+    int insertTestcase(AlgoTestcaseDto testcase);
+
+    /**
+     * 문제 ID로 테스트케이스 목록 조회
+     *
+     * @param problemId 문제 ID
+     * @return 테스트케이스 목록
+     */
+    List<AlgoTestcaseDto> selectTestcasesByProblemId(@Param("problemId") Long problemId);
+
+    /**
+     * 샘플 테스트케이스 조회 (is_sample = true)
+     */
+    List<AlgoTestcaseDto> selectSampleTestCasesByProblemId(@Param("problemId") Long problemId);
+
+    /**
+     * 모든 테스트케이스 조회
+     */
+    List<AlgoTestcaseDto> selectTestCasesByProblemId(@Param("problemId") Long problemId);
+
+    /**
+     * 문제별 통계 조회 (제출 수, 맞힌 사람 수)
+     * @param problemId 문제 ID
+     * @return 통계 정보 (totalAttempts, successCount)
+     */
+    Map<String, Object> selectProblemStatistics(@Param("problemId") Long problemId);
+
+    /**
+     * 사용자 풀이 상태 포함 문제 목록 조회
+     */
+    List<Map<String, Object>> selectProblemsWithUserStatus(
+            @Param("userId") Long userId,
+            @Param("difficulty") String difficulty,
+            @Param("tags") String tags,
+            @Param("keyword") String keyword,
+            @Param("offset") int offset,
+            @Param("size") int size,
+            @Param("solved") String solved
+    );
+
+    // ===== Phase 8: Fallback 전략용 랜덤 문제 조회 =====
+
+    /**
+     * 같은 난이도 + 같은 주제의 랜덤 문제 ID 조회 (Fallback 옵션 1)
+     *
+     * @param difficulty 난이도 (BRONZE, SILVER, GOLD, PLATINUM)
+     * @param topic      알고리즘 주제 (태그에 포함된 문제 검색)
+     * @return 랜덤 문제 ID (없으면 null)
+     */
+    Long findRandomProblemByDifficultyAndTopic(
+            @Param("difficulty") String difficulty,
+            @Param("topic") String topic
+    );
+
+    /**
+     * 같은 난이도의 랜덤 문제 ID 조회 (Fallback 옵션 2)
+     *
+     * @param difficulty 난이도
+     * @return 랜덤 문제 ID (없으면 null)
+     */
+    Long findRandomProblemByDifficulty(@Param("difficulty") String difficulty);
+
+    /**
+     * 사용 가능한 조합 목록 조회 (Fallback 옵션 3)
+     * 난이도별로 문제가 있는 태그(주제) 목록 반환
+     *
+     * @return 사용 가능한 조합 목록 [{difficulty, topic, count}, ...]
+     */
+    List<Map<String, Object>> findAvailableCombinations();
+    /**
+     * 문제 목록 하단의 통계 정보 조회
+     * @param userId 사용자 ID (null 가능)
+     * @return 통계 정보 Map
+     */
+    Map<String, Object> selectProblemStatisticsForUser(@Param("userId") Long userId);
+}

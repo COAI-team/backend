@@ -1,0 +1,207 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="kr.or.kosa.backend.admin.mapper.AdminUserBoardMapper">
+
+    <select id="userBoards" resultType="kr.or.kosa.backend.admin.dto.BoardItems">
+        SELECT *
+        FROM (
+        SELECT
+        T.ALGOSUBMISSION_ID AS id,
+        AP.ALGO_PROBLEM_TITLE AS title,
+        U.USER_NICKNAME AS userNickName,
+        T.SUBMITTED_AT AS createdAt,
+        'algo' AS boardType
+        FROM ALGO_SUBMISSIONS T
+        JOIN USERS U ON U.USER_ID = T.USER_ID
+        JOIN ALGO_PROBLEMS AP ON AP.ALGO_PROBLEM_ID = T.ALGO_PROBLEM_ID
+
+        UNION ALL
+
+        SELECT
+        C.CODEBOARD_ID AS id,
+        C.CODEBOARD_TITLE AS title,
+        U.USER_NICKNAME AS userNickName,
+        C.CODEBOARD_CREATED_AT AS createdAt,
+        'code' AS boardType
+        FROM CODEBOARD C
+        JOIN USERS U ON U.USER_ID = C.USER_ID
+
+        UNION ALL
+
+        SELECT
+        F.FREEBOARD_ID AS id,
+        F.FREEBOARD_TITLE AS title,
+        U.USER_NICKNAME AS userNickName,
+        F.FREEBOARD_CREATED_AT AS createdAt,
+        'free' AS boardType
+        FROM FREEBOARD F
+        JOIN USERS U ON U.USER_ID = F.USER_ID
+        ) AS combined
+        <where>
+            <if test="cond.boardType != null and cond.boardType != ''">
+                AND boardType = #{cond.boardType}
+            </if>
+
+            <!-- ✅ 검색조건 추가 -->
+            <if test="cond.keyword != null and cond.keyword != ''">
+                <choose>
+                    <!-- 제목 검색 -->
+                    <when test="cond.searchType == 'title'">
+                        AND title LIKE CONCAT('%', #{cond.keyword}, '%')
+                    </when>
+                    <!-- 작성자 검색 -->
+                    <when test="cond.searchType == 'user'">
+                        AND userNickName LIKE CONCAT('%', #{cond.keyword}, '%')
+                    </when>
+                </choose>
+            </if>
+        </where>
+        ORDER BY
+        <choose>
+            <when test="cond.sortField != null and cond.sortField != ''">
+                ${cond.sortField}
+            </when>
+            <otherwise>createdAt</otherwise>
+        </choose>
+        <choose>
+            <when test="cond.sortOrder == 'asc'">ASC</when>
+            <otherwise>DESC</otherwise>
+        </choose>
+        LIMIT #{cond.size} OFFSET #{cond.offset}
+    </select>
+
+    <select id="countUserBoards" resultType="int">
+        SELECT COUNT(*)
+        FROM (
+        SELECT
+        T.ALGOSUBMISSION_ID AS id,
+        AP.ALGO_PROBLEM_TITLE AS title,
+        U.USER_NICKNAME AS userNickName,
+        T.SUBMITTED_AT AS createdAt,
+        'algo' AS boardType
+        FROM ALGO_SUBMISSIONS T
+        JOIN USERS U ON U.USER_ID = T.USER_ID
+        JOIN ALGO_PROBLEMS AP ON AP.ALGO_PROBLEM_ID = T.ALGO_PROBLEM_ID
+
+        UNION ALL
+
+        SELECT
+        C.CODEBOARD_ID AS id,
+        C.CODEBOARD_TITLE AS title,
+        U.USER_NICKNAME AS userNickName,
+        C.CODEBOARD_CREATED_AT AS createdAt,
+        'code' AS boardType
+        FROM CODEBOARD C
+        JOIN USERS U ON U.USER_ID = C.USER_ID
+
+        UNION ALL
+
+        SELECT
+        F.FREEBOARD_ID AS id,
+        F.FREEBOARD_TITLE AS title,
+        U.USER_NICKNAME AS userNickName,
+        F.FREEBOARD_CREATED_AT AS createdAt,
+        'free' AS boardType
+        FROM FREEBOARD F
+        JOIN USERS U ON U.USER_ID = F.USER_ID
+        ) AS combined
+        <where>
+            <if test="cond.boardType != null and cond.boardType != ''">
+                AND boardType = #{cond.boardType}
+            </if>
+
+            <if test="cond.keyword != null and cond.keyword != ''">
+                <choose>
+                    <when test="cond.searchType == 'title'">
+                        AND title LIKE CONCAT('%', #{cond.keyword}, '%')
+                    </when>
+                    <when test="cond.searchType == 'user'">
+                        AND userNickName LIKE CONCAT('%', #{cond.keyword}, '%')
+                    </when>
+                </choose>
+            </if>
+        </where>
+    </select>
+
+
+    <select id="findOneAlgoBoardByBoardId" resultType="kr.or.kosa.backend.admin.dto.response.AlgoBoardDetailResponseDto">
+        SELECT
+        t.ALGOSUBMISSION_ID            AS algoSubmissionId,
+        t.USER_ID                     AS userId,
+        u.USER_NICKNAME               AS userNickName,
+        ap.ALGO_PROBLEM_TITLE         AS algoProblemTitle,
+        ap.ALGO_PROBLEM_DESCRIPTION   AS algoProblemDescription,
+        ap.ALGO_PROBLEM_DIFFICULTY    AS algoProblemDifficulty,
+        ap.PROBLEM_TYPE               AS problemType,
+        t.SOURCE_CODE                 AS sourceCode,
+        l.LANGUAGE_NAME               AS language,
+        t.AI_FEEDBACK                 AS aiFeedback,
+        t.AI_FEEDBACK_TYPE            AS aiFeedbackType,
+        t.SOLVE_MODE                  AS solveMode,
+        t.SUBMITTED_AT                AS submittedAt
+        FROM ALGO_SUBMISSIONS t
+        JOIN ALGO_PROBLEMS ap ON ap.ALGO_PROBLEM_ID = t.ALGO_PROBLEM_ID
+        JOIN LANGUAGES l ON l.LANGUAGE_ID = t.LANGUAGE_ID
+        JOIN USERS u ON u.USER_ID = t.USER_ID
+        WHERE t.ALGOSUBMISSION_ID = #{boardId}
+    </select>
+
+
+    <!-- CODEBOARD + CODE_ANALYSIS_HISTORY 상세 조회 -->
+    <select id="findOneCodeBoardByBoardId"
+            parameterType="long"
+            resultType="kr.or.kosa.backend.admin.dto.CodeBoardAnalysisDetailDto">
+        SELECT
+        c.CODEBOARD_ID AS codeboardId,
+        c.USER_ID AS userId,
+        c.ANALYSIS_ID AS analysisId,
+        c.CODEBOARD_TITLE AS codeboardTitle,
+        c.CODEBOARD_BLOCKS AS codeboardBlocks,
+        c.CODEBOARD_DELETED_YN AS codeboardDeletedYn,
+        cah.REPOSITORY_URL AS repositoryUrl,
+        cah.FILE_PATH AS filePath,
+        cah.ANALYSIS_TYPE AS analysisType,
+        cah.TONE_LEVEL AS toneLevel,
+        cah.CUSTOM_REQUIREMENTS AS customRequirements,
+        cah.ANALYANALYSIS_RESULTSIS_RESULT AS analysisResults,   <!-- ✅ 오타 수정 -->
+        cah.AI_SCORE AS aiScore
+        FROM CODEBOARD c
+        JOIN CODE_ANALYSIS_HISTORY cah
+        ON cah.ANALYSIS_ID = c.ANALYSIS_ID
+<!--        WHERE c.CODEBOARD_ID = 1-->
+        WHERE c.CODEBOARD_ID = #{boardId}
+    </select>
+
+    <!-- 자유게시판 단건 조회 -->
+    <select id="findOnefreeBoardByBoardId"
+            parameterType="long"
+            resultType="kr.or.kosa.backend.admin.dto.response.AdminFreeBoardDetailResponseDto">
+        SELECT
+        f.FREEBOARD_ID   AS freeboardId,
+        f.USER_ID        AS userId,
+        u.USER_NICKNAME  AS userNickName,
+        f.FREEBOARD_TITLE AS freeboardTitle,
+        f.FREEBOARD_CONTENT AS freeboardContent,
+        f.FREEBOARD_DELETED_YN  ASfreeBoardDeletedYn
+        FROM FREEBOARD f
+        JOIN USERS u ON u.USER_ID  = f.USER_ID
+        WHERE f.FREEBOARD_ID = #{boardId}
+    </select>
+
+    <update id="deleteFreeBoard">
+        UPDATE FREEBOARD
+        SET FREEBOARD_DELETED_YN = 'Y'
+        WHERE FREEBOARD_ID  = #{boardId}
+    </update>
+
+    <update id="deleteCodeBoard">
+        UPDATE CODEBOARD
+        SET CODEBOARD_DELETED_YN = 'Y'
+        WHERE CODEBOARD_ID  = #{boardId}
+    </update>
+
+</mapper>
+

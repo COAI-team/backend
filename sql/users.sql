@@ -1,0 +1,21 @@
+create table USERS (
+    USER_ID bigint auto_increment primary key,
+    USER_EMAIL varchar(255) not null,
+    USER_PW varchar(255) not null,
+    USER_NAME varchar(100) not null,
+    USER_NICKNAME varchar(50) not null,
+    USER_IMAGE varchar(500) null,
+    USER_GRADE int default 1 not null,
+    USER_ROLE enum ('ROLE_USER', 'ROLE_ADMIN') default 'ROLE_USER' not null,
+    USER_ISDELETED tinyint(1) default 0 not null,
+    USER_DELETEDAT datetime null,
+    USER_CREATEDAT datetime default CURRENT_TIMESTAMP not null,
+    USER_UPDATEDAT datetime default CURRENT_TIMESTAMP null on update CURRENT_TIMESTAMP,
+    USER_ENABLED tinyint(1) default 1 not null,
+    USER_ISSUBSCRIBED tinyint(1) default 0 not null,
+    GITHUB_ID varchar(255) null,
+    GITHUB_TOKEN text null,
+    MCP_TOKEN varchar(255) null,
+    constraint UQ_USERS_EMAIL unique (USER_EMAIL),
+    constraint UQ_USERS_NICKNAME unique (USER_NICKNAME)
+);

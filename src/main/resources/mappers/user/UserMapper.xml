@@ -1,0 +1,255 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="kr.or.kosa.backend.users.mapper.UserMapper">
+
+    <!-- ========= Users 매핑 ========= -->
+    <resultMap id="UserMap" type="kr.or.kosa.backend.users.domain.Users">
+        <id property="userId" column="USER_ID"/>
+        <result property="userEmail" column="USER_EMAIL"/>
+        <result property="userPw" column="USER_PW"/>
+        <result property="userName" column="USER_NAME"/>
+        <result property="userNickname" column="USER_NICKNAME"/>
+        <result property="userImage" column="USER_IMAGE"/>
+        <result property="userGrade" column="USER_GRADE"/>
+        <result property="userRole" column="USER_ROLE"/>
+        <result property="userIsdeleted" column="USER_ISDELETED"/>
+        <result property="userDeletedat" column="USER_DELETEDAT"/>
+        <result property="userCreatedat" column="USER_CREATEDAT"/>
+        <result property="userUpdatedat" column="USER_UPDATEDAT"/>
+        <result property="userEnabled" column="USER_ENABLED"/>
+        <result property="userIssubscribed" column="USER_ISSUBSCRIBED"/>
+        <result property="userEnabled" column="USER_ENABLED"/>
+        <result property="userIssubscribed" column="USER_ISSUBSCRIBED"/>
+        <result property="githubId" column="GITHUB_ID"/>
+        <result property="githubToken" column="GITHUB_TOKEN"/>
+        <result property="mcpToken" column="MCP_TOKEN"/>
+    </resultMap>
+
+    <!-- ========= SELECT ========= -->
+
+    <select id="findByMcpToken" resultMap="UserMap">
+        SELECT *
+        FROM USERS
+        WHERE MCP_TOKEN = #{mcpToken}
+    </select>
+
+    <select id="findByEmail" resultMap="UserMap">
+        SELECT *
+        FROM USERS
+        WHERE USER_EMAIL = #{userEmail}
+    </select>
+
+    <select id="findByNickname" resultMap="UserMap">
+        SELECT *
+        FROM USERS
+        WHERE USER_NICKNAME = #{userNickname}
+    </select>
+
+    <select id="findById" resultMap="UserMap">
+        SELECT *
+        FROM USERS
+        WHERE USER_ID = #{userId}
+    </select>
+
+    <select id="selectUsersByIds" resultMap="UserMap">
+        SELECT USER_ID, USER_NICKNAME, USER_EMAIL
+        FROM USERS
+        WHERE USER_ID IN
+        <foreach collection="userIds" item="userId" open="(" separator="," close=")">
+            #{userId}
+        </foreach>
+    </select>
+
+    <select id="getGithubUserInfo" resultType="map">
+        SELECT
+            s.SOCIALLOGIN_PROVIDER_ID AS githubId,
+            u.USER_NICKNAME AS githubLogin,
+            u.USER_IMAGE AS avatarUrl
+        FROM SOCIALLOGIN s
+                 JOIN USERS u ON s.USER_ID = u.USER_ID
+        WHERE s.USER_ID = #{userId}
+          AND s.SOCIALLOGIN_PROVIDER = 'github'
+    </select>
+
+    <select id="findSocialProviderByUserId" resultType="string">
+        SELECT SOCIALLOGIN_PROVIDER
+        FROM SOCIALLOGIN
+        WHERE USER_ID = #{userId}
+        LIMIT 1
+    </select>
+
+    <!-- ========= INSERT ========= -->
+
+    <insert id="insertUser"
+            parameterType="kr.or.kosa.backend.users.domain.Users"
+            useGeneratedKeys="true"
+            keyProperty="userId">
+        INSERT INTO USERS (
+            USER_EMAIL,
+            USER_PW,
+            USER_NAME,
+            USER_NICKNAME,
+            USER_IMAGE
+        ) VALUES (
+                     #{userEmail},
+                     #{userPw},
+                     #{userName},
+                     #{userNickname},
+                     #{userImage}
+                 )
+    </insert>
+
+
+    <!-- ========= UPDATE ========= -->
+
+    <update id="updateUser" parameterType="kr.or.kosa.backend.users.domain.Users">
+        UPDATE USERS
+        SET USER_NAME = #{userName},
+            USER_NICKNAME = #{userNickname},
+            USER_IMAGE = #{userImage},
+            GITHUB_ID = #{githubId},
+            GITHUB_TOKEN = #{githubToken},
+            USER_UPDATEDAT = NOW()
+        WHERE USER_ID = #{userId}
+    </update>
+
+    <update id="updateUserImage">
+        UPDATE USERS
+        SET USER_IMAGE = #{userImage},
+            USER_UPDATEDAT = NOW()
+        WHERE USER_ID = #{userId}
+    </update>
+
+    <update id="updatePassword">
+        UPDATE USERS
+        SET USER_PW = #{userPw},
+            USER_UPDATEDAT = NOW()
+        WHERE USER_ID = #{userId}
+    </update>
+
+    <update id="updateUserInfo">
+        UPDATE USERS
+        SET USER_NAME = #{userName},
+            USER_NICKNAME = #{userNickname},
+            USER_UPDATEDAT = NOW()
+        WHERE USER_ID = #{userId}
+    </update>
+
+    <update id="updateMcpToken">
+        UPDATE USERS
+        SET MCP_TOKEN = #{mcpToken},
+            USER_UPDATEDAT = NOW()
+        WHERE USER_ID = #{userId}
+    </update>
+
+
+    <!-- ========= DELETE ========= -->
+    <delete id="deleteUser">
+        DELETE FROM USERS
+        WHERE USER_ID = #{userId}
+    </delete>
+
+
+    <!-- ========= Social Login ========= -->
+
+    <select id="findBySocialProvider" resultMap="UserMap">
+        SELECT u.*
+        FROM USERS u
+                 JOIN SOCIALLOGIN s ON u.USER_ID = s.USER_ID
+        WHERE s.SOCIALLOGIN_PROVIDER = #{provider}
+          AND s.SOCIALLOGIN_PROVIDER_ID = #{providerId}
+    </select>
+
+    <insert id="insertSocialAccount">
+        INSERT INTO SOCIALLOGIN (
+            USER_ID, SOCIALLOGIN_PROVIDER,
+            SOCIALLOGIN_PROVIDER_ID, SOCIALLOGIN_SOCIAL_EMAIL
+        ) VALUES (
+                     #{userId}, #{provider}, #{providerId}, #{userEmail}
+                 )
+    </insert>
+
+    <delete id="deleteSocialAccount">
+        DELETE FROM SOCIALLOGIN
+        WHERE USER_ID = #{userId}
+          AND SOCIALLOGIN_PROVIDER = #{provider}
+    </delete>
+
+    <select id="countSocialAccount" resultType="int">
+        SELECT COUNT(*)
+        FROM SOCIALLOGIN
+        WHERE USER_ID = #{userId}
+          AND SOCIALLOGIN_PROVIDER = #{provider}
+    </select>
+
+    <!-- ========= 90일 뒤 자동 탈퇴 ========= -->
+
+    <update id="scheduleDelete">
+        UPDATE USERS
+        SET USER_DELETEDAT = #{userDeletedat},
+            USER_ISDELETED = 1
+        WHERE USER_ID = #{userId}
+    </update>
+
+    <update id="restoreUser">
+        UPDATE USERS
+        SET USER_DELETEDAT = NULL,
+            USER_ISDELETED = 0
+        WHERE USER_ID = #{userId}
+    </update>
+
+    <select id="findUsersToDelete" resultMap="UserMap">
+        <![CDATA[
+        SELECT *
+        FROM USERS
+        WHERE USER_ISDELETED = 1
+          AND USER_DELETEDAT IS NOT NULL
+          AND USER_DELETEDAT < #{now}
+        ]]>
+    </select>
+
+    <update id="softDeleteUser">
+        UPDATE USERS
+        SET USER_ISDELETED = 1
+        WHERE USER_ID = #{userId}
+    </update>
+
+    <update id="anonymizeUser">
+        UPDATE USERS
+        SET USER_EMAIL = #{userEmail},
+            USER_NAME = #{userName},
+            USER_UPDATEDAT = NOW()
+        WHERE USER_ID = #{userId}
+    </update>
+
+
+    <select id="findByIds" resultType="kr.or.kosa.backend.users.domain.Users">
+        SELECT
+        USER_ID,
+        USER_NICKNAME
+        FROM USERS
+        WHERE USER_ID IN
+        <foreach collection="userIds"
+                 item="id"
+                 open="("
+                 separator=","
+                 close=")">
+            #{id}
+        </foreach>
+    </select>
+
+    <select id="findNicknamesByIds" resultType="kr.or.kosa.backend.users.domain.Users">
+        SELECT USER_ID as userId, USER_NICKNAME as userNickname
+        FROM USERS
+        WHERE USER_ID IN
+        <foreach collection="userIds" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
+
+
+
+</mapper>

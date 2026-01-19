@@ -1,0 +1,269 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="kr.or.kosa.backend.pay.repository.PaymentsMapper">
+
+    <!-- ================== ResultMap ================== -->
+    <resultMap id="PaymentsResultMap"
+               type="kr.or.kosa.backend.pay.entity.Payments">
+        <id     column="order_id"         property="orderId"/>
+        <result column="user_id"          property="userId"/>
+        <result column="plan_code"        property="planCode"/>
+        <result column="payment_key"      property="paymentKey"/>
+        <result column="order_name"       property="orderName"/>
+        <result column="customer_name"    property="customerName"/>
+        <result column="cancel_reason"    property="cancelReason"/>
+
+        <!-- BigDecimal 금액들 -->
+        <result column="original_amount"  property="originalAmount"/>
+        <result column="used_point"       property="usedPoint"/>
+        <result column="amount"           property="amount"/>
+
+        <result column="status"           property="status"/>
+
+        <!-- LocalDateTime 매핑 -->
+        <result column="requested_at"
+                property="requestedAt"
+                javaType="java.time.LocalDateTime"/>
+        <result column="canceled_at"
+                property="canceledAt"
+                javaType="java.time.LocalDateTime"/>
+
+        <result column="pay_method"       property="payMethod"/>
+        <result column="pg_raw_response"  property="pgRawResponse"/>
+
+        <!-- 카드 정보 & 승인 시각 -->
+        <result column="card_company"     property="cardCompany"/>
+        <result column="card_approval_no" property="cardApprovalNo"/>
+        <result column="approved_at"
+                property="approvedAt"
+                javaType="java.time.LocalDateTime"/>
+
+        <!-- 구독 정보 (조인 전용) -->
+        <result column="subscription_status"    property="subscriptionStatus"/>
+        <result column="subscription_start_at"  property="subscriptionStartAt" javaType="java.time.LocalDateTime"/>
+        <result column="subscription_end_at"    property="subscriptionEndAt" javaType="java.time.LocalDateTime"/>
+    </resultMap>
+
+    <!-- ================== INSERT (READY 단계 최초 저장) ================== -->
+    <insert id="insertPayment"
+            parameterType="kr.or.kosa.backend.pay.entity.Payments">
+        INSERT INTO payments (
+        order_id,
+        user_id,
+        plan_code,
+        order_name,
+        customer_name,
+        cancel_reason,
+        original_amount,
+        used_point,
+        amount,
+        status,
+        requested_at
+        )
+        VALUES (
+        #{orderId},
+        #{userId},
+        #{planCode},
+        #{orderName},
+        #{customerName},
+        #{cancelReason},
+        #{originalAmount},
+        #{usedPoint},
+        #{amount},
+        #{status},
+        #{requestedAt}
+        )
+    </insert>
+
+    <!-- ================== SELECT by orderId ================== -->
+    <select id="findPaymentByOrderId"
+            resultMap="PaymentsResultMap">
+        SELECT
+        p.order_id,
+        p.user_id,
+        p.plan_code,
+        p.payment_key,
+        p.order_name,
+        p.customer_name,
+        p.cancel_reason,
+        p.original_amount,
+        p.used_point,
+        p.amount,
+        p.status,
+        p.requested_at,
+        p.canceled_at,
+        p.pay_method,
+        p.pg_raw_response,
+        p.card_company,
+        p.card_approval_no,
+        p.approved_at,
+        s.status      AS subscription_status,
+        s.start_date  AS subscription_start_at,
+        s.end_date    AS subscription_end_at
+        FROM payments p
+        LEFT JOIN subscriptions s ON s.order_id = p.order_id
+        WHERE p.order_id = #{orderId}
+    </select>
+
+    <!-- ================== SELECT by paymentKey (환불용) ================== -->
+    <select id="findPaymentByPaymentKey"
+            resultMap="PaymentsResultMap">
+        SELECT
+        p.order_id,
+        p.user_id,
+        p.plan_code,
+        p.payment_key,
+        p.order_name,
+        p.customer_name,
+        p.cancel_reason,
+        p.original_amount,
+        p.used_point,
+        p.amount,
+        p.status,
+        p.requested_at,
+        p.canceled_at,
+        p.pay_method,
+        p.pg_raw_response,
+        p.card_company,
+        p.card_approval_no,
+        p.approved_at,
+        s.status      AS subscription_status,
+        s.start_date  AS subscription_start_at,
+        s.end_date    AS subscription_end_at
+        FROM payments p
+        LEFT JOIN subscriptions s ON s.order_id = p.order_id
+        WHERE p.payment_key = #{paymentKey}
+        AND p.status = 'DONE'
+    </select>
+
+    <!-- ================== UPDATE status (승인 시) ================== -->
+    <update id="updatePaymentStatus"
+            parameterType="kr.or.kosa.backend.pay.entity.Payments">
+        UPDATE payments
+        SET
+        payment_key      = #{paymentKey},
+        status           = #{status},
+        pay_method       = #{payMethod},
+        pg_raw_response  = #{pgRawResponse},
+        card_company     = #{cardCompany},
+        card_approval_no = #{cardApprovalNo},
+        approved_at      = #{approvedAt}
+        WHERE order_id = #{orderId}
+    </update>
+
+    <!-- ================== 상태만 조건부 업데이트 (동시 승인 방지용) ================== -->
+    <update id="updatePaymentStatusIfMatch">
+        UPDATE payments
+        SET status = #{toStatus}
+        WHERE order_id = #{orderId}
+          AND status = #{fromStatus}
+    </update>
+
+    <!-- ================== UPDATE status (취소 시) ================== -->
+    <update id="updatePaymentStatusToCanceled">
+        UPDATE payments
+        SET
+        status        = #{status},
+        canceled_at   = #{canceledAt},
+        cancel_reason = #{cancelReason},
+        pg_raw_response = #{pgRawResponse}
+        WHERE order_id = #{orderId}
+          AND status = 'DONE'
+    </update>
+
+    <!-- ================== READY 단계: 기존 orderId 덮어쓰기 ================== -->
+    <update id="updatePaymentForReady"
+            parameterType="kr.or.kosa.backend.pay.entity.Payments">
+        UPDATE payments
+        SET
+        user_id         = #{userId},
+        plan_code       = #{planCode},
+        order_name      = #{orderName},
+        customer_name   = #{customerName},
+        cancel_reason   = #{cancelReason},
+        original_amount = #{originalAmount},
+        used_point      = #{usedPoint},
+        amount          = #{amount},
+        status          = #{status},
+        requested_at    = #{requestedAt}
+        WHERE order_id = #{orderId}
+    </update>
+
+    <!-- ================== 최근 결제 N건 (환불 남용 체크용) ================== -->
+    <select id="findRecentPaymentsByUser"
+            resultMap="PaymentsResultMap">
+        SELECT
+        p.order_id,
+        p.user_id,
+        p.plan_code,
+        p.payment_key,
+        p.order_name,
+        p.customer_name,
+        p.cancel_reason,
+        p.original_amount,
+        p.used_point,
+        p.amount,
+        p.status,
+        p.requested_at,
+        p.canceled_at,
+        p.pay_method,
+        p.pg_raw_response,
+        p.card_company,
+        p.card_approval_no,
+        p.approved_at,
+        s.status      AS subscription_status,
+        s.start_date  AS subscription_start_at,
+        s.end_date    AS subscription_end_at
+        FROM payments p
+        LEFT JOIN subscriptions s ON s.order_id = p.order_id
+        WHERE p.user_id = #{userId}
+        ORDER BY p.requested_at DESC
+        LIMIT #{limit}
+    </select>
+
+    <!-- ================== 기간/상태별 결제 내역 ================== -->
+    <select id="findPaymentsInRange"
+            resultMap="PaymentsResultMap">
+        SELECT
+        p.order_id,
+        p.user_id,
+        p.plan_code,
+        p.payment_key,
+        p.order_name,
+        p.customer_name,
+        p.cancel_reason,
+        p.original_amount,
+        p.used_point,
+        p.amount,
+        p.status,
+        p.requested_at,
+        p.canceled_at,
+        p.pay_method,
+        p.pg_raw_response,
+        p.card_company,
+        p.card_approval_no,
+        p.approved_at,
+        s.status      AS subscription_status,
+        s.start_date  AS subscription_start_at,
+        s.end_date    AS subscription_end_at
+        FROM payments p
+        LEFT JOIN subscriptions s ON s.order_id = p.order_id
+        <where>
+            p.user_id = #{userId}
+            <if test="from != null">
+                AND p.requested_at &gt;= #{from}
+            </if>
+            <if test="to != null">
+                AND p.requested_at &lt; #{to}
+            </if>
+            <if test="status != null">
+                AND p.status = #{status}
+            </if>
+        </where>
+        ORDER BY p.requested_at DESC
+    </select>
+
+</mapper>

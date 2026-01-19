@@ -1,0 +1,173 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="kr.or.kosa.backend.comment.mapper.CommentMapper">
+
+    <resultMap id="commentResponseMap" type="kr.or.kosa.backend.comment.dto.CommentResponse">
+        <id property="commentId" column="COMMENT_ID"/>
+        <result property="boardId" column="BOARD_ID"/>
+        <result property="boardType" column="BOARD_TYPE"/>
+        <result property="parentCommentId" column="PARENT_COMMENT_ID"/>
+        <result property="userId" column="USER_ID"/>
+        <result property="userNickname" column="USER_NICKNAME"/>
+        <result property="userImage" column="USER_IMAGE"/>
+        <result property="content" column="CONTENT"/>
+        <result property="likeCount" column="LIKE_COUNT"/>
+        <result property="isLiked" column="IS_LIKED"/>
+        <result property="isAuthor" column="IS_AUTHOR"/>
+        <result property="isDeleted" column="IS_DELETED"/>
+        <result property="createdAt" column="CREATED_AT"/>
+        <result property="updatedAt" column="UPDATED_AT"/>
+    </resultMap>
+
+    <!-- 댓글 생성 -->
+    <insert id="insertComment" parameterType="kr.or.kosa.backend.comment.domain.Comment"
+            useGeneratedKeys="true" keyProperty="commentId" keyColumn="COMMENT_ID">
+        INSERT INTO COMMENT (
+        BOARD_ID,
+        BOARD_TYPE,
+        PARENT_COMMENT_ID,
+        USER_ID,
+        CONTENT,
+        IS_DELETED,
+        CREATED_AT
+        ) VALUES (
+        #{boardId},
+        #{boardType},
+        #{parentCommentId},
+        #{userId},
+        #{content},
+        0,
+        NOW()
+        )
+    </insert>
+
+    <!-- 댓글 단건 조회 -->
+    <resultMap id="commentMap" type="kr.or.kosa.backend.comment.domain.Comment">
+        <id property="commentId" column="COMMENT_ID"/>
+        <result property="boardId" column="BOARD_ID"/>
+        <result property="boardType" column="BOARD_TYPE"/>
+        <result property="parentCommentId" column="PARENT_COMMENT_ID"/>
+        <result property="userId" column="USER_ID"/>
+        <result property="content" column="CONTENT"/>
+        <result property="likeCount" column="LIKE_COUNT"/>
+        <result property="isDeleted" column="IS_DELETED"/>
+        <result property="createdAt" column="CREATED_AT"/>
+        <result property="updatedAt" column="UPDATED_AT"/>
+    </resultMap>
+
+    <select id="selectCommentById" resultMap="commentMap">
+        SELECT
+        COMMENT_ID,
+        BOARD_ID,
+        BOARD_TYPE,
+        PARENT_COMMENT_ID,
+        USER_ID,
+        CONTENT,
+        LIKE_COUNT,
+        IS_DELETED,
+        CREATED_AT,
+        UPDATED_AT
+        FROM COMMENT
+        WHERE COMMENT_ID = #{commentId}
+    </select>
+
+    <!-- 댓글 + 답글 조회 (커서 기반 무한 스크롤)-->
+    <select id="selectCommentsWithReplies" resultMap="commentResponseMap">
+        WITH parent_comments AS (
+        SELECT COMMENT_ID
+        FROM COMMENT
+        WHERE BOARD_ID = #{boardId}
+        AND BOARD_TYPE = #{boardType}
+        AND PARENT_COMMENT_ID IS NULL
+        AND IS_DELETED = FALSE
+        <if test="cursor.hasCursor()">
+            AND COMMENT_ID &gt; #{cursor.cursor}
+        </if>
+        ORDER BY COMMENT_ID ASC
+        LIMIT #{cursor.size}
+        )
+        SELECT
+        c.COMMENT_ID,
+        c.BOARD_ID,
+        c.BOARD_TYPE,
+        c.PARENT_COMMENT_ID,
+        c.USER_ID,
+        u.USER_NICKNAME,
+        u.USER_IMAGE,
+        c.CONTENT,
+        c.IS_DELETED,
+        c.CREATED_AT,
+        c.UPDATED_AT,
+        (SELECT COUNT(*)
+        FROM `LIKE` l
+        WHERE l.REFERENCE_ID = c.COMMENT_ID
+        AND l.REFERENCE_TYPE = 'COMMENT') AS LIKE_COUNT,
+        <choose>
+            <when test="userId != null">
+                EXISTS(
+                SELECT 1
+                FROM `LIKE` l
+                WHERE l.REFERENCE_ID = c.COMMENT_ID
+                AND l.REFERENCE_TYPE = 'COMMENT'
+                AND l.USER_ID = #{userId}
+                ) AS IS_LIKED,
+                IF(c.USER_ID = #{userId}, TRUE, FALSE) AS IS_AUTHOR
+            </when>
+            <otherwise>
+                FALSE AS IS_LIKED,
+                FALSE AS IS_AUTHOR
+            </otherwise>
+        </choose>
+        FROM COMMENT c
+        LEFT JOIN USERS u ON c.USER_ID = u.USER_ID
+        WHERE c.BOARD_ID = #{boardId}
+        AND c.BOARD_TYPE = #{boardType}
+        AND c.IS_DELETED = FALSE
+        AND (
+        c.COMMENT_ID IN (SELECT COMMENT_ID FROM parent_comments)
+        OR c.PARENT_COMMENT_ID IN (SELECT COMMENT_ID FROM parent_comments)
+        )
+        ORDER BY
+        COALESCE(c.PARENT_COMMENT_ID, c.COMMENT_ID) ASC,
+        c.COMMENT_ID ASC
+    </select>
+
+    <!-- 댓글 수정 -->
+    <update id="updateComment">
+        UPDATE COMMENT
+        SET CONTENT = #{content},
+        UPDATED_AT = NOW()
+        WHERE COMMENT_ID = #{commentId}
+    </update>
+
+    <!-- 댓글 소프트 삭제 -->
+    <update id="deleteComment">
+        UPDATE COMMENT
+        SET IS_DELETED = 1,
+        UPDATED_AT = NOW()
+        WHERE COMMENT_ID = #{commentId}
+    </update>
+
+    <!-- 특정 사용자의 댓글인지 확인 -->
+    <select id="existsByCommentIdAndUserId" resultType="boolean">
+        SELECT EXISTS(
+        SELECT 1
+        FROM COMMENT
+        WHERE COMMENT_ID = #{commentId}
+        AND USER_ID = #{userId}
+        AND IS_DELETED = FALSE
+        )
+    </select>
+
+    <!-- 전체 댓글 수 조회 (답글 포함) -->
+    <select id="countComments" resultType="long">
+        SELECT COUNT(*)
+        FROM COMMENT
+        WHERE BOARD_ID = #{boardId}
+        AND BOARD_TYPE = #{boardType}
+        AND IS_DELETED = FALSE
+    </select>
+
+</mapper>

@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="kr.or.kosa.backend.admin.mapper.AdminUserMapper">
+
+<!--                 유저 검색                -->
+    <resultMap id="findConditionMap"
+               type="kr.or.kosa.backend.admin.dto.response.UserFindResponseDto">
+        <id     column="USER_ID"            property="userId"/>
+        <result column="USER_EMAIL"         property="userEmail"/>
+        <result column="USER_NICKNAME"      property="userNickName"/>
+        <result column="USER_GRADE"         property="userGrade"/>
+        <result column="USER_ROLE"          property="userRole"/>
+        <result column="USER_ISDELETED"     property="isDeleted" />
+    </resultMap>
+
+    <select id="findCondition" resultMap="findConditionMap">
+        SELECT
+        USER_ID,
+        USER_EMAIL,
+        USER_NICKNAME,
+        USER_GRADE,
+        USER_ROLE,
+        USER_ISDELETED
+        FROM USERS
+        <where>
+            <if test="statusFilter != null and statusFilter != ''">
+                USER_ISDELETED = #{statusFilter}
+            </if>
+
+            <if test="roleFilter != null and roleFilter != ''">
+                AND USER_ROLE = #{roleFilter}
+            </if>
+
+            <if test="userEmail != null and userEmail != ''">
+                AND USER_EMAIL LIKE CONCAT('%', #{userEmail}, '%')
+            </if>
+        </where>
+
+        ORDER BY
+        <choose>
+            <when test="sortField == 'USER_ID'">USER_ID</when>
+            <when test="sortField == 'USER_GRADE'">USER_GRADE</when>
+            <when test="sortField == 'USER_ROLE'">USER_ROLE</when>
+            <otherwise>USER_ID</otherwise>
+        </choose>
+        <choose>
+            <when test="sortOrder == 'DESC'">DESC</when>
+            <otherwise>ASC</otherwise>
+        </choose>
+        LIMIT #{offset}, #{limit}
+    </select>
+
+
+
+    <select id="totalCount" resultType="int"
+    >
+        SELECT
+        COUNT(*)
+        FROM
+        USERS
+        <where>
+            <choose>
+                <when test="statusFilter instanceof java.lang.Integer">
+                    USER_ISDELETED = #{statusFilter}
+                </when>
+                <when test="roleFilter instanceof java.lang.String and roleFilter != ''">
+                    USER_ROLE = #{roleFilter}
+                </when>
+            </choose>
+
+            <if test="userEmail != null and userEmail != ''">
+                AND USER_EMAIL LIKE CONCAT('%', #{userEmail}, '%')
+            </if>
+        </where>
+    </select>
+    <!--                 유저 상세 정보                 -->
+    <resultMap id="findOneUserByUserId"
+               type="kr.or.kosa.backend.admin.dto.response.AdminUserDetailResponseDto">
+        <!-- 기본 키 -->
+        <id     column="USER_ID"             property="userId"/>
+        <!-- 기본 정보 -->
+        <result column="USER_EMAIL"          property="userEmail"/>
+        <result column="USER_NAME"           property="userName"/>
+        <result column="USER_NICKNAME"       property="userNickName"/>
+        <result column="USER_ROLE"           property="userRole"/>
+        <result column="USER_GRADE"          property="userGrade"/>
+        <!-- 날짜/시간 정보 -->
+        <result column="USER_CREATEDAT"      property="userCreateAt"/>
+        <result column="USER_DELETEDAT"      property="userDeleteAt"/>
+        <!-- 기타 상태 정보 -->
+        <result column="balance"          property="userPoint"/>
+        <result column="start_date" property="userSubscribeStart"/>
+        <result column="end_date"   property="userSubscribeEnd"/>
+        <result column="subscription_type" property="subscriptionType"/>
+    </resultMap>
+
+    <select id="findOneUserByUserId" resultType="kr.or.kosa.backend.admin.dto.response.AdminUserDetailResponseDto">
+        SELECT
+        u.USER_ID,
+        u.USER_EMAIL,
+        u.USER_NAME,
+        u.USER_NICKNAME,
+        u.USER_ROLE,
+        u.USER_GRADE,
+        u.USER_CREATEDAT,
+        u.USER_DELETEDAT,
+        up.balance,
+        s.start_date,
+        s.end_date,
+        CASE
+        WHEN s.end_date > NOW() THEN 'ACTIVE'
+        WHEN s.end_date IS NULL THEN 'NONE'
+        ELSE 'EXPIRED'
+        END AS subscription_status,
+        s.subscription_type
+        FROM USERS u
+        LEFT JOIN user_points up
+        ON up.user_id = u.USER_ID
+        LEFT JOIN subscriptions s
+        ON s.user_id = u.USER_ID
+        AND s.status = 'ACTIVE'
+        AND s.subscription_id = (
+        SELECT s2.subscription_id
+        FROM subscriptions s2
+        WHERE s2.user_id = u.USER_ID
+        AND s2.status = 'ACTIVE'
+        ORDER BY s2.end_date DESC
+        LIMIT 1
+        )
+        WHERE u.USER_ID = #{userId};
+    </select>
+
+
+    <select id="findOneUserPaymentDetailByUserId" resultType="kr.or.kosa.backend.admin.dto.UserPaymentDetailDto">
+        SELECT
+        order_id, user_id, plan_code, payment_key,original_amount, used_point, amount, approved_at
+        FROM payments
+        WHERE user_id = #{userId} AND status = 'DONE'
+        ORDER BY approved_at DESC
+        LIMIT 1
+    </select>
+
+    <select id="checkUsedPoint" resultType="boolean">
+        select COUNT(*) > 0 from point_history ph
+        where user_id = #{userId} and ph.payment_order_id = #{orderId} and change_amount = #{usedPoint}
+    </select>
+
+    <delete id="deleteSubscription">
+        DELETE FROM subscriptions
+        WHERE user_id = #{userId}
+        AND order_id = #{orderId}
+        AND subscription_type = #{subscriptionType}
+    </delete>
+
+    <update id="banUser" >
+        UPDATE USERS
+            SET USER_DELETEDAT = NOW(),
+            USER_ISDELETED = 2
+        WHERE USER_ID = #{userId}
+    </update>
+</mapper>

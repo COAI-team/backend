@@ -1,0 +1,208 @@
+package kr.or.kosa.backend.algorithm.service;
+
+import kr.or.kosa.backend.algorithm.dto.AlgoProblemDto;
+import kr.or.kosa.backend.algorithm.dto.AlgoSubmissionDto;
+import kr.or.kosa.backend.algorithm.dto.AlgoTestcaseDto;
+import kr.or.kosa.backend.algorithm.dto.request.SubmissionRequestDto;
+import kr.or.kosa.backend.algorithm.dto.response.TestRunResponseDto;
+import kr.or.kosa.backend.algorithm.dto.enums.AiFeedbackStatus;
+import kr.or.kosa.backend.algorithm.dto.enums.JudgeResult;
+import kr.or.kosa.backend.algorithm.dto.enums.MissionType;
+import kr.or.kosa.backend.algorithm.dto.enums.ProblemDifficulty;
+import kr.or.kosa.backend.algorithm.mapper.AlgorithmProblemMapper;
+import kr.or.kosa.backend.algorithm.mapper.AlgorithmSubmissionMapper;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Async;
+import org.springframework.stereotype.Service;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.Duration;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+
+/**
+ * 알고리즘 채점 서비스
+ *
+ * 변경사항 (2025-12-13):
+ * - LanguageConstantService → LanguageService 교체
+ * - language (String) → languageId (INT) 사용
+ */
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class AlgorithmJudgingService {
+
+    private final AlgorithmSubmissionMapper submissionMapper;
+    private final AlgorithmProblemMapper problemMapper;
+    private final CodeExecutorService codeExecutorService;
+    private final AlgorithmEvaluationService evaluationService;
+    private final LanguageService languageService;  // 언어 정보 조회 (DB 기반)
+    private final DailyQuizBonusService dailyQuizBonusService;
+    private final DailyMissionService dailyMissionService;  // 데일리 미션 완료 처리용
+
+    /**
+     * 통합 채점 및 평가 프로세스 (비동기)
+     * - Judge0 채점 후 즉시 AI 평가 시작
+     *
+     * 변경사항 (2025-12-13): language (String) → languageId (INT)
+     */
+    @Async("judgeExecutor")
+    public void processCompleteJudgingFlow(Long submissionId, SubmissionRequestDto request, AlgoProblemDto problem) {
+        log.info("🔄 [스레드: {}] 통합 채점 프로세스 시작 - submissionId: {}",
+                Thread.currentThread().getName(), submissionId);
+
+        try {
+            // 1. 모든 테스트케이스 조회
+            List<AlgoTestcaseDto> testCases = problemMapper.selectTestCasesByProblemId(request.getProblemId());
+
+            // 2. 언어별 제한 시간/메모리 계산 (languageId 사용)
+            Integer languageId = request.getLanguageId();
+
+            int realTimeLimit = languageService.calculateRealTimeLimit(
+                    languageId, problem.getTimelimit());
+            int realMemoryLimit = languageService.calculateRealMemoryLimit(
+                    languageId, problem.getMemorylimit());
+
+            log.info("언어별 제한 적용 - languageId: {}, 시간: {}ms, 메모리: {}MB",
+                    languageId, realTimeLimit, realMemoryLimit);
+
+            // 3. 코드 채점 실행 (Judge0 또는 Piston 사용)
+            CompletableFuture<TestRunResponseDto> judgeFuture = codeExecutorService.judgeCode(
+                    request.getSourceCode(), languageId, testCases, realTimeLimit, realMemoryLimit);
+
+            TestRunResponseDto judgeResult = judgeFuture.get();
+
+            // 4. Judge 결과만으로 기본 제출 정보 업데이트
+            AlgoSubmissionDto updatedSubmission = updateSubmissionWithJudgeResult(submissionId, judgeResult, request);
+
+            log.info("Judge0 채점 완료 - submissionId: {}, result: {}",
+                    submissionId, judgeResult.getOverallResult());
+
+            // 5. AC 제출 시 보상 처리
+            if (updatedSubmission != null && updatedSubmission.getJudgeResult() == JudgeResult.AC) {
+                Long userId = updatedSubmission.getUserId();
+                Long problemId = updatedSubmission.getAlgoProblemId();
+
+                // 5-1. Daily Quiz 보너스 처리 (선착순 3명 추가 포인트)
+                dailyQuizBonusService.handleDailyQuizSolved(userId, problemId, LocalDate.now());
+
+                // 5-2. XP 지급 (모든 AC 제출에 대해)
+                try {
+                    ProblemDifficulty difficulty = problem.getAlgoProblemDifficulty();
+                    if (difficulty != null) {
+                        DailyMissionService.XpRewardResult xpResult =
+                                dailyMissionService.updateUserStatsWithXp(userId, problemId, difficulty);
+                        log.info("✨ XP 지급 완료 - userId: {}, problemId: {}, +{}XP ({})",
+                                userId, problemId, xpResult.earnedXp(), xpResult.getBonusDescription());
+
+                        if (xpResult.leveledUp()) {
+                            log.info("🎉 레벨 업! userId: {}, {} → {}",
+                                    userId, xpResult.previousLevel(), xpResult.newLevel());
+                        }
+                    }
+                } catch (Exception e) {
+                    log.warn("XP 지급 실패 (무시) - userId: {}, problemId: {}, error: {}",
+                            userId, problemId, e.getMessage());
+                }
+
+                // 5-3. 데일리 미션 완료 처리 (문제 ID 일치 시 추가 보너스 포인트)
+                try {
+                    DailyMissionService.MissionCompleteResult missionResult =
+                            dailyMissionService.completeMission(userId, MissionType.PROBLEM_SOLVE, problemId);
+                    if (missionResult.success()) {
+                        log.info("📋 데일리 미션 보너스 포인트 지급 - userId: {}, problemId: {}, +{}P",
+                                userId, problemId, missionResult.rewardPoints());
+                    }
+                } catch (Exception e) {
+                    log.warn("데일리 미션 완료 처리 실패 (무시) - userId: {}, problemId: {}, error: {}",
+                            userId, problemId, e.getMessage());
+                }
+            }
+
+            // 7. AI 평가 및 점수 계산 비동기 시작 (분리된 서비스)
+            log.info("🤖 AI 평가 서비스 호출 시작 - submissionId: {}, 현재 스레드: {}",
+                    submissionId, Thread.currentThread().getName());
+            try {
+                evaluationService.processEvaluationAsync(submissionId, problem, judgeResult);
+                log.info("✅ AI 평가 서비스 호출 완료 - submissionId: {}", submissionId);
+            } catch (Exception aiEx) {
+                log.error("❌ AI 평가 서비스 호출 실패 - submissionId: {}", submissionId, aiEx);
+                throw aiEx;
+            }
+
+        } catch (Exception e) {
+            log.error("통합 채점 프로세스 중 오류 발생 - submissionId: {}", submissionId, e);
+            markSubmissionFailed(submissionId, e.getMessage());
+        }
+    }
+
+    /**
+     * Judge 결과로만 제출 업데이트 (기본 점수)
+     */
+    private AlgoSubmissionDto updateSubmissionWithJudgeResult(Long submissionId, TestRunResponseDto judgeResult,
+                                                              SubmissionRequestDto request) {
+        AlgoSubmissionDto submission = submissionMapper.selectSubmissionById(submissionId);
+        if (submission == null)
+            return null;
+
+        // Judge 결과 설정
+        submission.setJudgeResult(JudgeResult.valueOf(judgeResult.getOverallResult()));
+        submission.setExecutionTime(judgeResult.getMaxExecutionTime());
+        submission.setMemoryUsage(judgeResult.getMaxMemoryUsage());
+        submission.setPassedTestCount(judgeResult.getPassedCount());
+        submission.setTotalTestCount(judgeResult.getTotalCount());
+
+        // 종료 시간 설정
+        if (request.getEndTime() == null) {
+            submission.setEndSolving(LocalDateTime.now());
+            if (submission.getStartSolving() != null) {
+                submission.setSolvingDurationSeconds(
+                        (int) Duration.between(submission.getStartSolving(), submission.getEndSolving()).getSeconds());
+            }
+        }
+
+        // 기본 점수 계산 (Judge 결과만으로)
+        BigDecimal basicScore = calculateBasicScore(judgeResult);
+        submission.setFinalScore(basicScore);
+        // DB 업데이트
+        submissionMapper.updateSubmission(submission);
+        return submission;
+    }
+
+    /**
+     * 제출 실패 표시
+     */
+    private void markSubmissionFailed(Long submissionId, String errorMessage) {
+        try {
+            AlgoSubmissionDto submission = submissionMapper.selectSubmissionById(submissionId);
+            if (submission != null) {
+                submission.setJudgeResult(JudgeResult.PENDING);
+                submission.setAiFeedbackStatus(AiFeedbackStatus.FAILED);
+                submissionMapper.updateSubmission(submission);
+            }
+        } catch (Exception e) {
+            log.error("제출 실패 표시 중 오류 - submissionId: {}", submissionId, e);
+        }
+    }
+
+    /**
+     * 기본 점수 계산 (Judge 결과만 사용)
+     */
+    private BigDecimal calculateBasicScore(TestRunResponseDto judgeResult) {
+        if ("AC".equals(judgeResult.getOverallResult())) {
+            return new BigDecimal("100");
+        }
+
+        if (judgeResult.getPassedCount() > 0 && judgeResult.getTotalCount() > 0) {
+            double partialScore = (double) judgeResult.getPassedCount() /
+                    judgeResult.getTotalCount() * 100;
+            return new BigDecimal(partialScore).setScale(2, RoundingMode.HALF_UP);
+        }
+
+        return BigDecimal.ZERO;
+    }
+}

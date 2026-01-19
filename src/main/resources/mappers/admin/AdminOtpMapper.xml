@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="kr.or.kosa.backend.googleOTP.mapper.AdminOtpMapper">
+
+    <select id="findByUserId" resultType="kr.or.kosa.backend.googleOTP.dto.AdminOtpDto">
+        SELECT *
+        FROM admin_otp
+        WHERE user_id = #{userId}
+    </select>
+
+    <insert id="upsert">
+        INSERT INTO admin_otp (
+        user_id,
+        otp_secret,
+        otp_enabled,
+        enabled_at
+        )
+        VALUES (
+        #{userId},
+        #{otpSecret},
+        false,
+        NULL
+        )
+        ON DUPLICATE KEY UPDATE
+        otp_secret = VALUES(otp_secret),
+        otp_enabled = false,
+        enabled_at = NULL
+    </insert>
+
+    <update id="updateSecret">
+        UPDATE admin_otp
+        SET otp_secret = #{otpSecret},
+        otp_enabled = false,
+        enabled_at = NULL
+        WHERE user_id = #{userId}
+    </update>
+
+    <update id="enableOtp">
+        UPDATE admin_otp
+        SET otp_enabled = true,
+        enabled_at = NOW()
+        WHERE user_id = #{userId}
+    </update>
+
+
+    <update id="disableOtp">
+        UPDATE admin_otp
+        SET otp_enabled = 0,
+        enabled_at = NULL
+        WHERE user_id = #{userId}
+    </update>
+
+
+</mapper>

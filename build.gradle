@@ -2,6 +2,11 @@ plugins {
     id 'java'
     id 'org.springframework.boot' version '3.5.7'
     id 'io.spring.dependency-management' version '1.1.7'
+    id 'antlr'
+}
+
+ext {
+    springAiVersion = "1.1.0"
 }
 
 group = 'kr.or.kosa'
@@ -14,6 +19,14 @@ java {
     }
 }
 
+sourceSets {
+    main {
+        java {
+            srcDirs 'build/generated/sources/antlr/main'
+        }
+    }
+}
+
 configurations {
     compileOnly {
         extendsFrom annotationProcessor
@@ -22,18 +35,130 @@ configurations {
 
 repositories {
     mavenCentral()
+    maven { url 'https://repo.spring.io/milestone' }
 }
 
 dependencies {
+
+    /* ------------------------
+     * 기본 Spring Boot 설정
+     * ------------------------ */
+
     implementation 'org.springframework.boot:spring-boot-starter-web'
-    compileOnly 'org.projectlombok:lombok'
-    developmentOnly 'org.springframework.boot:spring-boot-devtools'
+    implementation 'org.springframework.boot:spring-boot-starter-mail'
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'org.springframework.boot:spring-boot-starter-websocket'
+
+    /* Validation */
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+
+    /* MyBatis */
+    implementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter:3.0.4'
+    implementation 'io.github.cdimascio:dotenv-java:2.2.3'
+
+    /* Spring Batch */
+    implementation 'org.springframework.boot:spring-boot-starter-batch'
+    implementation 'org.springframework.boot:spring-boot-starter-webflux'
+    implementation 'io.projectreactor.netty:reactor-netty'
+
+    implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
+
+    /* AI — Spring AI */
+    implementation 'org.springframework.ai:spring-ai-starter-model-openai'
+    implementation 'org.springframework.ai:spring-ai-starter-vector-store-qdrant'
+
+    /* LangChain4j */
+    implementation 'dev.langchain4j:langchain4j-spring-boot-starter:0.35.0'
+    implementation 'dev.langchain4j:langchain4j-open-ai-spring-boot-starter:0.35.0'
+
+    // 구글 OTP
+    implementation 'com.warrenstrange:googleauth:1.5.0'
+
+
+    // com.langfuse:langfuse-java dependency removed due to version/compatibility issues.
+    // Implemented custom LangfuseService using RestClient instead.
+
+    /* ANTLR */
+    antlr "org.antlr:antlr4:4.13.1"
+    implementation 'org.antlr:antlr4-runtime:4.13.1'
+
+    implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310'
+}
+
+generateGrammarSource {
+    outputDirectory = file("${project.buildDir}/generated/sources/antlr/main/kr/or/kosa/backend/codenose/parser")
+}
+
+dependencies {
+
+    /* Spring Integration */
+    implementation 'org.springframework.boot:spring-boot-starter-integration'
+
+    /* Mustache */
+    implementation 'org.springframework.boot:spring-boot-starter-mustache'
+
+    /* DB */
     runtimeOnly 'com.mysql:mysql-connector-j'
-    runtimeOnly 'org.mariadb.jdbc:mariadb-java-client'
-    runtimeOnly 'org.postgresql:postgresql'
+    implementation 'com.mysql:mysql-connector-j:9.3.0'
+
+    /* JWT */
+    implementation 'io.jsonwebtoken:jjwt-api:0.11.5'
+    implementation 'io.jsonwebtoken:jjwt-impl:0.11.5'
+    implementation 'io.jsonwebtoken:jjwt-jackson:0.11.5'
+
+    /* Lombok */
+    compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
+
+    /* 개발 편의 */
+    developmentOnly 'org.springframework.boot:spring-boot-devtools'
+
+    /* AWS S3 */
+    implementation 'software.amazon.awssdk:s3:2.25.39'
+    implementation 'io.awspring.cloud:spring-cloud-aws-starter-s3:3.0.2'
+    implementation 'io.awspring.cloud:spring-cloud-aws-starter:3.0.2'
+
+    /* AOP */
+    implementation 'org.springframework.boot:spring-boot-starter-aop'
+
+    /* Logstash */
+    implementation 'net.logstash.logback:logstash-logback-encoder:7.3'
+
+    /* Jsoup */
+    implementation 'org.jsoup:jsoup:1.17.2'
+
+    /* Kumo (Word Cloud) */
+    implementation 'com.kennycason:kumo-core:1.28'
+    implementation 'com.kennycason:kumo-tokenizers:1.28'
+
+    /* Test */
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+    /* macOS native resolver (optional) */
+    if (isAppleSilicon()) {
+        runtimeOnly("io.netty:netty-resolver-dns-native-macos:4.1.94.Final:osx-aarch_64")
+    }
+}
+
+dependencyManagement {
+    imports {
+        mavenBom "org.springframework.ai:spring-ai-bom:$springAiVersion"
+    }
+}
+
+def isAppleSilicon() {
+    return System.getProperty("os.name") == "Mac OS X" &&
+            System.getProperty("os.arch") == "aarch64"
+}
+
+bootJar {
+    mainClass = 'kr.or.kosa.backend.BackendApplication'
+}
+
+bootRun {
+    mainClass = 'kr.or.kosa.backend.BackendApplication'
 }
 
 tasks.named('test') {
