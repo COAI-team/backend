@@ -21,8 +21,6 @@ java {
 
 repositories {
     mavenCentral()
-    // 필요할 때만 사용 (안정성 중요하면 제거 추천)
-    maven { url 'https://repo.spring.io/milestone' }
 }
 
 sourceSets {
@@ -41,88 +39,99 @@ configurations {
 
 dependencies {
 
-    /* ------------------------
-     * 🌱 Core
-     * ------------------------ */
+    /* =========================================================
+     * 🌱 Spring Boot
+     * ========================================================= */
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
 
-    /* ------------------------
-     * 🔐 Security & Auth
-     * ------------------------ */
+    /* =========================================================
+     * 🔐 Security
+     * ========================================================= */
     implementation 'org.springframework.boot:spring-boot-starter-security'
     implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
 
-    /* JWT (안정 버전 유지) */
+    /* JWT */
     implementation 'io.jsonwebtoken:jjwt-api:0.11.5'
-    runtimeOnly  'io.jsonwebtoken:jjwt-impl:0.11.5'
-    runtimeOnly  'io.jsonwebtoken:jjwt-jackson:0.11.5'
+    runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.11.5'
+    runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.11.5'
 
-    /* ------------------------
-     * 💾 DB & Redis
-     * ------------------------ */
+    /* =========================================================
+     * 💾 Database
+     * ========================================================= */
     implementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter:3.0.4'
     runtimeOnly 'com.mysql:mysql-connector-j'
 
+    /* =========================================================
+     * Redis / Cache
+     * ========================================================= */
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+    implementation 'org.springframework.boot:spring-boot-starter-cache'
 
-    /* ------------------------
-     * 📧 Mail
-     * ------------------------ */
+    /* =========================================================
+     * Mail
+     * ========================================================= */
     implementation 'org.springframework.boot:spring-boot-starter-mail'
 
-    /* ------------------------
-     * ⚡ Async / WebSocket
-     * ------------------------ */
+    /* =========================================================
+     * WebSocket
+     * ========================================================= */
     implementation 'org.springframework.boot:spring-boot-starter-websocket'
 
-    /* ------------------------
-     * 🤖 AI (Spring AI only 추천)
-     * ------------------------ */
+    /* =========================================================
+     * Spring Retry
+     * ========================================================= */
+    implementation 'org.springframework.retry:spring-retry'
+    implementation 'org.springframework.boot:spring-boot-starter-aop'
+
+    /* =========================================================
+     * Spring AI
+     * ========================================================= */
     implementation 'org.springframework.ai:spring-ai-starter-model-openai'
     implementation 'org.springframework.ai:spring-ai-starter-vector-store-qdrant'
 
-    /* ------------------------
-     * 🔍 ANTLR
-     * ------------------------ */
-    antlr "org.antlr:antlr4:4.13.1"
-    implementation 'org.antlr:antlr4-runtime:4.13.1'
-
-    /* ------------------------
-     * ☁ AWS S3
-     * ------------------------ */
+    /* =========================================================
+     * AWS S3
+     * ========================================================= */
     implementation 'software.amazon.awssdk:s3'
-    implementation 'io.awspring.cloud:spring-cloud-aws-starter-s3:3.0.2'
+    implementation 'io.awspring.cloud:spring-cloud-aws-starter-s3:3.3.1'
 
-    /* ------------------------
-     * 🧰 Utils
-     * ------------------------ */
+    /* =========================================================
+     * Parser (ANTLR)
+     * ========================================================= */
+    antlr 'org.antlr:antlr4:4.13.2'
+    implementation 'org.antlr:antlr4-runtime:4.13.2'
+
+    /* =========================================================
+     * Utilities
+     * ========================================================= */
     implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310'
-    implementation 'org.jsoup:jsoup:1.17.2'
+    implementation 'org.jsoup:jsoup:1.21.2'
 
     /* Word Cloud */
     implementation 'com.kennycason:kumo-core:1.28'
     implementation 'com.kennycason:kumo-tokenizers:1.28'
 
     /* Google OTP */
-    implementation 'com.warrenstrange:googleauth:1.5.0'
+    implementation 'com.warrenstrange:googleauth:1.5.1'
 
-    /* ------------------------
-     * 🧪 Test
-     * ------------------------ */
-    testImplementation 'org.springframework.boot:spring-boot-starter-test'
-    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
-
-    /* ------------------------
-     * 🛠 Dev
-     * ------------------------ */
+    /* =========================================================
+     * Development
+     * ========================================================= */
     developmentOnly 'org.springframework.boot:spring-boot-devtools'
 
-    /* ------------------------
-     * 🪶 Lombok
-     * ------------------------ */
+    /* =========================================================
+     * Lombok
+     * ========================================================= */
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
+
+    /* =========================================================
+     * Test
+     * ========================================================= */
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
 dependencyManagement {
@@ -132,7 +141,9 @@ dependencyManagement {
 }
 
 generateGrammarSource {
-    outputDirectory = file("${project.buildDir}/generated/sources/antlr/main/kr/or/kosa/backend/codenose/parser")
+    outputDirectory = file(
+            "${project.buildDir}/generated/sources/antlr/main/kr/or/kosa/backend/codenose/parser"
+    )
 }
 
 bootJar {
