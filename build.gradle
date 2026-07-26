@@ -26,7 +26,7 @@ repositories {
 sourceSets {
     main {
         java {
-            srcDirs 'build/generated/sources/antlr/main'
+            srcDirs = ['build/generated/sources/antlr/main']
         }
     }
 }
@@ -53,14 +53,14 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
 
     /* JWT */
-    implementation 'io.jsonwebtoken:jjwt-api:0.11.5'
-    runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.11.5'
-    runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.11.5'
+    implementation 'io.jsonwebtoken:jjwt-api:0.12.7'
+    runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.7'
+    runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.7'
 
     /* =========================================================
      * 💾 Database
      * ========================================================= */
-    implementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter:3.0.4'
+    implementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter:3.0.5'
     runtimeOnly 'com.mysql:mysql-connector-j'
 
     /* =========================================================
@@ -95,7 +95,7 @@ dependencies {
      * AWS S3
      * ========================================================= */
     implementation 'software.amazon.awssdk:s3'
-    implementation 'io.awspring.cloud:spring-cloud-aws-starter-s3:3.3.1'
+    implementation 'io.awspring.cloud:spring-cloud-aws-starter-s3:3.4.0'
 
     /* =========================================================
      * Parser (ANTLR)
@@ -114,7 +114,7 @@ dependencies {
     implementation 'com.kennycason:kumo-tokenizers:1.28'
 
     /* Google OTP */
-    implementation 'com.warrenstrange:googleauth:1.5.1'
+    implementation 'com.warrenstrange:googleauth:1.5.2'
 
     /* =========================================================
      * Development
@@ -136,7 +136,7 @@ dependencies {
 
 dependencyManagement {
     imports {
-        mavenBom "org.springframework.ai:spring-ai-bom:$springAiVersion"
+        mavenBom "org.springframework.ai:spring-ai-bom:${springAiVersion}"
     }
 }
 
@@ -144,6 +144,10 @@ generateGrammarSource {
     outputDirectory = file(
             "${project.buildDir}/generated/sources/antlr/main/kr/or/kosa/backend/codenose/parser"
     )
+}
+
+tasks.named("compileJava") {
+    dependsOn generateGrammarSource
 }
 
 bootJar {
