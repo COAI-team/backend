@@ -1,6 +1,7 @@
+
 plugins {
     id 'java'
-    id 'org.springframework.boot' version '3.5.7'
+    id 'org.springframework.boot' version '4.0.9'
     id 'io.spring.dependency-management' version '1.1.7'
     id 'antlr'
 }
@@ -10,7 +11,9 @@ version = '0.0.1-SNAPSHOT'
 description = 'backend'
 
 ext {
-    springAiVersion = "1.1.0"
+    springAiVersion = '2.0.2'
+    springCloudAwsVersion = '4.2.0'
+    awsSdkVersion = '2.57.4'
 }
 
 java {
@@ -23,133 +26,132 @@ repositories {
     mavenCentral()
 }
 
-sourceSets {
-    main {
-        java {
-            srcDirs = ['build/generated/sources/antlr/main']
-        }
-    }
-}
-
 configurations {
     compileOnly {
         extendsFrom annotationProcessor
     }
 }
 
-dependencies {
-
-    /* =========================================================
-     * 🌱 Spring Boot
-     * ========================================================= */
-    implementation 'org.springframework.boot:spring-boot-starter-web'
-    implementation 'org.springframework.boot:spring-boot-starter-validation'
-    implementation 'org.springframework.boot:spring-boot-starter-actuator'
-
-    /* =========================================================
-     * 🔐 Security
-     * ========================================================= */
-    implementation 'org.springframework.boot:spring-boot-starter-security'
-    implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
-
-    /* JWT */
-    implementation 'io.jsonwebtoken:jjwt-api:0.12.7'
-    runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.7'
-    runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.7'
-
-    /* =========================================================
-     * 💾 Database
-     * ========================================================= */
-    implementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter:3.0.5'
-    runtimeOnly 'com.mysql:mysql-connector-j'
-
-    /* =========================================================
-     * Redis / Cache
-     * ========================================================= */
-    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
-    implementation 'org.springframework.boot:spring-boot-starter-cache'
-
-    /* =========================================================
-     * Mail
-     * ========================================================= */
-    implementation 'org.springframework.boot:spring-boot-starter-mail'
-
-    /* =========================================================
-     * WebSocket
-     * ========================================================= */
-    implementation 'org.springframework.boot:spring-boot-starter-websocket'
-
-    /* =========================================================
-     * Spring Retry
-     * ========================================================= */
-    implementation 'org.springframework.retry:spring-retry'
-    implementation 'org.springframework.boot:spring-boot-starter-aop'
-
-    /* =========================================================
-     * Spring AI
-     * ========================================================= */
-    implementation 'org.springframework.ai:spring-ai-starter-model-openai'
-    implementation 'org.springframework.ai:spring-ai-starter-vector-store-qdrant'
-
-    /* =========================================================
-     * AWS S3
-     * ========================================================= */
-    implementation 'software.amazon.awssdk:s3'
-    implementation 'io.awspring.cloud:spring-cloud-aws-starter-s3:3.4.0'
-
-    /* =========================================================
-     * Parser (ANTLR)
-     * ========================================================= */
-    antlr 'org.antlr:antlr4:4.13.2'
-    implementation 'org.antlr:antlr4-runtime:4.13.2'
-
-    /* =========================================================
-     * Utilities
-     * ========================================================= */
-    implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310'
-    implementation 'org.jsoup:jsoup:1.21.2'
-
-    /* Word Cloud */
-    implementation 'com.kennycason:kumo-core:1.28'
-    implementation 'com.kennycason:kumo-tokenizers:1.28'
-
-    /* Google OTP */
-    implementation 'com.warrenstrange:googleauth:1.5.2'
-
-    /* =========================================================
-     * Development
-     * ========================================================= */
-    developmentOnly 'org.springframework.boot:spring-boot-devtools'
-
-    /* =========================================================
-     * Lombok
-     * ========================================================= */
-    compileOnly 'org.projectlombok:lombok'
-    annotationProcessor 'org.projectlombok:lombok'
-
-    /* =========================================================
-     * Test
-     * ========================================================= */
-    testImplementation 'org.springframework.boot:spring-boot-starter-test'
-    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
-}
-
-dependencyManagement {
-    imports {
-        mavenBom "org.springframework.ai:spring-ai-bom:${springAiVersion}"
+/*
+ * =========================================================
+ * Source Sets
+ * =========================================================
+ */
+sourceSets {
+    main {
+        java {
+            // 기존 src/main/java를 유지하면서 ANTLR 생성 소스 추가
+            srcDir "$buildDir/generated/sources/antlr/main"
+        }
     }
 }
 
+/*
+ * =========================================================
+ * Dependencies
+ * =========================================================
+ */
+dependencies {
+
+    // Spring Boot
+    implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+
+    // Security
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'org.springframework.boot:spring-boot-starter-security-oauth2-client'
+
+    // JWT
+    implementation 'io.jsonwebtoken:jjwt-api'
+    runtimeOnly 'io.jsonwebtoken:jjwt-impl'
+    runtimeOnly 'io.jsonwebtoken:jjwt-jackson'
+
+    // Database
+    implementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter:4.0.1'
+    runtimeOnly 'com.mysql:mysql-connector-j'
+
+    // Redis / Cache
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+    implementation 'org.springframework.boot:spring-boot-starter-cache'
+
+    // Mail
+    implementation 'org.springframework.boot:spring-boot-starter-mail'
+
+    // WebSocket
+    implementation 'org.springframework.boot:spring-boot-starter-websocket'
+
+    // Spring Retry / AOP
+    implementation 'org.springframework.retry:spring-retry'
+    implementation 'org.springframework.boot:spring-boot-starter-aspectj'
+
+    // Spring AI
+    implementation 'org.springframework.ai:spring-ai-starter-model-openai'
+    implementation 'org.springframework.ai:spring-ai-starter-vector-store-qdrant'
+
+    // AWS S3
+    implementation 'software.amazon.awssdk:s3'
+    implementation 'io.awspring.cloud:spring-cloud-aws-starter-s3'
+
+    // ANTLR
+    antlr 'org.antlr:antlr4:4.13.2'
+    implementation 'org.antlr:antlr4-runtime:4.13.2'
+
+    // Utilities
+    implementation 'org.jsoup:jsoup:1.23.2'
+
+    // Word Cloud
+    implementation 'com.kennycason:kumo-core:1.28'
+    implementation 'com.kennycason:kumo-tokenizers:1.28'
+
+    // Google OTP
+    implementation 'com.warrenstrange:googleauth:1.5.2'
+
+    // Development
+    developmentOnly 'org.springframework.boot:spring-boot-devtools'
+
+    // Lombok
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+
+    // Test
+    testImplementation 'org.springframework.boot:spring-boot-starter-test-classic'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+/*
+ * =========================================================
+ * Dependency Management
+ * =========================================================
+ */
+dependencyManagement {
+    imports {
+        mavenBom "org.springframework.ai:spring-ai-bom:${springAiVersion}"
+        mavenBom "io.awspring.cloud:spring-cloud-aws-dependencies:${springCloudAwsVersion}"
+        mavenBom "software.amazon.awssdk:bom:${awsSdkVersion}"
+    }
+}
+
+/*
+ * =========================================================
+ * ANTLR
+ * =========================================================
+ */
 generateGrammarSource {
     outputDirectory = file(
-            "${project.buildDir}/generated/sources/antlr/main/kr/or/kosa/backend/codenose/parser"
+        "${project.buildDir}/generated/sources/antlr/main/kr/or/kosa/backend/codenose/parser"
     )
 }
 
-tasks.named("compileJava") {
+tasks.named('compileJava') {
     dependsOn generateGrammarSource
 }
 
+/*
+ * =========================================================
+ * Spring Boot
+ * =========================================================
+ */
 bootJar {
     mainClass = 'kr.or.kosa.backend.BackendApplication'
 }
@@ -158,6 +160,11 @@ bootRun {
     mainClass = 'kr.or.kosa.backend.BackendApplication'
 }
 
+/*
+ * =========================================================
+ * Test
+ * =========================================================
+ */
 tasks.named('test') {
     useJUnitPlatform()
 }
